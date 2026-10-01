@@ -38,7 +38,7 @@ Browser ──► Next.js (frontend, :3000)
 - **Same-origin cookies.** The browser only talks to `localhost:3000`. Next.js rewrites `/api/*` to the backend, so Better Auth's session cookie is first-party. The existing waitlist endpoint moves to `/api/waitlist`.
 - **Backend owns all data and rules.** The frontend never talks to the database. Every rule (membership, roles, cycle prevention, workspace scoping) is enforced in backend code.
 - **Libraries.** Better Auth 1.7 (email/password plus Google social provider, Prisma adapter), Prisma 7 with the Neon adapter, Zod 4 for request validation, Vitest for backend tests, Playwright for one end-to-end test. Versions are pinned in lockfiles.
-- **Configuration.** `backend/.env`: `DATABASE_URL` (Neon, pooled), `DIRECT_URL` (Neon, direct, used by migrations), `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL=http://localhost:3000`, optional `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`. `TEST_DATABASE_URL` points at the same Neon database with `?schema=test`. The `.env.example` lists every variable without values. Secrets are never logged or sent to the browser.
+- **Configuration.** `backend/.env`: `DATABASE_URL` (Neon, pooled), `DIRECT_URL` (Neon, direct, used by migrations), `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL=http://localhost:3000`, optional `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`. `TEST_DATABASE_URL` points at a second database (named `test`) in the same Neon project. Test scripts refuse to run if it is missing or equals `DATABASE_URL`. The `.env.example` lists every variable without values. Secrets are never logged or sent to the browser.
 
 ## 3. Data model
 
@@ -51,7 +51,7 @@ Better Auth owns `user`, `session`, `account`, `verification` (generated through
 | `Department` | `workspaceId`, `name`, `sortOrder` | Unique on (`workspaceId`, `name`). |
 | `Agent` | `workspaceId`, `departmentId` (nullable), `managerId` (nullable, self-reference), `name`, `role`, `kind` (`ai`, `human`), `workingStyle` (text, max 500), `status` (`active`, `paused`, `archived`), `isHead` (boolean) | Persistent companion identity. Exactly one active head agent per workspace. Archiving keeps the row. |
 | `AgentAppearance` | `agentId` (unique), `style` (`robot`, `orb`), `color` (hex), `head` (`square`, `round`, `tall`), `eyes` (`dots`, `visor`, `wide`), `accessory` (`none`, `antenna`, `headset`, `cap`) | Visual only, one-to-one with `Agent`. |
-| `OfficeLayout` | `workspaceId` (unique), `layout` (JSON: department zones `{departmentId, x, y, w, h}` and desks `{agentId, x, y}`) | Visual only. Grants no access. |
+| `OfficeLayout` | `workspaceId` (unique), `layout` (JSON: department zones `{departmentId, x, y, w, h}` and desks as a map `{ [agentId]: {x, y} }`) | Visual only. Grants no access. |
 | `UserPreference` | `userId`, `workspaceId`, `theme` (`system`, `light`, `dark`), `reducedMotion` (boolean), `calmMode` (boolean) | Unique on (`userId`, `workspaceId`). |
 | `AuditLog` | `workspaceId`, `actorUserId`, `action`, `targetType`, `targetId`, `data` (JSON) | Written for workspace create, agent create/update/archive/pause/resume, department create/rename/delete, manager change. |
 
@@ -91,7 +91,7 @@ Rate limits: auth routes and waitlist are rate limited per IP; other routes per 
 
 - **Head only:** Leadership department, head agent.
 - **Starter (5):** head agent, product manager, full-stack developer, UI/UX designer, content writer across Leadership, Product, Engineering, Design, Content.
-- **Studio (14):** the spec's seed company: head agent, product manager, engineering manager, two developers, QA engineer, design manager, UI/UX designer, content/social manager, two scriptwriters, editor, marketing strategist, across Leadership, Product, Engineering, Design, Content, Marketing. Managers are wired: specialists report to their department manager, managers report to the head agent.
+- **Studio (13):** the spec's seed company: head agent, product manager, engineering manager, two developers, QA engineer, design manager, UI/UX designer, content/social manager, two scriptwriters, editor, marketing strategist, across Leadership, Product, Engineering, Design, Content, Marketing. Managers are wired: specialists report to their department manager, managers report to the head agent.
 
 Each template assigns distinct appearances (varied head, eyes, accessory, color) and an initial office layout. Templates are plain data in one backend file.
 
@@ -141,7 +141,7 @@ Every data view has loading skeletons, an empty state that says how to fill it, 
 
 ## 7. Testing and verification
 
-- **Backend (Vitest, against `TEST_DATABASE_URL`, schema reset per run):** sign up and session; workspace creation from each template; membership 404 for another user's workspace on every route group; role enforcement for viewer; reporting-cycle rejection; head-agent protections; clone; layout save; validation errors; secrets absent from responses.
+- **Backend (Vitest, against `TEST_DATABASE_URL`, database reset per run):** sign up and session; workspace creation from each template; membership 404 for another user's workspace on every route group; role enforcement for viewer; reporting-cycle rejection; head-agent protections; clone; layout save; validation errors; secrets absent from responses.
 - **End-to-end (Playwright, Chromium):** sign up, onboard with Starter, see 5 companions in the office, open one, customize its name and color, refresh, confirm the change; switch to list view; keyboard-select a companion.
 - **Manual checks with screenshots:** office, panel, customize, organization, settings, sign-in at 1440px and 390px, light and dark, reduced motion.
 - **Gates:** `npm run lint`, type checks for both apps, backend tests, the end-to-end test, and production builds all pass before the milestone is called done.
@@ -155,5 +155,5 @@ Every data view has loading skeletons, an empty state that says how to fill it, 
 ## 9. Risks
 
 - **Neon cold starts** can add a second to the first request after idle. Acceptable for development.
-- **Tests share the Neon project** through a separate schema. If that proves flaky, use a Neon branch for tests instead.
+- **Tests share the Neon project** through a second database. If that proves flaky, use a Neon branch for tests instead.
 - **Prisma 7 driver-adapter setup** differs from older guides; follow current Prisma and Better Auth docs during implementation.
