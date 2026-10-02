@@ -6,10 +6,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { DownloadSimple, FilePlus, FolderPlus, UploadSimple } from "@phosphor-icons/react";
 import { api, ApiError } from "@/lib/api";
-import { formatBytes, type ProjectSummary, type TreeEntry } from "@/lib/projects";
+import { formatBytes, type ProjectSummary, type ProjectSummaryInfo, type TreeEntry } from "@/lib/projects";
 import { canAdmin, canEdit } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace";
 import { FileTree, type TreeAction } from "@/components/app/files/FileTree";
+import { SummaryBox } from "@/components/app/files/SummaryBox";
 import { HistoryPanel } from "@/components/app/files/HistoryPanel";
 import { UploadDialog } from "@/components/app/files/UploadDialog";
 
@@ -28,6 +29,7 @@ export default function ProjectWorkspace() {
   const editable = canEdit(snapshot.role);
   const [project, setProject] = useState<ProjectSummary | null>(null);
   const [entries, setEntries] = useState<TreeEntry[]>([]);
+  const [summary, setSummary] = useState<ProjectSummaryInfo | null>(null);
   const [filter, setFilter] = useState("");
   const [open, setOpen] = useState<Open | null>(null);
   const [conflict, setConflict] = useState(false);
@@ -41,9 +43,10 @@ export default function ProjectWorkspace() {
 
   const loadTree = useCallback(
     () =>
-      api<{ project: ProjectSummary; entries: TreeEntry[] }>(`${base}/tree`).then((r) => {
+      api<{ project: ProjectSummary; entries: TreeEntry[]; summary: ProjectSummaryInfo | null }>(`${base}/tree`).then((r) => {
         setProject(r.project);
         setEntries(r.entries);
+        setSummary(r.summary);
       }),
     [base],
   );
@@ -174,6 +177,15 @@ export default function ProjectWorkspace() {
               </>
             )}
           </div>
+          <SummaryBox
+            base={base}
+            summary={summary}
+            editable={editable}
+            hasBrief={entries.some((e) => e.path.toLowerCase() === ".company/brief.md")}
+            hasBrand={entries.some((e) => e.path.toLowerCase() === ".company/brand.md")}
+            onChanged={loadTree}
+            onOpenFile={(p) => openFile(p)}
+          />
           <div className="min-h-0 flex-1 overflow-auto p-1">
             <FileTree entries={entries} selected={open?.path ?? null} filter={filter} editable={editable} onOpen={(p) => openFile(p)} onAction={act} />
           </div>

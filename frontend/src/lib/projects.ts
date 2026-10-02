@@ -146,3 +146,43 @@ export const restorePrompt = (revision: number, unsaved: boolean) =>
   unsaved
     ? `Restore version ${revision}? Your unsaved changes will be replaced. The saved text becomes an older version.`
     : `Restore version ${revision}? Your current text becomes an older version, so nothing is lost.`;
+
+export type ProjectSummaryInfo = { text: string; summarizedAt: string; stale: boolean };
+
+export const BRIEF_TEMPLATE = `# Project brief
+
+Shared with every companion working on this project.
+
+## What we're making
+
+## Who it's for
+
+## The outcome we want
+
+## Constraints
+- Deadline:
+- Must use:
+- Must avoid:
+`;
+
+export const BRAND_TEMPLATE = `# Brand kit
+
+Shared with every companion working on this project.
+
+## Voice
+- Sounds like:
+- Banned words:
+
+## Colors
+- Primary: #
+- Background: #
+- Text: #
+
+## Fonts
+- Headings:
+- Body:
+
+## Do / don't
+- Do:
+- Don't:
+`;
