@@ -1,6 +1,6 @@
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 
-export function Logo({ className = "" }: { className?: string }) {
+export function Logo({ className = "", compact = false }: { className?: string; compact?: boolean }) {
   return (
     <span className={`inline-flex items-center gap-[0.35em] whitespace-nowrap font-display text-xl font-semibold tracking-tight text-ink ${className}`}>
       <svg viewBox="0 0 24 24" className="size-[1.35em]" aria-hidden="true">
@@ -9,7 +9,7 @@ export function Logo({ className = "" }: { className?: string }) {
         <circle cx="9.5" cy="12" r="1.3" fill="var(--ink)" />
         <circle cx="14.5" cy="12" r="1.3" fill="var(--ink)" />
       </svg>
-      agent company
+      <span className={compact ? "hidden sm:inline" : ""}>agent company</span>
     </span>
   );
 }

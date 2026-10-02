@@ -50,7 +50,7 @@ export function CompanionPanel({ agent, onClose, onEdit, onSelect, onThinking }:
         <CompanionAvatar look={agent.appearance} size={72} />
         <button aria-label="Close details" onClick={onClose} className="grid size-9 place-items-center rounded-[8px] hover:bg-bg"><X size={18} /></button>
       </div>
-      <h2 ref={heading} tabIndex={-1} className="mt-3 text-xl font-semibold outline-none">{agent.name}</h2>
+      <h2 ref={heading} tabIndex={-1} style={{ outline: "none" }} className="mt-3 text-xl font-semibold">{agent.name}</h2>
       <p className="text-sm text-muted">
         {agent.role}
         {agent.kind === "human" ? " (human collaborator)" : ""}

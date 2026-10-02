@@ -27,6 +27,23 @@ npm run dev:backend
 npm run dev:frontend   # http://localhost:3000
 ```
 
+## AI providers
+
+Open **AI providers** in the app sidebar.
+
+- **ChatGPT account**: "Continue with ChatGPT" uses OpenAI's Sign in with ChatGPT. It works on a local or self-hosted install (`CHATGPT_LOCAL_LOGIN=true`). A hosted site needs OpenAI's approval through their interest form.
+- **Claude**: Anthropic does not allow other apps to use Claude logins, so use an Anthropic API key.
+- **OpenAI, Google Gemini**: paste an API key.
+- **Custom endpoint**: OpenRouter, xAI, DeepSeek, Ollama, or any OpenAI-compatible URL. Local servers such as Ollama need `ALLOW_LOCAL_ENDPOINTS=true`.
+
+Keys and tokens are encrypted with `CREDENTIALS_KEY` and never shown again.
+
+Live check with a real key (optional, costs a few tokens):
+
+```
+LIVE_PROVIDER=openai LIVE_API_KEY=sk-... LIVE_MODEL=<model id> npm --prefix backend run smoke
+```
+
 ## Test
 
 ```
