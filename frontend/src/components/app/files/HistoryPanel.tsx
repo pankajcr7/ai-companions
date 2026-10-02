@@ -37,6 +37,7 @@ export function HistoryPanel({ path, base, editable, onRestored, onClose }: { pa
       </div>
       <p className="truncate text-xs text-muted">{path}</p>
       {error && <p role="alert" className="mt-2 text-sm text-[#b42318]">{error}</p>}
+      {!revs && !error && <p className="mt-3 text-sm text-muted" aria-busy="true">Loading versions...</p>}
       <ul className="mt-3 space-y-2 overflow-auto text-sm">
         {revs?.map((r, i) => (
           <li key={r.id} className="rounded-[10px] border border-line p-2.5">
