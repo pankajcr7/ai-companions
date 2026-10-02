@@ -8,11 +8,17 @@ import { useWorkspace } from "@/lib/workspace";
 import { CompanionAvatar } from "./CompanionAvatar";
 import { CompanionChat } from "./CompanionChat";
 
-export function CompanionPanel({ agent, onClose, onEdit, onSelect, onThinking }: { agent: Agent; onClose: () => void; onEdit: () => void; onSelect: (id: string) => void; onThinking: (busy: boolean) => void }) {
+export function CompanionPanel({ agent, onClose, onEdit, onSelect, onThinking, command, onCommandSent }: { agent: Agent; onClose: () => void; onEdit: () => void; onSelect: (id: string) => void; onThinking: (busy: boolean) => void; command?: string; onCommandSent?: () => void }) {
   const { snapshot, reload, wsPath } = useWorkspace();
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<"profile" | "chat">("profile");
+  const [tab, setTab] = useState<"profile" | "chat">(command ? "chat" : "profile");
   const [error, setError] = useState("");
+  // A new command from the office bar switches to the chat tab.
+  const [seenCommand, setSeenCommand] = useState(command);
+  if (command !== seenCommand) {
+    setSeenCommand(command);
+    if (command) setTab("chat");
+  }
   const heading = useRef<HTMLHeadingElement>(null);
   const editable = canEdit(snapshot.role);
   const dept = snapshot.departments.find((d) => d.id === agent.departmentId)?.name ?? "Unassigned";
@@ -64,7 +70,7 @@ export function CompanionPanel({ agent, onClose, onEdit, onSelect, onThinking }:
       </div>
       {tab === "chat" && (
         <div role="tabpanel" className="mt-4">
-          <CompanionChat agent={agent} onEdit={onEdit} onThinking={onThinking} />
+          <CompanionChat agent={agent} onEdit={onEdit} onThinking={onThinking} command={command} onCommandSent={onCommandSent} />
         </div>
       )}
       {tab === "profile" && (

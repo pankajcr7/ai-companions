@@ -45,4 +45,12 @@ test("connect a custom endpoint, assign it to Nova, chat, and keep the history",
   await page.getByRole("complementary", { name: "Companion details" }).getByRole("tab", { name: "Chat" }).click();
   await expect(page.getByText("Hello Nova")).toBeVisible();
   await expect(page.getByText("Hello from the fake model.")).toBeVisible();
+
+  // The office command bar sends to the head agent and opens their chat.
+  await page.getByRole("button", { name: "Close details" }).click();
+  await page.getByLabel("Tell your company what to do").fill("Plan the launch");
+  await page.getByRole("button", { name: "Send to your company" }).click();
+  const chat = page.getByRole("complementary", { name: "Companion details" });
+  await expect(chat.getByText("Plan the launch")).toBeVisible();
+  await expect(chat.getByText("Hello from the fake model.")).toHaveCount(2);
 });

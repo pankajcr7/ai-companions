@@ -10,7 +10,7 @@ import { useWorkspace } from "@/lib/workspace";
 
 type Pending = { sent: string; text: string; stopped?: boolean; error?: { code: string; message: string } };
 
-export function CompanionChat({ agent, onEdit, onThinking }: { agent: Agent; onEdit: () => void; onThinking: (busy: boolean) => void }) {
+export function CompanionChat({ agent, onEdit, onThinking, command, onCommandSent }: { agent: Agent; onEdit: () => void; onThinking: (busy: boolean) => void; command?: string; onCommandSent?: () => void }) {
   const { snapshot, wsPath } = useWorkspace();
   const [messages, setMessages] = useState<ChatMessageDTO[] | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -30,6 +30,12 @@ export function CompanionChat({ agent, onEdit, onThinking }: { agent: Agent; onE
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
   }, [messages, pending]);
+  // A message typed in the office command bar is sent once this chat's history has loaded.
+  useEffect(() => {
+    if (!command || pending || messages === null || !canEdit(snapshot.role) || !conn || !agent.model) return;
+    onCommandSent?.();
+    send(command);
+  });
 
   if (!canEdit(snapshot.role)) return <p className="p-1 text-sm text-muted">Viewers can&apos;t chat with companions.</p>;
   if (!conn || !agent.model) {
@@ -42,10 +48,10 @@ export function CompanionChat({ agent, onEdit, onThinking }: { agent: Agent; onE
     );
   }
 
-  async function send() {
-    const message = draft.trim();
+  async function send(text = draft) {
+    const message = text.trim();
     if (!message || pending) return;
-    setDraft("");
+    if (text === draft) setDraft("");
     setError("");
     setPending({ sent: message, text: "" });
     onThinking(true);
