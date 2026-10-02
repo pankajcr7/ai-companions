@@ -48,7 +48,7 @@ test("connect a custom endpoint, assign it to Nova, chat, and keep the history",
 
   // The office command bar sends to the head agent and opens their chat.
   await page.getByRole("button", { name: "Close details" }).click();
-  await page.getByLabel("Tell your company what to do").fill("Plan the launch");
+  await page.getByLabel("Tell your company what to do").fill("chat: Plan the launch");
   await page.getByRole("button", { name: "Send to your company" }).click();
   const chat = page.getByRole("complementary", { name: "Companion details" });
   await expect(chat.getByText("Plan the launch")).toBeVisible();

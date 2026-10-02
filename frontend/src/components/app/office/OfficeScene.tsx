@@ -26,7 +26,7 @@ export function OfficeScene({
   snapshot,
   selectedId,
   highlightId,
-  thinkingId,
+  thinkingIds,
   deptFilter,
   editable,
   onSelect,
@@ -36,7 +36,7 @@ export function OfficeScene({
   snapshot: Snapshot;
   selectedId: string | null;
   highlightId: string | null;
-  thinkingId: string | null;
+  thinkingIds: string[];
   deptFilter: string | null;
   editable: boolean;
   onSelect: (id: string) => void;
@@ -221,7 +221,7 @@ export function OfficeScene({
           {placed.map((a) => {
             const pos = drag?.id === a.id ? drag : layout.desks[a.id];
             const dimmed = deptFilter && deptFilter !== (a.departmentId ?? UNASSIGNED);
-            const thinking = thinkingId === a.id;
+            const thinking = thinkingIds.includes(a.id);
             const label = `${a.name}, ${a.role}, ${statusLabel(a, thinking)}`;
             return (
               <g

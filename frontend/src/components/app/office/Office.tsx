@@ -1,12 +1,16 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { MagnifyingGlass, PaperPlaneTilt, Plus } from "@phosphor-icons/react";
+import { useEffect, useRef, useState } from "react";
+import { ListChecks, MagnifyingGlass, PaperPlaneTilt, Plus } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
+import { parseCommand } from "@/lib/goals";
+import type { ProjectSummary } from "@/lib/projects";
 import { canEdit, type Snapshot } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace";
 import { CompanionForm } from "../CompanionForm";
 import { CompanionPanel } from "../CompanionPanel";
+import { GoalPanel } from "../goals/GoalPanel";
+import { GoalsList } from "../goals/GoalsList";
 import { OfficeList } from "./OfficeList";
 import { OfficeScene, type SceneHandle } from "./OfficeScene";
 
@@ -23,6 +27,16 @@ export function Office() {
   const [thinkingId, setThinkingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [command, setCommand] = useState<{ agentId: string; text: string } | null>(null);
+  const [goalId, setGoalId] = useState<string | null>(null);
+  const [goalWorking, setGoalWorking] = useState<string[]>([]);
+  const [showGoals, setShowGoals] = useState(false);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [projectId, setProjectId] = useState("");
+  const thinkingIds = [...goalWorking, ...(thinkingId ? [thinkingId] : [])];
+  const projectsPath = wsPath("/projects");
+  useEffect(() => {
+    api<{ projects: ProjectSummary[] }>(projectsPath).then((r) => setProjects(r.projects), () => setProjects([]));
+  }, [projectsPath]);
 
   const editable = canEdit(snapshot.role);
   const q = query.trim().toLowerCase();
@@ -35,16 +49,29 @@ export function Office() {
     : !head
       ? "Your company needs a head agent to take instructions."
       : headReady
-        ? `${head.name} replies here for now. Planning work across the team is coming next.`
+        ? `${head.name} plans your goal into tasks for the team. Start with "chat:" to just talk to ${head.name}.`
         : `Choose an AI model for ${head.name} to use the company chat.`;
 
-  // For now the command bar talks to the head agent; the reply appears in their chat panel.
-  function sendCommand() {
-    const text = draft.trim();
-    if (!text || !head || thinkingId) return;
-    setDraft("");
-    setSelectedId(head.id);
-    setCommand({ agentId: head.id, text });
+  // A goal goes to Nova for planning; "chat: ..." talks to Nova directly in their chat panel.
+  async function sendCommand() {
+    const parsed = parseCommand(draft);
+    if (!parsed.text || !head || thinkingId) return;
+    if (parsed.kind === "chat") {
+      setDraft("");
+      setGoalId(null);
+      setSelectedId(head.id);
+      setCommand({ agentId: head.id, text: parsed.text });
+      return;
+    }
+    try {
+      const { id } = await api<{ id: string }>(wsPath("/goals"), { method: "POST", body: { text: parsed.text, projectId: projectId || null } });
+      setDraft("");
+      setError("");
+      setSelectedId(null);
+      setGoalId(id);
+    } catch (e) {
+      setError((e as Error).message);
+    }
   }
 
   // Send only the moved desk; the server merges it, so a stale view can't erase anyone else's changes.
@@ -107,6 +134,9 @@ export function Office() {
             <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> Show archived
           </label>
         )}
+        <button onClick={() => setShowGoals(true)} className="btn-light flex items-center gap-1.5 rounded-[10px] px-3 py-2 text-sm font-semibold">
+          <ListChecks size={14} /> Goals
+        </button>
         {editable && (
           <button onClick={() => setEditing("new")} className="btn-dark flex items-center gap-1.5 rounded-[10px] px-3 py-2 text-sm font-semibold text-paper">
             <Plus size={14} weight="bold" /> New companion
@@ -125,19 +155,24 @@ export function Office() {
               snapshot={snapshot}
               selectedId={selectedId}
               highlightId={match?.id ?? null}
-              thinkingId={thinkingId}
+              thinkingIds={thinkingIds}
               deptFilter={deptFilter}
               editable={editable}
               onSelect={setSelectedId}
               onMoveDesk={moveDesk}
             />
           ) : (
-            <OfficeList snapshot={snapshot} showArchived={showArchived} selectedId={selectedId} onSelect={setSelectedId} thinkingId={thinkingId} />
+            <OfficeList snapshot={snapshot} showArchived={showArchived} selectedId={selectedId} onSelect={setSelectedId} thinkingIds={thinkingIds} />
           )}
         </div>
         {selected && (
           <div className="fixed inset-x-0 bottom-0 z-20 max-h-[70dvh] overflow-auto rounded-t-[16px] shadow-2xl lg:static lg:max-h-none lg:w-80 lg:rounded-none lg:shadow-none">
             <CompanionPanel key={selected.id} command={command?.agentId === selected.id ? command.text : undefined} onCommandSent={() => setCommand(null)} agent={selected} onClose={closePanel} onEdit={() => setEditing(selected.id)} onSelect={setSelectedId} onThinking={(busy) => setThinkingId(busy ? selected.id : null)} />
+          </div>
+        )}
+        {!selected && goalId && (
+          <div className="fixed inset-x-0 bottom-0 z-20 max-h-[75dvh] overflow-auto rounded-t-[16px] shadow-2xl lg:static lg:max-h-none lg:w-96 lg:rounded-none lg:shadow-none">
+            <GoalPanel key={goalId} goalId={goalId} onClose={() => setGoalId(null)} onWorking={setGoalWorking} />
           </div>
         )}
       </div>
@@ -148,8 +183,16 @@ export function Office() {
             e.preventDefault();
             sendCommand();
           }}
-          className={`flex items-center gap-3 rounded-full border border-line bg-bg py-2 pl-5 pr-2 ${editable && headReady ? "" : "opacity-70"}`}
+          className={`flex items-center gap-3 rounded-full border border-line bg-bg py-2 pl-3 pr-2 ${editable && headReady ? "" : "opacity-70"}`}
         >
+          {editable && projects.length > 0 && (
+            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} aria-label="Project for this goal" className="max-w-36 shrink-0 rounded-full border border-line bg-paper px-2 py-1 text-xs">
+              <option value="">No project</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          )}
           <label htmlFor="command" className="sr-only">Tell your company what to do</label>
           <input
             id="command"
@@ -182,6 +225,15 @@ export function Office() {
             await reload();
             setSelectedId(id);
           }}
+        />
+      )}
+      {showGoals && (
+        <GoalsList
+          onOpen={(id) => {
+            setSelectedId(null);
+            setGoalId(id);
+          }}
+          onClose={() => setShowGoals(false)}
         />
       )}
     </div>
