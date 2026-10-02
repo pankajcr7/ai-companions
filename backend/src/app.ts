@@ -3,6 +3,7 @@ import Fastify from "fastify";
 import rateLimit from "@fastify/rate-limit";
 import { errorHandler } from "./http.js";
 import { authRoutes } from "./routes/auth.js";
+import { workspaceRoutes } from "./routes/workspaces.js";
 import { waitlistRoutes } from "./routes/waitlist.js";
 
 export async function buildApp() {
@@ -11,6 +12,7 @@ export async function buildApp() {
   app.setErrorHandler(errorHandler);
   app.get("/health", async () => ({ ok: true }));
   await app.register(authRoutes);
+  await app.register(workspaceRoutes);
   await app.register(waitlistRoutes);
   return app;
 }
