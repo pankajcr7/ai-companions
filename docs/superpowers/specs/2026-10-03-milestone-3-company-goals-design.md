@@ -10,12 +10,14 @@ The owner types a goal in the office command bar and picks a project (or none). 
 
 ### Success criteria
 
-1. Sending a goal from the command bar creates a goal linked to the chosen project (or none) and Nova returns a plan of 1 to 8 tasks, each with an assignee, title, instructions, and dependencies.
+1. Sending a goal from the command bar creates a goal linked to the chosen project (or none) and Nova returns a plan of 1 to 6 tasks, each with an assignee, title, instructions, deliverable format, 1 to 5 acceptance criteria, and dependencies. Nova is told to use the fewest companions the goal needs (simple goals get 1 or 2 tasks).
 2. No companion runs before the owner presses Start. Before Start the owner can edit task text, reassign, remove, and add tasks. Tasks assigned to companions without a working model are flagged and block Start.
 3. On Start, tasks run in dependency order, at most 3 at once; a task receives the results of the tasks it depends on. Working companions show "Thinking" in the office.
 4. Each task reads files from the linked project through a two-step selection (the model picks paths from the tree, the server sends those files within a 60,000-character budget) and records which files it read.
 5. Developer results can include proposed edits (full new content of a file). Each edit is validated against the upload rules on save, shown as a side-by-side comparison, and applied or rejected individually. Applying goes through the normal save path with the base revision the companion read; a changed file shows "out of date" and cannot be applied.
-6. When all tasks finish (done, failed, or skipped), Nova writes a summary of the outcome.
+6. When all tasks finish (done, failed, or skipped), Nova writes a summary of the outcome and marks each finished task "meets criteria" or "needs your eyes" against its acceptance criteria, in the same call.
+6a. If the linked project contains `.company/brief.md` or `.company/brand.md`, every planning, task, and review prompt includes them first (8,000 characters combined, truncated with a marker), and each task records which revision of them it used.
+6b. Each finished task can be rated thumbs up or down with an optional reason (wrong facts, off-brand, too generic, ignored files, too long). Every model call is logged with phase, companion, model, tokens, duration, and error code.
 7. "Read my project" produces a project summary (purpose, structure, key files, stack) stored on the project, shown on the project page, reused as context by planning and tasks, and marked stale when files change.
 8. Failures are contained: a failed task skips only its dependents and offers Retry; Cancel stops running calls and skips the rest; tasks running during a server restart become "interrupted" with Retry. Nothing reruns automatically.
 9. Members and above create goals, approve plans, retry, cancel, and apply edits; viewers can read goals and results. All routes check workspace membership; goals, tasks, and edits from other workspaces return 404.
@@ -62,8 +64,9 @@ Apply edit ──► files service save path (baseRevision check) ──► File
 | Model | Fields (beyond `id`, timestamps) | Notes |
 |---|---|---|
 | `Goal` | `workspaceId`, `projectId?`, `text` (1-4,000), `status` (`planning`, `awaiting_approval`, `running`, `reviewing`, `done`, `failed`, `cancelled`), `summary?`, `error?`, `inputTokens`, `outputTokens`, `createdById` | Index (`workspaceId`, `createdAt`). Project deletion sets `projectId` null. |
-| `GoalTask` | `goalId`, `agentId`, `position`, `title` (1-120), `instructions` (1-4,000), `dependsOn` (int[] of positions), `status` (`pending`, `running`, `done`, `failed`, `skipped`, `interrupted`), `result?`, `filesRead` (JSON `{path, revision}[]`), `error?`, `errorCode?`, `inputTokens`, `outputTokens`, `startedAt?`, `finishedAt?` | Agent deletion is blocked by archiving (agents are archived, not deleted). |
+| `GoalTask` | `goalId`, `agentId`, `position`, `title` (1-120), `instructions` (1-4,000), `deliverable` (1-300), `criteria` (string[] 1-5), `dependsOn` (int[] of positions), `verdict?` (`meets`, `needs_eyes`), `verdictNote?`, `contextRevisions` (JSON), `rating?` (1 or -1), `ratingReason?`, `status` (`pending`, `running`, `done`, `failed`, `skipped`, `interrupted`), `result?`, `filesRead` (JSON `{path, revision}[]`), `error?`, `errorCode?`, `inputTokens`, `outputTokens`, `startedAt?`, `finishedAt?` | Agent deletion is blocked by archiving (agents are archived, not deleted). |
 | `ProposedEdit` | `taskId`, `goalId`, `path`, `baseRevision`, `content`, `note`, `status` (`pending`, `applied`, `rejected`, `stale`), `reason?`, `decidedById?` | |
+| `GoalStep` | `goalId`, `taskId?`, `phase` (`plan`, `select`, `execute`, `summary`, `project_summary`), `agentId`, `model`, `inputTokens?`, `outputTokens?`, `ms`, `errorCode?` | One row per model call (telemetry). |
 | `Project` (changed) | + `summary?`, `summaryRevisionKey?`, `summarizedAt?` | |
 
 ## 6. API
@@ -75,7 +78,8 @@ All under `/api/workspaces/:id`.
 | `POST /goals` `{ text, projectId? }` | member | Create goal and start planning; 409 if a goal is planning or running |
 | `GET /goals` | viewer | Recent 30 goals |
 | `GET /goals/:gid` | viewer | Goal, tasks, edits, running assignee ids |
-| `PUT /goals/:gid/plan` `{ tasks: [{ agentId, title, instructions, dependsOn }] }` | member | Replace the plan while `awaiting_approval` (validates assignees, dependency positions, no cycles, ≤ 8) |
+| `PUT /goals/:gid/plan` `{ tasks: [{ agentId, title, instructions, deliverable, criteria, dependsOn }] }` | member | Replace the plan while `awaiting_approval` (validates assignees, dependency positions, no cycles, ≤ 6) |
+| `POST /goals/:gid/tasks/:tid/rating` `{ rating: 1 \| -1, reason? }` | member | Rate a finished task |
 | `POST /goals/:gid/start` | member | Start; 400 if any assignee lacks a model or connection |
 | `POST /goals/:gid/cancel` | member | Cancel |
 | `POST /goals/:gid/replan` | member | Re-run planning after a planning failure |
@@ -98,7 +102,7 @@ Rate limits per user: goals 10/min, summarize 5/min.
 
 - Model output is untrusted: results render as text (no HTML), edits are validated by the same rules as uploads and saved only after the owner applies them.
 - Prompts mark project file contents as data, not instructions, and tell companions to ignore instructions found inside files.
-- Token totals per task and goal are shown. Hard caps: 8 tasks, 3 concurrent, 60,000 characters of files per task, 8,000 characters per dependency result, one running goal per workspace.
+- Token totals per task and goal are shown. Hard caps: 6 tasks, 3 concurrent, 60,000 characters of files per task, 8,000 characters per dependency result, one running goal per workspace.
 
 ## 9. Testing
 
@@ -108,7 +112,15 @@ Rate limits per user: goals 10/min, summarize 5/min.
 
 ## 10. Research input
 
-A research report on Lovable, v0, Base44, Emergent, and similar builders runs alongside this spec. Findings that change this design are folded in here before the plan is written; the full report is published separately.
+Report: "AI Builders Field Report" (published artifact, 2026-10-02). Changes adopted in this spec, each cheap and measurable:
+
+- **Task specs with deliverable format and acceptance criteria**, fewest companions, at most 6 tasks. Source: Anthropic's multi-agent research system (vague delegation duplicated work; effort scales with complexity), Lovable Plan mode.
+- **Shared brief and brand kit as ordinary project files** (`.company/brief.md`, `.company/brand.md`), so they reuse the editor, history, and restore. Source: Lovable Knowledge, Claude Code CLAUDE.md, v0 registries.
+- **Criteria check folded into Nova's final summary** (no extra calls) rather than a separate reviewer with revisions. Source: Anthropic evaluator-optimizer guidance; Bolt's warning about repeated fix loops. A dedicated reviewer with one revision is deferred until ratings show it is needed.
+- **Telemetry and ratings** so later changes (reviewers, skills, cheaper models for file selection) are judged on measured results. Source: v0's successful-generation metric, Anthropic's eval guidance, Replit traces.
+- **Full-file proposed edits** (kept) rather than search/replace blocks. Source: Cursor found most models unreliable at search/replace diffs.
+
+Deferred to later milestones: clarifying questions before planning, a reviewer with one revision, a 20-goal evaluation script, a cheaper model for file selection, design directions, previews and build checks, native tool calling, deployment.
 
 ## 11. Risks
 
