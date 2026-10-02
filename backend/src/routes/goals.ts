@@ -2,7 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import type { Prisma } from "../generated/prisma/client.js";
-import { loadProject } from "../files/service.js";
+import { loadProject, saveText } from "../files/service.js";
+import { getBlob } from "../files/store.js";
 import { readiness } from "../goals/llm.js";
 import { loadHead } from "../goals/load.js";
 import { Plan, planProblems } from "../goals/plan.js";
@@ -195,6 +196,57 @@ export async function goalRoutes(app: FastifyInstance) {
     if (task.status !== "done") throw new HttpError(409, "conflict", "Only finished tasks can be rated.");
     const { rating, reason } = z.object({ rating: z.union([z.literal(1), z.literal(-1)]), reason: z.enum(RATING_REASONS).optional() }).parse(req.body);
     await prisma.goalTask.update({ where: { id: tid }, data: { rating, ratingReason: rating === -1 ? (reason ?? null) : null } });
+    return { ok: true };
+  });
+
+  const EditParams = GoalParams.extend({ eid: z.string().min(1).max(64) });
+
+  async function loadEdit(workspaceId: string, gid: string, eid: string) {
+    const goal = await loadGoal(workspaceId, gid);
+    const edit = await prisma.proposedEdit.findFirst({ where: { id: eid, goalId: goal.id } });
+    if (!edit) throw new HttpError(404, "not_found", "Proposed change not found");
+    return { goal, edit };
+  }
+
+  app.get("/api/workspaces/:id/goals/:gid/edits/:eid", async (req) => {
+    const { id, gid, eid } = EditParams.parse(req.params);
+    await requireMember(req, id);
+    const { goal, edit } = await loadEdit(id, gid, eid);
+    let current: string | null = null;
+    if (goal.projectId) {
+      const entry = await prisma.projectEntry.findUnique({ where: { projectId_pathLower: { projectId: goal.projectId, pathLower: edit.path.toLowerCase() } } });
+      if (entry?.kind === "file" && entry.isText && entry.blobHash) current = (await getBlob(entry.blobHash)).toString("utf8");
+    }
+    return { edit: { id: edit.id, path: edit.path, content: edit.content, current, baseRevision: edit.baseRevision, status: edit.status, note: edit.note } };
+  });
+
+  app.post("/api/workspaces/:id/goals/:gid/edits/:eid/apply", async (req) => {
+    const { id, gid, eid } = EditParams.parse(req.params);
+    const { user } = await requireMember(req, id, "member");
+    const { goal, edit } = await loadEdit(id, gid, eid);
+    if (edit.status !== "pending") throw new HttpError(409, "conflict", "This change was already decided.");
+    if (!goal.projectId) throw new HttpError(409, "conflict", "The project was deleted, so this change can't be applied.");
+    const project = await loadProject(id, goal.projectId);
+    try {
+      const saved = await saveText(project, user.id, edit.path, edit.content, edit.baseRevision);
+      await prisma.proposedEdit.update({ where: { id: eid }, data: { status: "applied", decidedById: user.id } });
+      await audit(prisma, id, user.id, "goal.edit.apply", "proposedEdit", eid, { path: edit.path });
+      return saved;
+    } catch (e) {
+      if (e instanceof HttpError && e.status === 409) {
+        await prisma.proposedEdit.update({ where: { id: eid }, data: { status: "stale", reason: "The file changed after the companion read it.", decidedById: user.id } });
+        throw new HttpError(409, "stale", "The file changed after the companion read it, so this change is out of date.");
+      }
+      throw e;
+    }
+  });
+
+  app.post("/api/workspaces/:id/goals/:gid/edits/:eid/reject", async (req) => {
+    const { id, gid, eid } = EditParams.parse(req.params);
+    const { user } = await requireMember(req, id, "member");
+    const { edit } = await loadEdit(id, gid, eid);
+    if (edit.status !== "pending") throw new HttpError(409, "conflict", "This change was already decided.");
+    await prisma.proposedEdit.update({ where: { id: eid }, data: { status: "rejected", decidedById: user.id } });
     return { ok: true };
   });
 }
