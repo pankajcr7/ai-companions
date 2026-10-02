@@ -1,9 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { encryptSecret, SecretError } from "../crypto.js";
+import { revoke, type ChatgptSecret } from "../chatgpt-oauth.js";
+import { decryptSecret, encryptSecret, SecretError } from "../crypto.js";
 import { prisma } from "../db.js";
 import type { ProviderConnection } from "../generated/prisma/client.js";
-import { audit, HttpError, requireMember } from "../http.js";
+import { audit, HttpError, perUser, requireMember } from "../http.js";
 import { clientFor } from "../providers/index.js";
 import { ProviderError } from "../providers/types.js";
 import { checkBaseUrl, UnsafeUrlError } from "../safe-fetch.js";
@@ -64,7 +65,7 @@ export async function connectionRoutes(app: FastifyInstance) {
     return { connections: rows.map((c) => connectionDTO(c, totals.get(c.id))), chatgptLocalLogin: process.env.CHATGPT_LOCAL_LOGIN === "true" };
   });
 
-  app.post("/api/workspaces/:id/connections", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (req, reply) => {
+  app.post("/api/workspaces/:id/connections", { config: { rateLimit: { max: 10, timeWindow: "1 minute", keyGenerator: perUser } } }, async (req, reply) => {
     const { id } = WsParams.parse(req.params);
     const { user } = await requireMember(req, id, "admin");
     const body = CreateConnection.parse(req.body);
@@ -116,14 +117,22 @@ export async function connectionRoutes(app: FastifyInstance) {
   app.delete("/api/workspaces/:id/connections/:cid", async (req) => {
     const { id, cid } = ConnParams.parse(req.params);
     const { user } = await requireMember(req, id, "admin");
-    await loadConnection(id, cid);
+    const conn = await loadConnection(id, cid);
+    let revoked: boolean | null = null;
+    if (conn.kind === "chatgpt" && conn.secret) {
+      try {
+        revoked = await revoke(JSON.parse(decryptSecret(conn.secret)) as ChatgptSecret);
+      } catch {
+        revoked = false;
+      }
+    }
     // Companions using it keep their identity; the foreign key clears connectionId.
     await prisma.providerConnection.delete({ where: { id: cid } });
-    await audit(prisma, id, user.id, "connection.delete", "connection", cid);
-    return { revoked: null };
+    await audit(prisma, id, user.id, "connection.delete", "connection", cid, { revoked });
+    return { revoked };
   });
 
-  app.post("/api/workspaces/:id/connections/:cid/test", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (req) => {
+  app.post("/api/workspaces/:id/connections/:cid/test", { config: { rateLimit: { max: 10, timeWindow: "1 minute", keyGenerator: perUser } } }, async (req) => {
     const { id, cid } = ConnParams.parse(req.params);
     await requireMember(req, id, "admin");
     const conn = await loadConnection(id, cid);

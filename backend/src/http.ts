@@ -57,3 +57,6 @@ export function audit(
 ) {
   return db.auditLog.create({ data: { workspaceId, actorUserId, action, targetType, targetId, data } });
 }
+
+/** Rate-limit key: the session cookie (one bucket per signed-in user), falling back to the IP. */
+export const perUser = (req: FastifyRequest) => req.headers.cookie ?? req.ip;

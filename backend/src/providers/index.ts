@@ -1,10 +1,11 @@
+import { chatgptAccessToken } from "../chatgpt-oauth.js";
 import { decryptSecret } from "../crypto.js";
 import { testOverride } from "../env.js";
 import type { ProviderKind } from "../generated/prisma/client.js";
 import { anthropicClient } from "./anthropic.js";
 import { openAiChatClient } from "./openai-chat.js";
 import { openAiResponsesClient } from "./openai-responses.js";
-import { ProviderError, type ProviderClient } from "./types.js";
+import type { ProviderClient } from "./types.js";
 
 export const PRESETS = {
   openrouter: "https://openrouter.ai/api/v1",
@@ -30,6 +31,6 @@ export function clientFor(conn: ConnectionLike): ProviderClient {
     case "custom":
       return openAiChatClient({ baseUrl: conn.baseUrl ?? "", apiKey: secret });
     case "chatgpt":
-      throw new ProviderError("unsupported", "ChatGPT connections are not available yet.");
+      return openAiResponsesClient({ baseUrl: openaiBase(), token: () => chatgptAccessToken(conn.id), modelList: "chatgpt" });
   }
 }
