@@ -112,3 +112,41 @@ details > summary {
 details > summary::-webkit-details-marker {
   display: none;
 }
+
+/* App theme. The landing page stays light; the app follows the user's preference. */
+.app {
+  background: var(--bg);
+  color: var(--ink);
+}
+.app[data-theme="dark"] {
+  --bg: #0e1013;
+  --paper: #16191d;
+  --ink: #eef0f3;
+  --muted: #9aa1ad;
+  --line: #2a2e35;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  .app[data-theme="system"] {
+    --bg: #0e1013;
+    --paper: #16191d;
+    --ink: #eef0f3;
+    --muted: #9aa1ad;
+    --line: #2a2e35;
+    color-scheme: dark;
+  }
+}
+
+.bob {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .app:not([data-still="true"]) .bob {
+    animation: bob 3.2s ease-in-out infinite;
+  }
+}
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}

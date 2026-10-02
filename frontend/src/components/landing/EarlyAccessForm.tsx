@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-
 type State = { kind: "idle" | "sending" | "done" } | { kind: "error"; message: string };
 
 const field =
@@ -17,7 +15,7 @@ export function EarlyAccessForm() {
     const data = Object.fromEntries(new FormData(e.currentTarget));
     setState({ kind: "sending" });
     try {
-      const res = await fetch(`${API_URL}/waitlist`, {
+      const res = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(data),

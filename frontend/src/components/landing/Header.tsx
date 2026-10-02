@@ -27,6 +27,7 @@ export function Header() {
           ))}
         </nav>
         <div className="relative flex items-center gap-2 border-l border-line px-4 md:px-8">
+          <a href="/sign-in" className="hidden text-sm font-medium text-ink/80 hover:text-ink sm:block">Sign in</a>
           <div className="hidden sm:block">
             <DarkButton href="#early-access" icon={false}>
               Get early access
