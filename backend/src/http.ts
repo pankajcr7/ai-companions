@@ -1,5 +1,9 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
+import { fromNodeHeaders } from "better-auth/node";
 import { ZodError } from "zod";
+import { auth } from "./auth.js";
+import { prisma, type Db } from "./db.js";
+import type { Prisma, Role } from "./generated/prisma/client.js";
 
 export class HttpError extends Error {
   constructor(
@@ -23,4 +27,33 @@ export function errorHandler(err: FastifyError | Error, req: FastifyRequest, rep
   if (status < 500) return send(status, "bad_request", err.message);
   req.log.error(err);
   return send(500, "server_error", "Something went wrong");
+}
+
+export async function requireUser(req: FastifyRequest) {
+  const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
+  if (!session) throw new HttpError(401, "unauthenticated", "Sign in first");
+  return session.user;
+}
+
+const rank: Record<Role, number> = { viewer: 0, member: 1, admin: 2, owner: 3 };
+
+export async function requireMember(req: FastifyRequest, workspaceId: string, min: Role = "viewer") {
+  const user = await requireUser(req);
+  const membership = await prisma.membership.findUnique({ where: { workspaceId_userId: { workspaceId, userId: user.id } } });
+  // 404, not 403, so workspace ids can't be probed.
+  if (!membership) throw new HttpError(404, "not_found", "Workspace not found");
+  if (rank[membership.role] < rank[min]) throw new HttpError(403, "forbidden", "Your role can't do that");
+  return { user, role: membership.role };
+}
+
+export function audit(
+  db: Db,
+  workspaceId: string,
+  actorUserId: string,
+  action: string,
+  targetType: string,
+  targetId: string,
+  data?: Prisma.InputJsonValue,
+) {
+  return db.auditLog.create({ data: { workspaceId, actorUserId, action, targetType, targetId, data } });
 }
