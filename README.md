@@ -44,6 +44,14 @@ Live check with a real key (optional, costs a few tokens):
 LIVE_PROVIDER=openai LIVE_API_KEY=sk-... LIVE_MODEL=<model id> npm --prefix backend run smoke
 ```
 
+## Projects and files
+
+Open **Projects** in the sidebar to upload a folder, a ZIP, or files, then browse and edit them in the built-in code editor. Every save is a version you can restore. Download single files or the whole project as a ZIP.
+
+- Skipped automatically: `node_modules`, `.git`, build output, caches, `.env` files (except `.env.example`), private keys and credential files.
+- Limits: 2,000 files and folders, 50 MB per project, 10 MB per file, 1 MB for files edited in the browser.
+- Files are stored on the server's disk under `backend/data/blobs` (set `FILES_DIR` to change). Nothing uploaded is ever run.
+
 ## Test
 
 ```
