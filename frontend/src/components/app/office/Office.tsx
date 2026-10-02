@@ -20,6 +20,7 @@ export function Office() {
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState<"new" | string | null>(null);
   const [error, setError] = useState("");
+  const [thinkingId, setThinkingId] = useState<string | null>(null);
 
   const editable = canEdit(snapshot.role);
   const q = query.trim().toLowerCase();
@@ -104,18 +105,19 @@ export function Office() {
               snapshot={snapshot}
               selectedId={selectedId}
               highlightId={match?.id ?? null}
+              thinkingId={thinkingId}
               deptFilter={deptFilter}
               editable={editable}
               onSelect={setSelectedId}
               onMoveDesk={moveDesk}
             />
           ) : (
-            <OfficeList snapshot={snapshot} showArchived={showArchived} selectedId={selectedId} onSelect={setSelectedId} />
+            <OfficeList snapshot={snapshot} showArchived={showArchived} selectedId={selectedId} onSelect={setSelectedId} thinkingId={thinkingId} />
           )}
         </div>
         {selected && (
           <div className="fixed inset-x-0 bottom-0 z-20 max-h-[70dvh] overflow-auto rounded-t-[16px] shadow-2xl lg:static lg:max-h-none lg:w-80 lg:rounded-none lg:shadow-none">
-            <CompanionPanel agent={selected} onClose={closePanel} onEdit={() => setEditing(selected.id)} onSelect={setSelectedId} />
+            <CompanionPanel agent={selected} onClose={closePanel} onEdit={() => setEditing(selected.id)} onSelect={setSelectedId} onThinking={(busy) => setThinkingId(busy ? selected.id : null)} />
           </div>
         )}
       </div>

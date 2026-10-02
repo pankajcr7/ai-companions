@@ -38,7 +38,7 @@ export type Me = { user: { id: string; name: string; email: string }; workspaces
 export const UNASSIGNED = "unassigned";
 export const canEdit = (r: Role) => r !== "viewer";
 export const canAdmin = (r: Role) => r === "owner" || r === "admin";
-export const statusLabel = (a: Agent) => ({ active: "Idle", paused: "Paused", archived: "Archived" })[a.status];
+export const statusLabel = (a: Agent, thinking = false) => (thinking ? "Thinking" : { active: "Idle", paused: "Paused", archived: "Archived" }[a.status]);
 
 export type ProviderKind = "chatgpt" | "openai" | "anthropic" | "gemini" | "custom";
 export type ConnectionStatus = "connected" | "error" | "reauth";

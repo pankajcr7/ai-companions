@@ -6,10 +6,12 @@ import { api } from "@/lib/api";
 import { canEdit, statusLabel, type Agent } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace";
 import { CompanionAvatar } from "./CompanionAvatar";
+import { CompanionChat } from "./CompanionChat";
 
-export function CompanionPanel({ agent, onClose, onEdit, onSelect }: { agent: Agent; onClose: () => void; onEdit: () => void; onSelect: (id: string) => void }) {
+export function CompanionPanel({ agent, onClose, onEdit, onSelect, onThinking }: { agent: Agent; onClose: () => void; onEdit: () => void; onSelect: (id: string) => void; onThinking: (busy: boolean) => void }) {
   const { snapshot, reload, wsPath } = useWorkspace();
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<"profile" | "chat">("profile");
   const [error, setError] = useState("");
   const heading = useRef<HTMLHeadingElement>(null);
   const editable = canEdit(snapshot.role);
@@ -53,12 +55,26 @@ export function CompanionPanel({ agent, onClose, onEdit, onSelect }: { agent: Ag
         {agent.role}
         {agent.kind === "human" ? " (human collaborator)" : ""}
       </p>
+      <div role="tablist" aria-label="Companion views" className="mt-4 flex gap-1 rounded-[10px] border border-line p-0.5">
+        {(["profile", "chat"] as const).map((t) => (
+          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`flex-1 rounded-[8px] px-3 py-1.5 text-sm ${tab === t ? "bg-ink text-paper" : ""}`}>
+            {t === "profile" ? "Profile" : "Chat"}
+          </button>
+        ))}
+      </div>
+      {tab === "chat" && (
+        <div role="tabpanel" className="mt-4">
+          <CompanionChat agent={agent} onEdit={onEdit} onThinking={onThinking} />
+        </div>
+      )}
+      {tab === "profile" && (
+      <div role="tabpanel">
       <dl className="mt-5 space-y-3 text-sm">
         {[
           ["Status", statusLabel(agent)],
           ["Department", dept],
           ["Reports to", manager],
-          ["AI provider", "Not connected yet"],
+          ["AI model", agent.model ? `${agent.model} (${snapshot.connections.find((c) => c.id === agent.connectionId)?.label ?? "connection removed"})` : "Not chosen yet"],
           ["Working style", agent.workingStyle || "Not set"],
         ].map(([k, v]) => (
           <div key={k}>
@@ -100,6 +116,8 @@ export function CompanionPanel({ agent, onClose, onEdit, onSelect }: { agent: Ag
         </div>
       )}
       <p className="mt-6 text-xs text-muted">Pause and archive are saved now. They will stop real work once companions can work (milestone 3).</p>
+      </div>
+      )}
     </aside>
   );
 }

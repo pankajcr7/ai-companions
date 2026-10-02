@@ -3,7 +3,7 @@
 import { statusLabel, type Snapshot } from "@/lib/types";
 import { CompanionAvatar } from "../CompanionAvatar";
 
-export function OfficeList({ snapshot, showArchived, selectedId, onSelect }: { snapshot: Snapshot; showArchived: boolean; selectedId: string | null; onSelect: (id: string) => void }) {
+export function OfficeList({ snapshot, showArchived, selectedId, onSelect, thinkingId }: { snapshot: Snapshot; showArchived: boolean; selectedId: string | null; onSelect: (id: string) => void; thinkingId: string | null }) {
   const dept = (id: string | null) => snapshot.departments.find((d) => d.id === id)?.name ?? "Unassigned";
   const name = (id: string | null) => snapshot.agents.find((a) => a.id === id)?.name ?? "No manager";
   const rows = snapshot.agents.filter((a) => showArchived || a.status !== "archived");
@@ -33,7 +33,7 @@ export function OfficeList({ snapshot, showArchived, selectedId, onSelect }: { s
               <td className="p-3">{a.role}</td>
               <td className="p-3">{dept(a.departmentId)}</td>
               <td className="p-3">{a.isHead ? "You" : name(a.managerId)}</td>
-              <td className="p-3">{statusLabel(a)}</td>
+              <td className="p-3">{statusLabel(a, thinkingId === a.id)}</td>
             </tr>
           ))}
         </tbody>

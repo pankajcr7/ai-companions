@@ -26,6 +26,7 @@ export function OfficeScene({
   snapshot,
   selectedId,
   highlightId,
+  thinkingId,
   deptFilter,
   editable,
   onSelect,
@@ -35,6 +36,7 @@ export function OfficeScene({
   snapshot: Snapshot;
   selectedId: string | null;
   highlightId: string | null;
+  thinkingId: string | null;
   deptFilter: string | null;
   editable: boolean;
   onSelect: (id: string) => void;
@@ -219,7 +221,8 @@ export function OfficeScene({
           {placed.map((a) => {
             const pos = drag?.id === a.id ? drag : layout.desks[a.id];
             const dimmed = deptFilter && deptFilter !== (a.departmentId ?? UNASSIGNED);
-            const label = `${a.name}, ${a.role}, ${statusLabel(a)}`;
+            const thinking = thinkingId === a.id;
+            const label = `${a.name}, ${a.role}, ${statusLabel(a, thinking)}`;
             return (
               <g
                 key={a.id}
@@ -249,13 +252,14 @@ export function OfficeScene({
                   opacity={selectedId === a.id || highlightId === a.id ? 1 : 0}
                 />
                 <rect x={-46} y={26} width={92} height={14} rx={4} fill="var(--line)" />
+                {thinking && <text y={-46} textAnchor="middle" className="fill-ink" style={{ fontSize: 18 }}>…</text>}
                 <g className="bob">
                   <CompanionFigure look={a.appearance} />
                 </g>
                 <text y={62} textAnchor="middle" className="fill-ink" style={{ fontSize: 15, fontWeight: 600 }}>{a.name}</text>
                 <text y={80} textAnchor="middle" className="fill-muted" style={{ fontSize: 12 }}>
                   {a.kind === "human" ? "Human, " : ""}
-                  {statusLabel(a)}
+                  {statusLabel(a, thinking)}
                 </text>
               </g>
             );

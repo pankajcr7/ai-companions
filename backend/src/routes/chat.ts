@@ -55,6 +55,15 @@ export async function chatRoutes(app: FastifyInstance) {
     "/api/workspaces/:id/agents/:agentId/chat",
     { config: { rateLimit: { max: 20, timeWindow: "1 minute", keyGenerator: perUser } } },
     async (req, reply) => {
+      // Watch for the client leaving from the start: with a slow database it can leave before streaming begins.
+      const ac = new AbortController();
+      let clientGone = false;
+      reply.raw.on("close", () => {
+        if (!reply.raw.writableEnded) {
+          clientGone = true;
+          ac.abort();
+        }
+      });
       const { id, agentId } = AgentParams.parse(req.params);
       const { user } = await requireMember(req, id, "member");
       const { message } = Send.parse(req.body);
@@ -80,14 +89,6 @@ export async function chatRoutes(app: FastifyInstance) {
       const send = (event: string, data: unknown) => raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       send("start", { userMessageId: userMsg.id });
 
-      const ac = new AbortController();
-      let clientGone = false;
-      raw.on("close", () => {
-        if (!raw.writableEnded) {
-          clientGone = true;
-          ac.abort();
-        }
-      });
       const signal = AbortSignal.any([ac.signal, AbortSignal.timeout(300_000)]);
 
       let text = "";

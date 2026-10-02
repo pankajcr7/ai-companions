@@ -195,3 +195,30 @@ test("a rejected ChatGPT token marks the connection as needing sign-in", async (
   expect(events.at(-1)).toMatchObject({ event: "error", data: { code: "reauth" } });
   expect((await prisma.providerConnection.findUniqueOrThrow({ where: { id: conn.id } })).status).toBe("reauth");
 });
+
+test("stopping before the first word arrives still saves the reply as stopped", async () => {
+  const { req, id, cid, nova, cookie } = await setup();
+  await req("PATCH", `/api/workspaces/${id}/agents/${nova.id}`, { connectionId: cid, model: "fake-1" });
+  let providerCalls = 0;
+  fake.routes["POST /v1/chat/completions"] = (q, res) => {
+    providerCalls++;
+    setTimeout(() => okReply(q, res), 3000);
+  };
+  const address = await app.listen({ port: 0, host: "127.0.0.1" }).catch(() => `http://127.0.0.1:${(app.server.address() as { port: number }).port}`);
+  const ac = new AbortController();
+  const pending = fetch(`${address}/api/workspaces/${id}/agents/${nova.id}/chat`, {
+    method: "POST",
+    headers: { cookie, origin: ORIGIN, "content-type": "application/json" },
+    body: JSON.stringify({ message: "Quick stop" }),
+    signal: ac.signal,
+  }).catch(() => null);
+  setTimeout(() => ac.abort(), 50);
+  await pending;
+  let last;
+  for (let i = 0; i < 60 && !last; i++) {
+    await new Promise((r) => setTimeout(r, 250));
+    last = await prisma.chatMessage.findFirst({ where: { agentId: nova.id, role: "assistant" }, orderBy: { createdAt: "desc" } });
+  }
+  expect(last).toMatchObject({ status: "stopped" });
+  expect(providerCalls).toBeLessThanOrEqual(1);
+});

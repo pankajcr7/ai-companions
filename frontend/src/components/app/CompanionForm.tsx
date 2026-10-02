@@ -35,6 +35,8 @@ export function CompanionForm({ agent, onClose, onSaved }: { agent: Agent | null
     workingStyle: agent?.workingStyle ?? "",
     departmentId: agent?.departmentId ?? snapshot.departments[0]?.id ?? "",
     managerId: agent ? (agent.managerId ?? "") : (head?.id ?? ""),
+    connectionId: agent?.connectionId ?? "",
+    model: agent?.model ?? "",
     appearance: agent?.appearance ?? ({ style: "robot", color: "#a1a1aa", head: "square", eyes: "dots", accessory: "none" } as Appearance),
   }));
   const [error, setError] = useState("");
@@ -43,6 +45,26 @@ export function CompanionForm({ agent, onClose, onSaved }: { agent: Agent | null
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
+  const [models, setModels] = useState<{ id: string; label: string }[]>([]);
+  const [modelsNote, setModelsNote] = useState("");
+  useEffect(() => {
+    if (!form.connectionId) return;
+    let cancelled = false;
+    api<{ models: { id: string; label: string }[] }>(wsPath(`/connections/${form.connectionId}/models`))
+      .then((r) => {
+        if (cancelled) return;
+        setModels(r.models);
+        setModelsNote(r.models.length ? "" : "No models listed. Type a model ID.");
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setModels([]);
+        setModelsNote(`${(e as Error).message} You can still type a model ID.`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [form.connectionId, wsPath]);
 
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
   const look = <K extends keyof Appearance>(k: K, v: Appearance[K]) => setForm((f) => ({ ...f, appearance: { ...f.appearance, [k]: v } }));
@@ -54,7 +76,13 @@ export function CompanionForm({ agent, onClose, onSaved }: { agent: Agent | null
     e.preventDefault();
     setBusy(true);
     setError("");
-    const body = { ...form, departmentId: form.departmentId || null, managerId: agent?.isHead ? null : form.managerId || null };
+    const body = {
+      ...form,
+      departmentId: form.departmentId || null,
+      managerId: agent?.isHead ? null : form.managerId || null,
+      connectionId: form.connectionId || null,
+      model: form.connectionId && form.model.trim() ? form.model.trim() : null,
+    };
     try {
       const id = agent
         ? (await api<{ id: string }>(wsPath(`/agents/${agent.id}`), { method: "PATCH", body })).id
@@ -124,6 +152,29 @@ export function CompanionForm({ agent, onClose, onSaved }: { agent: Agent | null
               <button type="button" key={c} aria-label={`Use color ${c}`} onClick={() => look("color", c)} className="size-7 rounded-full border border-line" style={{ background: c }} />
             ))}
           </div>
+          <fieldset className="grid gap-4 sm:grid-cols-2">
+            <legend className="mb-1 text-sm font-semibold">AI model</legend>
+            <label className="text-sm font-medium">
+              Provider
+              <select value={form.connectionId} onChange={(e) => set("connectionId", e.target.value)} className={field}>
+                <option value="">Not connected</option>
+                {snapshot.connections.map((c) => (
+                  <option key={c.id} value={c.id}>{c.label} ({c.hint})</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm font-medium">
+              Model
+              <input list={`models-${agent?.id ?? "new"}`} value={form.model} disabled={!form.connectionId} onChange={(e) => set("model", e.target.value)} placeholder={form.connectionId ? "Pick or type a model" : "Choose a provider first"} className={field} />
+              <datalist id={`models-${agent?.id ?? "new"}`}>
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+              </datalist>
+            </label>
+            {snapshot.connections.length === 0 && <p className="text-xs text-muted sm:col-span-2">No providers yet. An owner can add one on the AI providers page.</p>}
+            {modelsNote && form.connectionId && <p className="text-xs text-muted sm:col-span-2">{modelsNote}</p>}
+          </fieldset>
           <label className="block text-sm font-medium">
             Working style
             <textarea maxLength={500} rows={2} value={form.workingStyle} onChange={(e) => set("workingStyle", e.target.value)} className={`${field} resize-none`} />

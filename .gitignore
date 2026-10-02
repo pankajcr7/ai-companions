@@ -10,3 +10,4 @@ backend/src/generated
 frontend/.next-e2e
 frontend/test-results
 frontend/playwright-report
+frontend/.next-check
