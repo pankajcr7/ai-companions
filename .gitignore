@@ -6,3 +6,7 @@ dist
 .DS_Store
 data
 .superpowers
+backend/src/generated
+frontend/.next-e2e
+frontend/test-results
+frontend/playwright-report

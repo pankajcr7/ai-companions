@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String           @id
+  name          String
+  email         String
+  emailVerified Boolean          @default(false)
+  image         String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  memberships   Membership[]
+  preferences   UserPreference[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+enum Role {
+  owner
+  admin
+  member
+  viewer
+}
+
+enum AgentKind {
+  ai
+  human
+}
+
+enum AgentStatus {
+  active
+  paused
+  archived
+}
+
+enum CompanionStyle {
+  robot
+  orb
+}
+
+enum Theme {
+  system
+  light
+  dark
+}
+
+model Workspace {
+  id          String           @id @default(cuid())
+  name        String
+  slug        String           @unique
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  memberships Membership[]
+  departments Department[]
+  agents      Agent[]
+  layout      OfficeLayout?
+  preferences UserPreference[]
+  auditLogs   AuditLog[]
+}
+
+model Membership {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        Role
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model Department {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  sortOrder   Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agents      Agent[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model Agent {
+  id           String           @id @default(cuid())
+  workspaceId  String
+  departmentId String?
+  managerId    String?
+  name         String
+  role         String
+  kind         AgentKind        @default(ai)
+  workingStyle String           @default("")
+  status       AgentStatus      @default(active)
+  isHead       Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  workspace    Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  department   Department?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  manager      Agent?           @relation("Reports", fields: [managerId], references: [id], onDelete: SetNull)
+  reports      Agent[]          @relation("Reports")
+  appearance   AgentAppearance?
+
+  @@index([workspaceId])
+  @@index([departmentId])
+}
+
+model AgentAppearance {
+  id        String         @id @default(cuid())
+  agentId   String         @unique
+  style     CompanionStyle @default(robot)
+  color     String
+  head      String
+  eyes      String
+  accessory String
+  agent     Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+model OfficeLayout {
+  id          String    @id @default(cuid())
+  workspaceId String    @unique
+  layout      Json
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model UserPreference {
+  id            String    @id @default(cuid())
+  userId        String
+  workspaceId   String
+  theme         Theme     @default(system)
+  reducedMotion Boolean   @default(false)
+  calmMode      Boolean   @default(false)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  workspaceId String
+  actorUserId String
+  action      String
+  targetType  String
+  targetId    String
+  data        Json?
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+}

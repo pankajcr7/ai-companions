@@ -4,8 +4,9 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
-    "outDir": "dist",
-    "skipLibCheck": true
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true
   },
-  "include": ["src"]
+  "include": ["src", "test", "prisma.config.ts", "vitest.config.ts"]
 }
