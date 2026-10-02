@@ -13,3 +13,8 @@ if (process.env.USE_TEST_DB) {
   }
   process.env.DATABASE_URL = url;
 }
+
+/** Lets tests point fixed provider hosts at fake servers. Ignored outside test mode. */
+export function testOverride(name: string): string | undefined {
+  return process.env.VITEST || process.env.USE_TEST_DB ? process.env[name] : undefined;
+}

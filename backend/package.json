@@ -14,11 +14,14 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@fastify/rate-limit": "^11.2.0",
     "@prisma/adapter-pg": "7.10",
     "@prisma/client": "7.10",
     "better-auth": "1.7",
     "fastify": "^5.12.5",
+    "jose": "^6.2.12",
+    "undici": "^8.11.2",
     "zod": "^4.6.5"
   },
   "devDependencies": {

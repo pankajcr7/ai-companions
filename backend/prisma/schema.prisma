@@ -19,6 +19,7 @@ model User {
   accounts      Account[]
   memberships   Membership[]
   preferences   UserPreference[]
+  chatMessages  ChatMessage[]
 
   @@unique([email])
   @@map("user")
@@ -102,17 +103,19 @@ enum Theme {
 }
 
 model Workspace {
-  id          String           @id @default(cuid())
-  name        String
-  slug        String           @unique
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  memberships Membership[]
-  departments Department[]
-  agents      Agent[]
-  layout      OfficeLayout?
-  preferences UserPreference[]
-  auditLogs   AuditLog[]
+  id           String               @id @default(cuid())
+  name         String
+  slug         String               @unique
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  memberships  Membership[]
+  departments  Department[]
+  agents       Agent[]
+  layout       OfficeLayout?
+  preferences  UserPreference[]
+  auditLogs    AuditLog[]
+  connections  ProviderConnection[]
+  chatMessages ChatMessage[]
 }
 
 model Membership {
@@ -143,23 +146,27 @@ model Department {
 }
 
 model Agent {
-  id           String           @id @default(cuid())
+  id           String              @id @default(cuid())
   workspaceId  String
   departmentId String?
   managerId    String?
   name         String
   role         String
-  kind         AgentKind        @default(ai)
-  workingStyle String           @default("")
-  status       AgentStatus      @default(active)
-  isHead       Boolean          @default(false)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-  workspace    Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  department   Department?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  manager      Agent?           @relation("Reports", fields: [managerId], references: [id], onDelete: SetNull)
-  reports      Agent[]          @relation("Reports")
+  kind         AgentKind           @default(ai)
+  workingStyle String              @default("")
+  status       AgentStatus         @default(active)
+  isHead       Boolean             @default(false)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  workspace    Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  department   Department?         @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  manager      Agent?              @relation("Reports", fields: [managerId], references: [id], onDelete: SetNull)
+  reports      Agent[]             @relation("Reports")
   appearance   AgentAppearance?
+  connectionId String?
+  model        String?
+  connection   ProviderConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  chatMessages ChatMessage[]
 
   @@index([workspaceId])
   @@index([departmentId])
@@ -209,4 +216,75 @@ model AuditLog {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, createdAt])
+}
+
+enum ProviderKind {
+  chatgpt
+  openai
+  anthropic
+  gemini
+  custom
+}
+
+enum ConnectionStatus {
+  connected
+  error
+  reauth
+}
+
+enum MessageRole {
+  user
+  assistant
+}
+
+enum MessageStatus {
+  complete
+  error
+  stopped
+}
+
+model ProviderConnection {
+  id            String           @id @default(cuid())
+  workspaceId   String
+  kind          ProviderKind
+  label         String
+  baseUrl       String?
+  secret        String?
+  hint          String           @default("")
+  status        ConnectionStatus @default(connected)
+  lastCheckedAt DateTime?
+  lastError     String?
+  createdById   String
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  workspace     Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agents        Agent[]
+  messages      ChatMessage[]
+
+  @@index([workspaceId])
+}
+
+model ChatMessage {
+  id           String              @id @default(cuid())
+  workspaceId  String
+  agentId      String
+  userId       String
+  role         MessageRole
+  content      String
+  status       MessageStatus       @default(complete)
+  connectionId String?
+  kind         ProviderKind?
+  model        String?
+  inputTokens  Int?
+  outputTokens Int?
+  errorCode    String?
+  errorMessage String?
+  createdAt    DateTime            @default(now())
+  workspace    Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent        Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection   ProviderConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  @@index([agentId, userId, createdAt])
+  @@index([workspaceId])
 }
