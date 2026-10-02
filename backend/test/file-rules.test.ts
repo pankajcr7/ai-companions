@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
 import { exclusionReason, normalizePath, parentDirs, PRIVATE_KEY } from "../src/files/rules.js";
 
@@ -60,4 +61,10 @@ test("private key detection", () => {
 test("parentDirs lists every ancestor folder", () => {
   expect(parentDirs("a/b/c.txt")).toEqual(["a", "a/b"]);
   expect(parentDirs("top.txt")).toEqual([]);
+});
+
+test("the browser copy of the rules is identical to the server's", () => {
+  const server = readFileSync(new URL("../src/files/rules.ts", import.meta.url), "utf8");
+  const browser = readFileSync(new URL("../../frontend/src/lib/file-rules.ts", import.meta.url), "utf8");
+  expect(browser).toBe(server);
 });

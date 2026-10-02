@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Buildings, GearSix, Plugs, SignOut, TreeStructure } from "@phosphor-icons/react";
+import { Buildings, FolderSimple, GearSix, Plugs, SignOut, TreeStructure } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/lib/workspace";
 import { Logo } from "@/components/landing/ui";
@@ -14,6 +14,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const base = `/w/${snapshot.workspace.slug}`;
   const nav = [
     { href: base, label: "Office", icon: Buildings },
+    { href: `${base}/projects`, label: "Projects", icon: FolderSimple },
     { href: `${base}/organization`, label: "Organization", icon: TreeStructure },
     { href: `${base}/providers`, label: "AI providers", icon: Plugs },
     { href: `${base}/settings`, label: "Settings", icon: GearSix },
@@ -32,7 +33,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <p className="hidden truncate text-sm font-medium text-muted lg:mt-6 lg:block">{snapshot.workspace.name}</p>
         <nav aria-label="App" className="flex gap-1 lg:mt-4 lg:flex-col">
           {nav.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href;
+            const active = href === base ? pathname === href : pathname.startsWith(href);
             return (
               <Link
                 key={href}
