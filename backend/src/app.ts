@@ -9,6 +9,7 @@ import { connectionRoutes } from "./routes/connections.js";
 import { chatgptRoutes } from "./routes/chatgpt.js";
 import { chatRoutes } from "./routes/chat.js";
 import { projectRoutes } from "./routes/projects.js";
+import { uploadRoutes } from "./routes/uploads.js";
 import { waitlistRoutes } from "./routes/waitlist.js";
 
 export async function buildApp() {
@@ -24,6 +25,7 @@ export async function buildApp() {
   await app.register(chatgptRoutes);
   await app.register(chatRoutes);
   await app.register(projectRoutes);
+  await app.register(uploadRoutes);
   await app.register(waitlistRoutes);
   return app;
 }

@@ -11,6 +11,8 @@ const mb = (n: number) => `${Math.round(n / 1024 / 1024)} MB`;
  * expand past the limits. No filesystem paths are created here; callers validate names.
  */
 export function readZip(buf: Buffer, limits: Pick<typeof LIMITS, "maxEntries" | "maxTotalBytes" | "maxFileBytes"> = LIMITS): ZipEntry[] {
+  // Every ZIP ends with an end-of-central-directory record; without it the file is corrupt or truncated.
+  if (buf.length < 22 || buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06])) === -1) throw new ZipLimitError("That ZIP file couldn't be read");
   const out: ZipEntry[] = [];
   let total = 0;
   let failure: Error | null = null;
@@ -57,7 +59,6 @@ export function readZip(buf: Buffer, limits: Pick<typeof LIMITS, "maxEntries" | 
     throw new ZipLimitError("That ZIP file couldn't be read");
   }
   if (failure) throw failure;
-  if (!out.length && buf.length > 22) throw new ZipLimitError("That ZIP file couldn't be read");
   return out;
 }
 
