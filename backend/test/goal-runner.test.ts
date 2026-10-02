@@ -67,7 +67,7 @@ test("at most 3 tasks run at once", async () => {
     if (isReview(s)) return review(5);
     inFlight++;
     peak = Math.max(peak, inFlight);
-    await sleep(1200);
+    await sleep(4000);
     inFlight--;
     return "ok";
   });

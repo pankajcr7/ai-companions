@@ -59,11 +59,13 @@ async function tick(goalId: string) {
   if (skip.length) await prisma.goalTask.updateMany({ where: { id: { in: skip }, status: "pending" }, data: { status: "skipped", error: "Skipped because a task it waits for didn't finish." } });
   const running = [...status.values()].filter((s) => s === "running").length;
   const ready = goal.tasks.filter((t) => status.get(t.position) === "pending" && t.dependsOn.every((d) => status.get(d) === "done"));
-  for (const t of ready.slice(0, Math.max(0, MAX_PARALLEL - running))) {
-    // Claiming with a conditional update keeps overlapping ticks from starting a task twice.
-    const claimed = await prisma.goalTask.updateMany({ where: { id: t.id, status: "pending" }, data: { status: "running", startedAt: new Date() } });
-    if (claimed.count) void runTask(goalId, t.id).finally(() => kickGoal(goalId));
-  }
+  // Claim together so ready tasks start together; the conditional update keeps overlapping ticks from starting one twice.
+  await Promise.all(
+    ready.slice(0, Math.max(0, MAX_PARALLEL - running)).map(async (t) => {
+      const claimed = await prisma.goalTask.updateMany({ where: { id: t.id, status: "pending" }, data: { status: "running", startedAt: new Date() } });
+      if (claimed.count) void runTask(goalId, t.id).finally(() => kickGoal(goalId));
+    }),
+  );
   if (![...status.values()].some((s) => s === "pending" || s === "running")) await finishGoal(goalId);
 }
 
