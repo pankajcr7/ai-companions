@@ -6,8 +6,10 @@ type Body = { messages: { role: string; content: string }[] };
 export type Reply = string | { status: number; message: string };
 export type Script = (system: string, user: string, body: Body) => Reply | Promise<Reply>;
 
-export const systemOf = (q: FakeRequest) => (q.body as Body).messages.find((m) => m.role === "system")?.content ?? "";
-export const userOf = (q: FakeRequest) => (q.body as Body).messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
+// Requests without a chat body (such as GET /v1/models) read as empty.
+const messagesOf = (q: FakeRequest) => (q.body as Body | undefined)?.messages ?? [];
+export const systemOf = (q: FakeRequest) => messagesOf(q).find((m) => m.role === "system")?.content ?? "";
+export const userOf = (q: FakeRequest) => messagesOf(q).filter((m) => m.role === "user").at(-1)?.content ?? "";
 export const fence = (value: unknown) => `\`\`\`json\n${JSON.stringify(value)}\n\`\`\``;
 
 /** An OpenAI-compatible fake whose replies come from a script that sees the system and last user message. */
