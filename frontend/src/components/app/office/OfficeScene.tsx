@@ -5,7 +5,7 @@ import { ArrowsOut, Minus, Plus } from "@phosphor-icons/react";
 import { statusLabel, UNASSIGNED, type Agent, type Snapshot } from "@/lib/types";
 import { CompanionFigure } from "../CompanionAvatar";
 
-export type SceneHandle = { centerOn: (agentId: string) => void };
+export type SceneHandle = { centerOn: (agentId: string) => void; focusCompanion: (agentId: string) => void };
 type View = { x: number; y: number; k: number };
 type Gesture =
   | { kind: "pan"; sx: number; sy: number; view: View }
@@ -69,6 +69,9 @@ export function OfficeScene({
   };
 
   useImperativeHandle(ref, () => ({
+    focusCompanion(agentId) {
+      svgRef.current?.querySelector<SVGGElement>(`[data-agent="${agentId}"]`)?.focus();
+    },
     centerOn(agentId) {
       const d = layout.desks[agentId];
       const r = svgRef.current?.getBoundingClientRect();
@@ -220,6 +223,7 @@ export function OfficeScene({
             return (
               <g
                 key={a.id}
+                data-agent={a.id}
                 transform={`translate(${pos.x} ${pos.y})`}
                 opacity={dimmed ? 0.3 : a.status === "paused" ? 0.6 : 1}
                 tabIndex={0}

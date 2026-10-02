@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { audit, HttpError, requireMember, requireUser } from "../http.js";
-import { UNASSIGNED } from "../layout.js";
+import type { Layout } from "../layout.js";
 import { relayout } from "../templates.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { snapshot } from "../snapshot.js";
@@ -15,7 +15,8 @@ const CreateWorkspace = z.object({ name: Name, template: z.enum(["starter", "stu
 const DeptParams = WsParams.extend({ deptId: z.string().min(1).max(64) });
 const Point = z.object({ x: z.number().finite(), y: z.number().finite() });
 const LayoutBody = z.object({
-  zones: z.array(Point.extend({ departmentId: z.string().max(64), w: z.number().positive(), h: z.number().positive() })).max(200),
+  // Zones are server-owned (relayout computes them); accepted for compatibility but ignored.
+  zones: z.array(Point.extend({ departmentId: z.string().max(64), w: z.number().positive(), h: z.number().positive() })).max(200).optional(),
   desks: z.record(z.string().max(64), Point).refine((d) => Object.keys(d).length <= 1000, "too many desks"),
 });
 const Preferences = z.object({ theme: z.enum(["system", "light", "dark"]), reducedMotion: z.boolean(), calmMode: z.boolean() });
@@ -86,10 +87,12 @@ export async function workspaceRoutes(app: FastifyInstance) {
     await requireMember(req, id, "member");
     const body = LayoutBody.parse(req.body);
     const agentIds = new Set((await prisma.agent.findMany({ where: { workspaceId: id }, select: { id: true } })).map((a) => a.id));
-    const deptIds = new Set((await prisma.department.findMany({ where: { workspaceId: id }, select: { id: true } })).map((d) => d.id));
+    const stored = ((await prisma.officeLayout.findUnique({ where: { workspaceId: id } }))?.layout as Layout | undefined) ?? { zones: [], desks: {} };
+    // Merge only desk positions into the stored layout, so a stale client can't erase newer zones or desks.
+    // ponytail: read-merge-write, two simultaneous drags can lose one; use a JSON update in SQL if that bites.
     const layout = {
-      zones: body.zones.filter((z) => deptIds.has(z.departmentId) || z.departmentId === UNASSIGNED),
-      desks: Object.fromEntries(Object.entries(body.desks).filter(([agentId]) => agentIds.has(agentId))),
+      zones: stored.zones,
+      desks: { ...stored.desks, ...Object.fromEntries(Object.entries(body.desks).filter(([agentId]) => agentIds.has(agentId))) },
     } as unknown as Prisma.InputJsonValue;
     await prisma.officeLayout.upsert({ where: { workspaceId: id }, create: { workspaceId: id, layout }, update: { layout } });
     return { ok: true };

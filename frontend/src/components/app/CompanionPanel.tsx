@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Archive, Copy, Pause, PencilSimple, Play, X } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
 import { canEdit, statusLabel, type Agent } from "@/lib/types";
@@ -11,9 +11,22 @@ export function CompanionPanel({ agent, onClose, onEdit, onSelect }: { agent: Ag
   const { snapshot, reload, wsPath } = useWorkspace();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const heading = useRef<HTMLHeadingElement>(null);
   const editable = canEdit(snapshot.role);
   const dept = snapshot.departments.find((d) => d.id === agent.departmentId)?.name ?? "Unassigned";
   const manager = agent.isHead ? "You (the owner)" : (snapshot.agents.find((a) => a.id === agent.managerId)?.name ?? "No manager");
+
+  // Move focus into the panel when it opens or switches companion; Escape closes it (unless a dialog is open).
+  useEffect(() => {
+    heading.current?.focus();
+  }, [agent.id]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !document.querySelector("dialog[open]")) onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -35,7 +48,7 @@ export function CompanionPanel({ agent, onClose, onEdit, onSelect }: { agent: Ag
         <CompanionAvatar look={agent.appearance} size={72} />
         <button aria-label="Close details" onClick={onClose} className="grid size-9 place-items-center rounded-[8px] hover:bg-bg"><X size={18} /></button>
       </div>
-      <h2 className="mt-3 text-xl font-semibold">{agent.name}</h2>
+      <h2 ref={heading} tabIndex={-1} className="mt-3 text-xl font-semibold outline-none">{agent.name}</h2>
       <p className="text-sm text-muted">
         {agent.role}
         {agent.kind === "human" ? " (human collaborator)" : ""}

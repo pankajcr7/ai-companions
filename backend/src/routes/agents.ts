@@ -90,6 +90,12 @@ export async function agentRoutes(app: FastifyInstance) {
           ...(appearance && { appearance: { upsert: { create: appearance, update: appearance } } }),
         },
       });
+      if (status === "archived" && agent.status !== "archived") {
+        // Reports move up to the archived companion's own manager, so nobody is left reporting to an inactive one.
+        const newManager = body.managerId !== undefined ? body.managerId : agent.managerId;
+        const moved = await tx.agent.updateMany({ where: { workspaceId: id, managerId: agentId }, data: { managerId: newManager } });
+        if (moved.count) await audit(tx, id, user.id, "agent.reassign_reports", "agent", agentId, { to: newManager, count: moved.count });
+      }
       if (structural) await relayout(tx, id);
       await audit(tx, id, user.id, action, "agent", agentId, { fields: Object.keys(req.body as object) });
     });

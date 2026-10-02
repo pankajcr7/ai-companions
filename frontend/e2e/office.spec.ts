@@ -33,6 +33,15 @@ test("sign up, onboard, customize a companion, and it survives refresh", async (
   await page.reload();
   await expect(page.getByRole("button", { name: "Nova Prime, Head agent, Idle" })).toBeVisible();
 
+  // Escape closes the panel and returns focus to the companion.
+  const nova = page.getByRole("button", { name: "Nova Prime, Head agent, Idle" });
+  await nova.focus();
+  await page.keyboard.press("Enter");
+  await expect(panel).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(panel).toBeHidden();
+  await expect(nova).toBeFocused();
+
   await page.getByRole("button", { name: "List" }).click();
   await expect(page.getByRole("row", { name: /^Nova Prime/ })).toBeVisible();
 });

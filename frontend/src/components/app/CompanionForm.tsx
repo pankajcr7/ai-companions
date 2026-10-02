@@ -47,7 +47,8 @@ export function CompanionForm({ agent, onClose, onSaved }: { agent: Agent | null
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
   const look = <K extends keyof Appearance>(k: K, v: Appearance[K]) => setForm((f) => ({ ...f, appearance: { ...f.appearance, [k]: v } }));
   const blocked = agent ? selfAndReports(snapshot.agents, agent.id) : new Set<string>();
-  const managers = snapshot.agents.filter((a) => a.status === "active" && !blocked.has(a.id));
+  // Keep the current manager listed even if paused, so the select shows the truth.
+  const managers = snapshot.agents.filter((a) => (a.status === "active" || a.id === agent?.managerId) && !blocked.has(a.id));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -103,7 +104,7 @@ export function CompanionForm({ agent, onClose, onSaved }: { agent: Agent | null
               Reports to
               <select value={form.managerId} disabled={agent?.isHead} onChange={(e) => set("managerId", e.target.value)} className={field}>
                 {agent?.isHead ? <option value="">You (the owner)</option> : <option value="">No manager</option>}
-                {!agent?.isHead && managers.map((m) => <option key={m.id} value={m.id}>{m.name}, {m.role}</option>)}
+                {!agent?.isHead && managers.map((m) => <option key={m.id} value={m.id}>{m.name}, {m.role}{m.status !== "active" ? " (paused)" : ""}</option>)}
               </select>
             </label>
             <label className="text-sm font-medium">

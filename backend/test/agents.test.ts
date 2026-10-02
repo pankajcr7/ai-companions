@@ -110,3 +110,13 @@ test("updating appearance and profile persists", async () => {
   await req("PATCH", `/api/workspaces/${id}/agents/${t.id}`, { name: "Priya Prime", kind: "human", appearance: LOOK });
   expect((await snap()).agents.find((a: { id: string }) => a.id === t.id)).toMatchObject({ name: "Priya Prime", kind: "human", appearance: LOOK });
 });
+
+test("archiving a manager moves their reports up to that manager's manager", async () => {
+  const { req, id, snap, s, head } = await setup("studio");
+  const rhea = s.agents.find((a: { role: string }) => a.role === "Engineering manager");
+  const reports = s.agents.filter((a: { managerId: string }) => a.managerId === rhea.id).map((a: { id: string }) => a.id);
+  expect(reports).toHaveLength(3);
+  expect((await req("PATCH", `/api/workspaces/${id}/agents/${rhea.id}`, { status: "archived" })).statusCode).toBe(200);
+  const after = await snap();
+  for (const r of reports) expect(after.agents.find((a: { id: string }) => a.id === r).managerId).toBe(head.id);
+});

@@ -26,18 +26,24 @@ export function Office() {
   const match = q ? snapshot.agents.find((a) => a.status !== "archived" && (a.name.toLowerCase().includes(q) || a.role.toLowerCase().includes(q))) : undefined;
   const selected = snapshot.agents.find((a) => a.id === selectedId) ?? null;
 
+  // Send only the moved desk; the server merges it, so a stale view can't erase anyone else's changes.
   async function moveDesk(agentId: string, pos: { x: number; y: number }) {
-    const before = snapshot;
     const next: Snapshot = { ...snapshot, layout: { ...snapshot.layout, desks: { ...snapshot.layout.desks, [agentId]: pos } } };
     setSnapshot(next);
     try {
-      await api(wsPath("/layout"), { method: "PUT", body: next.layout });
+      await api(wsPath("/layout"), { method: "PUT", body: { desks: { [agentId]: pos } } });
       setError("");
     } catch (e) {
-      setSnapshot(before);
       setError(`Couldn't save the new desk position. ${(e as Error).message}`);
+      await reload();
     }
   }
+
+  const closePanel = () => {
+    const id = selectedId;
+    setSelectedId(null);
+    if (id) requestAnimationFrame(() => scene.current?.focusCompanion(id));
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -109,7 +115,7 @@ export function Office() {
         </div>
         {selected && (
           <div className="fixed inset-x-0 bottom-0 z-20 max-h-[70dvh] overflow-auto rounded-t-[16px] shadow-2xl lg:static lg:max-h-none lg:w-80 lg:rounded-none lg:shadow-none">
-            <CompanionPanel agent={selected} onClose={() => setSelectedId(null)} onEdit={() => setEditing(selected.id)} onSelect={setSelectedId} />
+            <CompanionPanel agent={selected} onClose={closePanel} onEdit={() => setEditing(selected.id)} onSelect={setSelectedId} />
           </div>
         )}
       </div>

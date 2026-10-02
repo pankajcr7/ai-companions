@@ -104,3 +104,18 @@ test("non-members get 404 on every write route", async () => {
   ];
   for (const [method, url, body] of routes) expect((await stranger(method as "GET", url, body)).statusCode, `${method} ${url}`).toBe(404);
 });
+
+test("a stale layout save keeps the server's zones and other people's new desks", async () => {
+  const { req, id, snap, s } = await setup();
+  const stale = s.layout;
+  const look = { style: "robot", color: "#000000", head: "square", eyes: "dots", accessory: "none" };
+  // Someone else adds an unassigned companion: a new desk and a new Unassigned zone.
+  const created = (await req("POST", `/api/workspaces/${id}/agents`, { name: "New", role: "Helper", appearance: look })).json().id;
+  const fresh = await snap();
+  const moved = s.agents[1].id;
+  await req("PUT", `/api/workspaces/${id}/layout`, { zones: stale.zones, desks: { ...stale.desks, [moved]: { x: 5, y: 6 } } });
+  const after = await snap();
+  expect(after.layout.desks[moved]).toEqual({ x: 5, y: 6 });
+  expect(after.layout.desks[created]).toEqual(fresh.layout.desks[created]);
+  expect(after.layout.zones).toEqual(fresh.layout.zones);
+});

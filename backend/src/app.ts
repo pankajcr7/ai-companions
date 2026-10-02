@@ -8,7 +8,8 @@ import { agentRoutes } from "./routes/agents.js";
 import { waitlistRoutes } from "./routes/waitlist.js";
 
 export async function buildApp() {
-  const app = Fastify({ logger: !process.env.VITEST, trustProxy: true });
+  // Trust only the local Next.js proxy: it appends the real client IP; earlier X-Forwarded-For entries are client-forged.
+  const app = Fastify({ logger: !process.env.VITEST, trustProxy: ["127.0.0.1", "::1"] });
   await app.register(rateLimit, { global: false });
   app.setErrorHandler(errorHandler);
   app.get("/health", async () => ({ ok: true }));
