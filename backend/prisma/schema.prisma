@@ -117,6 +117,8 @@ model Workspace {
   connections  ProviderConnection[]
   chatMessages ChatMessage[]
   projects     Project[]
+  goals        Goal[]
+  goalSteps    GoalStep[]
 }
 
 model Membership {
@@ -168,6 +170,7 @@ model Agent {
   model        String?
   connection   ProviderConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
   chatMessages ChatMessage[]
+  goalTasks    GoalTask[]
 
   @@index([workspaceId])
   @@index([departmentId])
@@ -316,17 +319,21 @@ enum ImportSource {
 }
 
 model Project {
-  id          String          @id @default(cuid())
-  workspaceId String
-  name        String
-  createdById String
-  totalBytes  Int             @default(0)
-  fileCount   Int             @default(0)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  entries     ProjectEntry[]
-  imports     ProjectImport[]
+  id                 String          @id @default(cuid())
+  workspaceId        String
+  name               String
+  createdById        String
+  totalBytes         Int             @default(0)
+  fileCount          Int             @default(0)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  workspace          Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  entries            ProjectEntry[]
+  imports            ProjectImport[]
+  summary            String?
+  summaryRevisionKey String?
+  summarizedAt       DateTime?
+  goals              Goal[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -379,4 +386,136 @@ model ProjectImport {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+enum GoalStatus {
+  planning
+  awaiting_approval
+  running
+  reviewing
+  done
+  failed
+  cancelled
+}
+
+enum TaskStatus {
+  pending
+  running
+  done
+  failed
+  skipped
+  interrupted
+}
+
+enum EditStatus {
+  pending
+  applied
+  rejected
+  stale
+}
+
+enum TaskVerdict {
+  meets
+  needs_eyes
+}
+
+enum StepPhase {
+  plan
+  select
+  execute
+  summary
+  project_summary
+}
+
+model Goal {
+  id           String         @id @default(cuid())
+  workspaceId  String
+  projectId    String?
+  text         String
+  status       GoalStatus     @default(planning)
+  summary      String?
+  error        String?
+  inputTokens  Int            @default(0)
+  outputTokens Int            @default(0)
+  createdById  String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project      Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  tasks        GoalTask[]
+  edits        ProposedEdit[]
+  steps        GoalStep[]
+
+  @@index([workspaceId, createdAt])
+}
+
+model GoalTask {
+  id               String         @id @default(cuid())
+  goalId           String
+  agentId          String
+  position         Int
+  title            String
+  instructions     String
+  deliverable      String
+  criteria         String[]
+  dependsOn        Int[]
+  status           TaskStatus     @default(pending)
+  result           String?
+  filesRead        Json           @default("[]")
+  contextRevisions Json           @default("{}")
+  error            String?
+  errorCode        String?
+  verdict          TaskVerdict?
+  verdictNote      String?
+  rating           Int?
+  ratingReason     String?
+  inputTokens      Int            @default(0)
+  outputTokens     Int            @default(0)
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  goal             Goal           @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  agent            Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  edits            ProposedEdit[]
+
+  @@unique([goalId, position])
+}
+
+model ProposedEdit {
+  id           String     @id @default(cuid())
+  taskId       String
+  goalId       String
+  path         String
+  baseRevision Int
+  content      String
+  note         String     @default("")
+  status       EditStatus @default(pending)
+  reason       String?
+  decidedById  String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  task         GoalTask   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  goal         Goal       @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+}
+
+model GoalStep {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  goalId       String?
+  taskId       String?
+  phase        StepPhase
+  agentId      String
+  model        String
+  inputTokens  Int?
+  outputTokens Int?
+  ms           Int
+  errorCode    String?
+  createdAt    DateTime  @default(now())
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  goal         Goal?     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
 }
