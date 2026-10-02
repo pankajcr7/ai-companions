@@ -1,4 +1,4 @@
-import { exclusionReason, normalizePath } from "./file-rules";
+import { exclusionReason, normalizePath } from "./file-rules.ts";
 
 export type ProjectSummary = { id: string; name: string; fileCount: number; totalBytes: number; updatedAt: string };
 export type TreeEntry = { path: string; kind: "file" | "dir"; size: number; isText: boolean; revision: number; updatedAt: string };
@@ -110,7 +110,15 @@ export async function uploadBatches(opts: {
     const url = projectId ? `/api/workspaces/${opts.workspaceId}/projects/${projectId}/upload` : `/api/workspaces/${opts.workspaceId}/projects/upload`;
     const res = await fetch(url, { method: "POST", body: form });
     const data = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(data?.error?.message ?? "Upload failed. Try again.");
+    if (!res.ok) {
+      const message = data?.error?.message ?? "Upload failed.";
+      // A project this upload created is removed on failure, so a retry starts clean under the same name.
+      if (!opts.projectId && projectId && importId) {
+        await finish(opts.workspaceId, projectId, importId, "failed").catch(() => null);
+        throw new Error(`${message} The new project was removed, so nothing was kept. Try again.`);
+      }
+      throw new Error(message);
+    }
     projectId = data.projectId;
     importId = data.importId;
     result.projectId = data.projectId;
@@ -119,13 +127,22 @@ export async function uploadBatches(opts: {
     opts.onProgress(i + 1, batches.length);
   }
   if (projectId && importId) {
-    const fin = await fetch(`/api/workspaces/${opts.workspaceId}/projects/${projectId}/imports/${importId}/finish`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status: result.cancelled ? "cancelled" : "complete" }),
-    });
-    const f = await fin.json().catch(() => null);
+    const f = await finish(opts.workspaceId, projectId, importId, result.cancelled ? "cancelled" : "complete").catch(() => null);
     if (f?.deletedProject) result.projectId = "";
   }
   return result;
 }
+
+async function finish(workspaceId: string, projectId: string, importId: string, status: "complete" | "cancelled" | "failed") {
+  const res = await fetch(`/api/workspaces/${workspaceId}/projects/${projectId}/imports/${importId}/finish`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  return (await res.json().catch(() => null)) as { deletedProject?: boolean } | null;
+}
+
+export const restorePrompt = (revision: number, unsaved: boolean) =>
+  unsaved
+    ? `Restore version ${revision}? Your unsaved changes will be replaced. The saved text becomes an older version.`
+    : `Restore version ${revision}? Your current text becomes an older version, so nothing is lost.`;

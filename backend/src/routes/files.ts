@@ -115,13 +115,13 @@ export async function fileRoutes(app: FastifyInstance) {
     const sameEntry = to.toLowerCase() === from.toLowerCase();
     if (!sameEntry && (await findPath(pid, to))) throw new HttpError(409, "conflict", "Something with that name already exists there");
     await ensureParents(pid, to, user.id);
-    const fromLower = from.toLowerCase();
+    const fromLower = entry.pathLower;
     await prisma.$transaction(async (tx) => {
       // One statement renames the entry and everything under it (starts_with avoids LIKE wildcards).
       await tx.$executeRaw`
         UPDATE "ProjectEntry"
-        SET "path" = ${to}::text || substr("path", ${from.length + 1}::int),
-            "pathLower" = lower(${to}::text || substr("path", ${from.length + 1}::int)),
+        SET "path" = ${to}::text || substr("path", char_length(${from}::text) + 1),
+            "pathLower" = ${to.toLowerCase()}::text || substr("pathLower", char_length(${fromLower}::text) + 1),
             "updatedAt" = now()
         WHERE "projectId" = ${pid} AND ("pathLower" = ${fromLower}::text OR starts_with("pathLower", ${`${fromLower}/`}::text))`;
       if (entry.kind === "file") {
@@ -138,7 +138,8 @@ export async function fileRoutes(app: FastifyInstance) {
     const path = requirePath((req.query as { path?: string }).path);
     const entry = await loadEntry(pid, path);
     await prisma.$transaction(async (tx) => {
-      await tx.projectEntry.deleteMany({ where: { projectId: pid, OR: [{ id: entry.id }, { pathLower: { startsWith: `${entry.pathLower}/` } }] } });
+      // starts_with, not Prisma's startsWith: LIKE would treat _ and % in folder names as wildcards.
+      await tx.$executeRaw`DELETE FROM "ProjectEntry" WHERE "projectId" = ${pid} AND ("id" = ${entry.id} OR starts_with("pathLower", ${`${entry.pathLower}/`}::text))`;
       await recount(tx, pid);
     });
     return reply.code(204).send();

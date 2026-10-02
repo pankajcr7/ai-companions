@@ -89,3 +89,18 @@ test("binary files can't be opened as text; viewers can't edit; other workspaces
   const stranger = client(app, (await signUp(app)).cookie);
   expect((await stranger("GET", `${base}/files?path=logo.png`)).statusCode).toBe(404);
 });
+
+test("deleting a folder leaves sibling folders whose names differ at _ or % alone", async () => {
+  const { req, base, tree } = await project([["a_b/x.ts", "x"], ["a-b/y.ts", "y"], ["axb/z.ts", "z"], ["100%/p.ts", "p"], ["100x/q.ts", "q"]]);
+  expect((await req("DELETE", `${base}/entries?path=a_b`)).statusCode).toBe(204);
+  expect((await req("DELETE", `${base}/entries?path=100%25`)).statusCode).toBe(204);
+  expect(await tree()).toEqual(["100x", "100x/q.ts", "a-b", "a-b/y.ts", "axb", "axb/z.ts"]);
+});
+
+test("renaming a folder whose name has an emoji keeps its children inside", async () => {
+  const { req, base, tree } = await project([["📁n/a.txt", "a"], ["İx/b.txt", "b"]]);
+  expect((await req("POST", `${base}/move`, { from: "📁n", to: "new" })).statusCode).toBe(200);
+  expect((await req("POST", `${base}/move`, { from: "İx", to: "done" })).statusCode).toBe(200);
+  expect(await tree()).toEqual(["done", "done/b.txt", "new", "new/a.txt"]);
+  expect((await req("GET", `${base}/files?path=NEW/A.TXT`)).json().content).toBe("a");
+});

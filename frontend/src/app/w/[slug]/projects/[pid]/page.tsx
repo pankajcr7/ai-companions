@@ -233,6 +233,7 @@ export default function ProjectWorkspace() {
               path={history}
               base={base}
               editable={editable}
+              unsaved={dirty && open?.path === history}
               onClose={() => setHistory(null)}
               onRestored={async () => {
                 const restored = history;

@@ -54,7 +54,9 @@ export function readZip(buf: Buffer, limits: Pick<typeof LIMITS, "maxEntries" | 
     file.start();
   };
   try {
-    unzip.push(new Uint8Array(buf), true);
+    // Small slices keep each inflate step small, so a limit trips before a bomb expands in memory.
+    const step = 16 * 1024;
+    for (let i = 0; i < buf.length && !failure; i += step) unzip.push(buf.subarray(i, i + step), i + step >= buf.length);
   } catch {
     throw new ZipLimitError("That ZIP file couldn't be read");
   }

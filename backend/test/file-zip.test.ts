@@ -44,3 +44,21 @@ test("writeZip round-trips through readZip", () => {
   expect(back.find((e) => e.path === "a/b.txt")!.data.toString()).toBe("hello");
   expect(back.some((e) => e.path === "a/empty/" && e.isDir)).toBe(true);
 });
+
+test("a bomb is refused without expanding it in memory", async () => {
+  const { Zip, ZipDeflate } = await import("fflate");
+  const parts: Uint8Array[] = [];
+  const zip = new Zip((err, chunk) => {
+    if (err) throw err;
+    parts.push(chunk);
+  });
+  const entry = new ZipDeflate("zeros.bin", { level: 9 });
+  zip.add(entry);
+  const mb = new Uint8Array(1024 * 1024);
+  for (let i = 0; i < 400; i++) entry.push(mb, i === 399);
+  zip.end();
+  const bomb = Buffer.concat(parts);
+  const before = process.memoryUsage().rss;
+  expect(() => readZip(bomb, small)).toThrow(/larger than/);
+  expect(process.memoryUsage().rss - before).toBeLessThan(150 * 1024 * 1024);
+});

@@ -13,15 +13,28 @@ type Parsed = { fields: Record<string, string>; files: Incoming[]; zip: Buffer |
 
 async function parse(req: FastifyRequest): Promise<Parsed> {
   const out: Parsed = { fields: {}, files: [], zip: null, tooBig: [] };
+  let total = 0;
   for await (const part of req.parts({ limits: { fileSize: LIMITS.maxTotalBytes, files: 100, fields: 10, fieldSize: 256 * 1024 } })) {
     if (part.type === "field") {
       out.fields[part.fieldname] = String(part.value);
       continue;
     }
-    const data = await part.toBuffer();
-    if (part.fieldname === "zip") out.zip = data;
-    else if (data.length > LIMITS.maxFileBytes) out.tooBig.push(part.fieldname);
-    else out.files.push({ path: part.fieldname, data });
+    if (part.fieldname === "zip" && out.zip) throw new HttpError(400, "invalid", "Upload one ZIP file at a time");
+    // Count bytes as they stream: a file part stops being kept past 10 MB, and the request stops past 50 MB.
+    const cap = part.fieldname === "zip" ? LIMITS.maxTotalBytes : LIMITS.maxFileBytes;
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of part.file as AsyncIterable<Buffer>) {
+      size += chunk.length;
+      total += chunk.length;
+      if (total > LIMITS.maxTotalBytes) throw new HttpError(413, "too_large", "One upload can be up to 50 MB. Upload fewer files at a time.");
+      if (size <= cap) chunks.push(chunk);
+    }
+    if (size > cap || part.file.truncated) {
+      if (part.fieldname === "zip") throw new HttpError(413, "too_large", "ZIP files can be up to 50 MB");
+      out.tooBig.push(part.fieldname);
+    } else if (part.fieldname === "zip") out.zip = Buffer.concat(chunks);
+    else out.files.push({ path: part.fieldname, data: Buffer.concat(chunks) });
   }
   return out;
 }
@@ -104,12 +117,13 @@ export async function uploadRoutes(app: FastifyInstance) {
     const { id, pid, importId } = ProjectParams.extend({ importId: z.string().min(1).max(64) }).parse(req.params);
     await requireMember(req, id, "member");
     const project = await loadProject(id, pid);
-    const { status } = z.object({ status: z.enum(["complete", "cancelled"]) }).parse(req.body);
+    const { status } = z.object({ status: z.enum(["complete", "cancelled", "failed"]) }).parse(req.body);
     const imp = await prisma.projectImport.findFirst({ where: { id: importId, projectId: pid } });
     if (!imp) throw new HttpError(404, "not_found", "Upload not found");
     await prisma.projectImport.update({ where: { id: importId }, data: { status } });
     const empty = (await prisma.projectEntry.count({ where: { projectId: pid } })) === 0;
-    if (status === "cancelled" && imp.createdNew && empty) {
+    // A new project whose upload failed part way is removed rather than left half-made.
+    if (imp.createdNew && (status === "failed" || (status === "cancelled" && empty))) {
       await prisma.project.delete({ where: { id: project.id } });
       return { deletedProject: true };
     }

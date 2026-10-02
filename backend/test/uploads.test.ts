@@ -116,3 +116,23 @@ test("files over 10 MB are skipped, and viewers can't upload", async () => {
   const denied = await app.inject({ method: "POST", url: `/api/workspaces/${id}/projects/upload`, payload: body.payload, headers: { ...body.headers, cookie: viewer.cookie, origin: ORIGIN } });
   expect(denied.statusCode).toBe(403);
 });
+
+test("one request over 50 MB is refused, and only one ZIP is accepted", async () => {
+  const { id, upload } = await owner();
+  const nine = Buffer.alloc(9 * 1024 * 1024, 97);
+  const big = await upload(`/api/workspaces/${id}/projects/upload`, { name: "Huge", source: "files" }, Array.from({ length: 6 }, (_, i) => [`f${i}.txt`, `f${i}.txt`, nine] as [string, string, Buffer]));
+  expect(big.statusCode).toBe(413);
+  const zip = Buffer.from(zipSync({ "a.txt": strToU8("a") }));
+  const two = await upload(`/api/workspaces/${id}/projects/upload`, { name: "Two zips", source: "zip" }, [["zip", "a.zip", zip], ["zip", "b.zip", zip]]);
+  expect(two.statusCode).toBe(400);
+  expect(await prisma.project.count({ where: { workspaceId: id } })).toBe(0);
+});
+
+test("a failed new-project upload is removed when the browser reports the failure", async () => {
+  const { req, id, upload } = await owner();
+  const res = await upload(`/api/workspaces/${id}/projects/upload`, { name: "Half", source: "folder" }, [["half/a.txt", "a.txt", "a"]]);
+  const { projectId, importId } = res.json();
+  const fin = await req("POST", `/api/workspaces/${id}/projects/${projectId}/imports/${importId}/finish`, { status: "failed" });
+  expect(fin.json()).toEqual({ deletedProject: true });
+  expect(await prisma.project.count({ where: { id: projectId } })).toBe(0);
+});

@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { restorePrompt } from "@/lib/projects";
 
 type Rev = { id: string; revision: number; reason: string; size: number; fromPath: string | null; createdAt: string; createdBy: string };
 const REASON: Record<string, string> = { upload: "Uploaded", edit: "Edited", restore: "Restored", rename: "Renamed" };
 
-export function HistoryPanel({ path, base, editable, onRestored, onClose }: { path: string; base: string; editable: boolean; onRestored: () => void; onClose: () => void }) {
+export function HistoryPanel({ path, base, editable, unsaved, onRestored, onClose }: { path: string; base: string; editable: boolean; unsaved: boolean; onRestored: () => void; onClose: () => void }) {
   const [revs, setRevs] = useState<Rev[] | null>(null);
   const [preview, setPreview] = useState<{ id: string; content: string } | null>(null);
   const [error, setError] = useState("");
@@ -20,7 +21,7 @@ export function HistoryPanel({ path, base, editable, onRestored, onClose }: { pa
   }, [base, q]);
 
   async function restore(r: Rev) {
-    if (!confirm(`Restore version ${r.revision}? Your current text becomes an older version, so nothing is lost.`)) return;
+    if (!confirm(restorePrompt(r.revision, unsaved))) return;
     try {
       await api(`${base}/restore`, { method: "POST", body: { path, revisionId: r.id } });
       onRestored();
