@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../db.js";
-import { exclusionReason, LIMITS, parentDirs, PRIVATE_KEY } from "../files/rules.js";
-import { loadEntry, loadProject, ProjectParams, recount, requirePath } from "../files/service.js";
-import { getBlob, isTextContent, putBlob } from "../files/store.js";
+import { exclusionReason, LIMITS, parentDirs } from "../files/rules.js";
+import { loadEntry, loadProject, ProjectParams, recount, requirePath, saveText } from "../files/service.js";
+import { getBlob, isTextContent } from "../files/store.js";
 import { HttpError, perUser, requireMember } from "../http.js";
 
 const Save = z.object({ path: z.string().max(1024), content: z.string(), baseRevision: z.number().int().min(0) });
@@ -46,46 +46,7 @@ export async function fileRoutes(app: FastifyInstance) {
     const { user } = await requireMember(req, id, "member");
     const project = await loadProject(id, pid);
     const body = Save.parse(req.body);
-    const path = requirePath(body.path);
-    checkAllowed(path, "file");
-    const data = Buffer.from(body.content, "utf8");
-    if (data.length > LIMITS.maxEditorBytes) throw new HttpError(413, "too_large", "Files edited here can be up to 1 MB");
-    if (PRIVATE_KEY.test(body.content)) throw new HttpError(400, "invalid", "This file contains a private key, which isn't allowed in projects");
-    const existing = await findPath(pid, path);
-    const growth = data.length - (existing?.size ?? 0);
-    if (project.totalBytes + growth > LIMITS.maxTotalBytes) throw new HttpError(413, "too_large", "The project has reached 50 MB");
-
-    if (body.baseRevision === 0) {
-      if (existing) throw new HttpError(409, "conflict", "A file or folder with this name already exists");
-      const entries = await prisma.projectEntry.count({ where: { projectId: pid } });
-      if (entries + 1 + parentDirs(path).length > LIMITS.maxEntries) throw new HttpError(413, "too_large", "The project has reached 2,000 files and folders");
-      const blobHash = await putBlob(data);
-      await ensureParents(pid, path, user.id);
-      await prisma.$transaction(async (tx) => {
-        const entry = await tx.projectEntry.create({ data: { projectId: pid, path, pathLower: path.toLowerCase(), kind: "file", blobHash, size: data.length, isText: true, revision: 1, updatedById: user.id } });
-        await tx.fileRevision.create({ data: { entryId: entry.id, projectId: pid, blobHash, size: data.length, revision: 1, reason: "edit", createdById: user.id } });
-        await recount(tx, pid);
-      });
-      return { revision: 1 };
-    }
-
-    if (!existing || existing.kind !== "file") throw new HttpError(404, "not_found", "File not found");
-    if (!existing.isText) throw new HttpError(415, "not_text", "Binary files can't be edited here");
-    const blobHash = await putBlob(data);
-    const next = body.baseRevision + 1;
-    const updated = await prisma.$transaction(async (tx) => {
-      // Conditional update: only succeeds if nobody saved since this revision was opened.
-      const r = await tx.projectEntry.updateMany({
-        where: { id: existing.id, revision: body.baseRevision },
-        data: { blobHash, size: data.length, revision: next, updatedById: user.id },
-      });
-      if (r.count === 0) return false;
-      await tx.fileRevision.create({ data: { entryId: existing.id, projectId: pid, blobHash, size: data.length, revision: next, reason: "edit", createdById: user.id } });
-      await recount(tx, pid);
-      return true;
-    });
-    if (!updated) throw new HttpError(409, "conflict", "This file changed since you opened it. Reload to see the latest version.");
-    return { revision: next };
+    return saveText(project, user.id, body.path, body.content, body.baseRevision);
   });
 
   app.post("/api/workspaces/:id/projects/:pid/folders", async (req, reply) => {

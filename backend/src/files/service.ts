@@ -150,3 +150,53 @@ export async function addFiles(projectId: string, userId: string, files: Incomin
   });
   return { added: accepted.length, skipped };
 }
+
+async function ensureParents(projectId: string, path: string, userId: string) {
+  const dirs = parentDirs(path);
+  if (!dirs.length) return;
+  const blockers = await prisma.projectEntry.findMany({ where: { projectId, kind: "file", pathLower: { in: dirs.map((d) => d.toLowerCase()) } } });
+  if (blockers.length) throw new HttpError(409, "conflict", `${blockers[0].path} is a file, not a folder`);
+  await prisma.projectEntry.createMany({ data: dirs.map((d) => ({ projectId, path: d, pathLower: d.toLowerCase(), kind: "dir" as const, updatedById: userId })), skipDuplicates: true });
+}
+
+/** Creates a file when baseRevision is 0, otherwise saves only if nobody saved since that revision. */
+export async function saveText(project: Project, userId: string, rawPath: string, content: string, baseRevision: number): Promise<{ revision: number }> {
+  const pid = project.id;
+  const path = requirePath(rawPath);
+  const excluded = exclusionReason(path, "file");
+  if (excluded) throw new HttpError(400, "invalid", `This isn't allowed in projects: ${excluded}`);
+  const data = Buffer.from(content, "utf8");
+  if (data.length > LIMITS.maxEditorBytes) throw new HttpError(413, "too_large", "Files edited here can be up to 1 MB");
+  if (PRIVATE_KEY.test(content)) throw new HttpError(400, "invalid", "This file contains a private key, which isn't allowed in projects");
+  const existing = await prisma.projectEntry.findUnique({ where: { projectId_pathLower: { projectId: pid, pathLower: path.toLowerCase() } } });
+  const current = await prisma.project.findUniqueOrThrow({ where: { id: pid } });
+  if (current.totalBytes + data.length - (existing?.size ?? 0) > LIMITS.maxTotalBytes) throw new HttpError(413, "too_large", "The project has reached 50 MB");
+
+  if (baseRevision === 0) {
+    if (existing) throw new HttpError(409, "conflict", "A file or folder with this name already exists");
+    const entries = await prisma.projectEntry.count({ where: { projectId: pid } });
+    if (entries + 1 + parentDirs(path).length > LIMITS.maxEntries) throw new HttpError(413, "too_large", "The project has reached 2,000 files and folders");
+    const blobHash = await putBlob(data);
+    await ensureParents(pid, path, userId);
+    await prisma.$transaction(async (tx) => {
+      const entry = await tx.projectEntry.create({ data: { projectId: pid, path, pathLower: path.toLowerCase(), kind: "file", blobHash, size: data.length, isText: true, revision: 1, updatedById: userId } });
+      await tx.fileRevision.create({ data: { entryId: entry.id, projectId: pid, blobHash, size: data.length, revision: 1, reason: "edit", createdById: userId } });
+      await recount(tx, pid);
+    });
+    return { revision: 1 };
+  }
+
+  if (!existing || existing.kind !== "file") throw new HttpError(404, "not_found", "File not found");
+  if (!existing.isText) throw new HttpError(415, "not_text", "Binary files can't be edited here");
+  const blobHash = await putBlob(data);
+  const next = baseRevision + 1;
+  const updated = await prisma.$transaction(async (tx) => {
+    const r = await tx.projectEntry.updateMany({ where: { id: existing.id, revision: baseRevision }, data: { blobHash, size: data.length, revision: next, updatedById: userId } });
+    if (r.count === 0) return false;
+    await tx.fileRevision.create({ data: { entryId: existing.id, projectId: pid, blobHash, size: data.length, revision: next, reason: "edit", createdById: userId } });
+    await recount(tx, pid);
+    return true;
+  });
+  if (!updated) throw new HttpError(409, "conflict", "This file changed since you opened it. Reload to see the latest version.");
+  return { revision: next };
+}

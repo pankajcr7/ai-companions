@@ -4,7 +4,11 @@ import { prisma } from "../db.js";
 import { entryDTO, loadEntry, loadProject, ProjectParams, projectDTO, requirePath, sendFile } from "../files/service.js";
 import { getBlob } from "../files/store.js";
 import { writeZip } from "../files/zip.js";
-import { audit, HttpError, requireMember } from "../http.js";
+import { revisionKey } from "../goals/context.js";
+import { CallError, readiness } from "../goals/llm.js";
+import { loadHead } from "../goals/load.js";
+import { summarizeProject } from "../goals/summary.js";
+import { audit, HttpError, perUser, requireMember } from "../http.js";
 import { Name, WsParams } from "./workspaces.js";
 
 export async function projectRoutes(app: FastifyInstance) {
@@ -48,7 +52,10 @@ export async function projectRoutes(app: FastifyInstance) {
     await requireMember(req, id);
     const project = await loadProject(id, pid);
     const entries = await prisma.projectEntry.findMany({ where: { projectId: pid }, orderBy: { path: "asc" } });
-    return { project: projectDTO(project), entries: entries.map(entryDTO) };
+    const summary = project.summary
+      ? { text: project.summary, summarizedAt: project.summarizedAt, stale: project.summaryRevisionKey !== revisionKey(entries) }
+      : null;
+    return { project: projectDTO(project), entries: entries.map(entryDTO), summary };
   });
 
   app.get("/api/workspaces/:id/projects/:pid/download", async (req, reply) => {
@@ -70,4 +77,25 @@ export async function projectRoutes(app: FastifyInstance) {
     for (const e of entries) items.push(e.kind === "dir" ? { path: e.path, isDir: true } : { path: e.path, isDir: false, data: await getBlob(e.blobHash!) });
     return sendFile(reply, `${project.name}.zip`, writeZip(items), true);
   });
+
+  app.post(
+    "/api/workspaces/:id/projects/:pid/summarize",
+    { config: { rateLimit: { max: 5, timeWindow: "1 minute", keyGenerator: perUser } } },
+    async (req) => {
+      const { id, pid } = ProjectParams.parse(req.params);
+      await requireMember(req, id, "member");
+      const project = await loadProject(id, pid);
+      const nova = await loadHead(id);
+      const problem = nova ? readiness(nova) : "Your company has no head agent";
+      if (problem || !nova) throw new HttpError(409, "unassigned", `${problem}. Choose a model on the companion's Customize form.`);
+      const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id } });
+      try {
+        const s = await summarizeProject(project, nova, workspace.name);
+        return { summary: { ...s, stale: false } };
+      } catch (e) {
+        if (e instanceof CallError) throw new HttpError(502, e.code, `Nova couldn't summarize the project: ${e.message}`);
+        throw e;
+      }
+    },
+  );
 }

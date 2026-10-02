@@ -1,14 +1,17 @@
 import type { ChatTurn } from "./providers/types.js";
 
-export function companionInstructions(agent: { name: string; role: string; workingStyle: string }, company: string, department: string | null) {
-  return [
-    `You are ${agent.name}, the ${agent.role}${department ? ` in the ${department} department` : ""} at ${company}.`,
-    agent.workingStyle ? `Your working style: ${agent.workingStyle}` : "",
-    "You are an AI companion in this company's workspace. You can talk and help think things through. You cannot take actions, browse, or open files yet; if asked, say so plainly.",
-    "Keep answers clear and concise unless asked for more detail.",
-  ]
+export function companionIntro(agent: { name: string; role: string; workingStyle: string }, company: string, department: string | null) {
+  return [`You are ${agent.name}, the ${agent.role}${department ? ` in the ${department} department` : ""} at ${company}.`, agent.workingStyle ? `Your working style: ${agent.workingStyle}` : ""]
     .filter(Boolean)
     .join("\n");
+}
+
+export function companionInstructions(agent: { name: string; role: string; workingStyle: string }, company: string, department: string | null) {
+  return [
+    companionIntro(agent, company, department),
+    "You are an AI companion in this company's workspace. You can talk and help think things through. You cannot take actions, browse, or open files yet; if asked, say so plainly.",
+    "Keep answers clear and concise unless asked for more detail.",
+  ].join("\n");
 }
 
 /** Keeps the newest turns within maxChars (always the last one), and starts on a user turn. */
