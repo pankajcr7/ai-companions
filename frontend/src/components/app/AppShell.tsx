@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Buildings, GearSix, SignOut, TreeStructure } from "@phosphor-icons/react";
+import { Buildings, GearSix, Plugs, SignOut, TreeStructure } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/lib/workspace";
 import { Logo } from "@/components/landing/ui";
@@ -15,6 +15,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const nav = [
     { href: base, label: "Office", icon: Buildings },
     { href: `${base}/organization`, label: "Organization", icon: TreeStructure },
+    { href: `${base}/providers`, label: "AI providers", icon: Plugs },
     { href: `${base}/settings`, label: "Settings", icon: GearSix },
   ];
   const { theme, reducedMotion, calmMode } = snapshot.preferences;
