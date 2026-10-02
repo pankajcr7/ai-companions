@@ -93,10 +93,10 @@ Rate limits per user: goals 10/min, summarize 5/min.
 ## 7. Frontend
 
 - **Command bar**: project picker (`No project` or projects); send creates a goal and opens the Goal panel; `chat:` prefix keeps the one-to-one behavior with Nova. Disabled with a "Choose a model for Nova" link when Nova has no model.
-- **Goal panel** (right side, bottom sheet on phones): planning state; editable plan (task cards with assignee select, title, instructions, waits-for chips, remove, add task, Start, Cancel, model warnings); running state with per-task status and expandable results (Markdown rendered safely as text with basic formatting) and files read; proposed edits rows with View changes (side-by-side read-only CodeMirror merge view), Apply, Reject, out-of-date label; done state with Nova's summary and Copy summary; failed state with Try again.
+- **Goal panel** (right side, bottom sheet on phones): planning state; editable plan (task cards with assignee select, title, instructions, deliverable, acceptance criteria, waits-for chips, remove, add task, Start, Cancel, model warnings); running state with per-task status and expandable results (Markdown rendered safely as text with basic formatting) and files read; proposed edits rows with View changes (side-by-side read-only CodeMirror merge view), Apply, Reject, out-of-date label; done state with Nova's summary, a "meets criteria" or "needs your eyes" chip per task, thumbs up/down with reason chips per task, and Copy summary; failed state with Try again.
 - **Goals list**: "Goals" button in the office header lists recent goals.
 - **Office**: companions with running tasks show "Thinking".
-- **Project page**: Project summary box with Read my project / Refresh and the date; "Out of date" label when stale.
+- **Project page**: Project summary box with Read my project / Refresh and the date; "Out of date" label when stale; a hint that `.company/brief.md` and `.company/brand.md` are shared with every companion, with buttons that create them from a short template in the editor.
 
 ## 8. Security and cost
 
@@ -107,7 +107,7 @@ Rate limits per user: goals 10/min, summarize 5/min.
 ## 9. Testing
 
 - **Unit**: plan schema and cycle detection, context budget and map truncation, edit block parsing and validation.
-- **Routes** (fake OpenAI-compatible server with scripted replies): plan creation, repair retry and failure; plan editing validation; start blocked by missing models; dependency order and result passing; concurrency cap; failure skipping dependents and retry; cancel; restart recovery marks interrupted; file selection drops unknown paths and respects the budget; proposed edits applied, rejected, stale, rule-violating; summary generation and staleness; roles and cross-workspace isolation.
+- **Routes** (fake OpenAI-compatible server with scripted replies): plan creation, repair retry and failure; plan editing validation; start blocked by missing models; dependency order and result passing; concurrency cap; failure skipping dependents and retry; cancel; restart recovery marks interrupted; file selection drops unknown paths and respects the budget; proposed edits applied, rejected, stale, rule-violating; brief and brand files included first and capped; verdicts parsed from the summary; ratings; one step row per model call; summary generation and staleness; roles and cross-workspace isolation.
 - **E2E**: upload fixture project, connect the fake LLM, assign models, send a goal, edit a task, Start, see results, view and apply a proposed edit, see version 2 of the file in the project.
 
 ## 10. Research input
