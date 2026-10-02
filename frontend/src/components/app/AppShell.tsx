@@ -26,8 +26,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app flex min-h-[100dvh] flex-col lg:flex-row" data-theme={theme} data-still={reducedMotion || calmMode}>
-      <aside className="flex items-center justify-between gap-4 border-b border-line bg-paper px-4 py-3 lg:w-60 lg:flex-col lg:items-stretch lg:justify-start lg:border-b-0 lg:border-r lg:p-5">
-        <Link href={base} aria-label="Office home"><Logo className="text-lg" /></Link>
+      <aside className="flex items-center justify-between gap-2 border-b border-line bg-paper px-4 py-3 lg:w-60 lg:flex-col lg:items-stretch lg:justify-start lg:border-b-0 lg:border-r lg:p-5">
+        <Link href={base} aria-label="Office home"><Logo className="text-base sm:text-lg" /></Link>
         <p className="hidden truncate text-sm font-medium text-muted lg:mt-6 lg:block">{snapshot.workspace.name}</p>
         <nav aria-label="App" className="flex gap-1 lg:mt-4 lg:flex-col">
           {nav.map(({ href, label, icon: Icon }) => {
@@ -37,14 +37,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={href}
                 href={href}
                 aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-2 rounded-[10px] px-3 py-2 text-sm font-medium ${active ? "bg-ink text-paper" : "text-ink hover:bg-bg"}`}
+                className={`flex items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm font-medium sm:px-3 ${active ? "bg-ink text-paper" : "text-ink hover:bg-bg"}`}
               >
                 <Icon size={18} /> <span className="hidden sm:inline">{label}</span>
               </Link>
             );
           })}
         </nav>
-        <button onClick={signOut} className="flex items-center gap-2 rounded-[10px] px-3 py-2 text-sm text-muted hover:bg-bg lg:mt-auto">
+        <button onClick={signOut} className="flex items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm text-muted hover:bg-bg sm:px-3 lg:mt-auto">
           <SignOut size={18} /> <span className="hidden sm:inline">Sign out</span>
         </button>
       </aside>

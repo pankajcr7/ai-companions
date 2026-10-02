@@ -15,7 +15,7 @@ type Gesture =
 
 const TABLE_W = 300;
 const TABLE_H = 240;
-const clamp = (k: number) => Math.min(2.5, Math.max(0.3, k));
+const clamp = (k: number) => Math.min(2.5, Math.max(0.12, k));
 const zoomAt = (v: View, k: number, cx: number, cy: number): View => {
   const nk = clamp(k);
   return { k: nk, x: cx - (cx - v.x) * (nk / v.k), y: cy - (cy - v.y) * (nk / v.k) };

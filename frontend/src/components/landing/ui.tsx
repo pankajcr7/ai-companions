@@ -2,7 +2,7 @@ import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 
 export function Logo({ className = "" }: { className?: string }) {
   return (
-    <span className={`inline-flex items-center gap-[0.35em] font-display text-xl font-semibold tracking-tight text-ink ${className}`}>
+    <span className={`inline-flex items-center gap-[0.35em] whitespace-nowrap font-display text-xl font-semibold tracking-tight text-ink ${className}`}>
       <svg viewBox="0 0 24 24" className="size-[1.35em]" aria-hidden="true">
         <rect width="24" height="24" rx="7" fill="var(--ink)" />
         <rect x="5" y="9" width="14" height="6" rx="3" fill="var(--lime)" />

@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "dev:frontend": "npm --prefix frontend run dev",
-    "dev:backend": "npm --prefix backend run dev"
+    "dev:backend": "npm --prefix backend run dev",
+    "test": "npm --prefix backend test && npm --prefix frontend run e2e"
   }
 }

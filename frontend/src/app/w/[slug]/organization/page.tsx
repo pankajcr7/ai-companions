@@ -14,7 +14,7 @@ function Tree({ agents, managerId }: { agents: Agent[]; managerId: string }) {
     <ul className="ml-5 border-l border-line pl-4">
       {reports.map((a) => (
         <li key={a.id} className="py-1.5">
-          <span className="flex items-center gap-2 text-sm">
+          <span className="flex flex-wrap items-center gap-x-2 text-sm">
             <CompanionAvatar look={a.appearance} size={28} /> <span className="font-medium">{a.name}</span> <span className="text-muted">{a.role}, {statusLabel(a)}</span>
           </span>
           <Tree agents={agents} managerId={a.id} />
@@ -56,8 +56,8 @@ export default function Organization() {
     });
 
   return (
-    <main className="grid gap-8 p-6 lg:grid-cols-2">
-      <section aria-labelledby="dept-title">
+    <main className="grid gap-8 p-4 sm:p-6 lg:grid-cols-2">
+      <section aria-labelledby="dept-title" className="min-w-0">
         <h1 id="dept-title" className="text-2xl font-semibold">Departments</h1>
         {!admin && <p className="mt-1 text-sm text-muted">Only owners and admins can change departments.</p>}
         {error && <p role="alert" className="mt-3 text-sm text-[#b42318]">{error}</p>}
@@ -65,7 +65,7 @@ export default function Organization() {
           {depts.map((d, i) => (
             <li key={d.id} className="flex items-center gap-2 rounded-[12px] border border-line bg-paper p-2">
               <form
-                className="flex flex-1 gap-2"
+                className="flex min-w-0 flex-1 gap-2"
                 onSubmit={(e) => {
                   e.preventDefault();
                   const name = new FormData(e.currentTarget).get("name");
@@ -108,13 +108,13 @@ export default function Organization() {
             }}
           >
             <label className="sr-only" htmlFor="new-dept">New department name</label>
-            <input id="new-dept" name="name" required maxLength={60} placeholder="New department" className="flex-1 rounded-[10px] border border-line bg-paper px-3 py-2 text-sm" />
+            <input id="new-dept" name="name" required maxLength={60} placeholder="New department" className="min-w-0 flex-1 rounded-[10px] border border-line bg-paper px-3 py-2 text-sm" />
             <button disabled={busy} className="btn-dark rounded-[10px] px-4 text-sm font-semibold text-paper">Add</button>
           </form>
         )}
       </section>
 
-      <section aria-labelledby="tree-title">
+      <section aria-labelledby="tree-title" className="min-w-0">
         <h2 id="tree-title" className="text-2xl font-semibold">Reporting lines</h2>
         <p className="mt-1 text-sm text-muted">Change who someone reports to from their Customize form in the office.</p>
         <div className="mt-4 rounded-[12px] border border-line bg-paper p-4">
@@ -122,7 +122,7 @@ export default function Organization() {
           {head && (
             <ul className="ml-5 border-l border-line pl-4">
               <li className="py-1.5">
-                <span className="flex items-center gap-2 text-sm">
+                <span className="flex flex-wrap items-center gap-x-2 text-sm">
                   <CompanionAvatar look={head.appearance} size={28} /> <span className="font-medium">{head.name}</span> <span className="text-muted">{head.role}</span>
                 </span>
                 <Tree agents={snapshot.agents} managerId={head.id} />
