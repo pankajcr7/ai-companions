@@ -24,6 +24,8 @@ const Fields = {
   departmentId: z.string().max(64).nullable(),
   managerId: z.string().max(64).nullable(),
   appearance: Look,
+  connectionId: z.string().max(64).nullable(),
+  model: z.string().trim().min(1).max(200).nullable(),
 };
 
 const CreateAgent = z.object({
@@ -32,12 +34,18 @@ const CreateAgent = z.object({
   workingStyle: Fields.workingStyle.default(""),
   departmentId: Fields.departmentId.default(null),
   managerId: Fields.managerId.default(null),
+  connectionId: Fields.connectionId.default(null),
+  model: Fields.model.default(null),
 });
 
 const UpdateAgent = z.object(Fields).partial().extend({ status: z.enum(["active", "paused", "archived"]).optional() });
 
 /** Department and manager must exist in this workspace; managers must be active and not create a loop. */
-async function checkRelations(workspaceId: string, agentId: string | null, departmentId?: string | null, managerId?: string | null) {
+async function checkRelations(workspaceId: string, agentId: string | null, departmentId?: string | null, managerId?: string | null, connectionId?: string | null) {
+  if (connectionId) {
+    const conn = await prisma.providerConnection.findFirst({ where: { id: connectionId, workspaceId } });
+    if (!conn) throw new HttpError(400, "invalid", "That AI connection isn't in this workspace");
+  }
   if (departmentId) {
     const dept = await prisma.department.findFirst({ where: { id: departmentId, workspaceId } });
     if (!dept) throw new HttpError(400, "invalid", "That department isn't in this workspace");
@@ -57,7 +65,7 @@ export async function agentRoutes(app: FastifyInstance) {
     const { id } = WsParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
     const { appearance, ...body } = CreateAgent.parse(req.body);
-    await checkRelations(id, null, body.departmentId, body.managerId);
+    await checkRelations(id, null, body.departmentId, body.managerId, body.connectionId);
     const agent = await prisma.$transaction(async (tx) => {
       const created = await tx.agent.create({ data: { ...body, workspaceId: id, appearance: { create: appearance } } });
       await relayout(tx, id);
@@ -75,8 +83,8 @@ export async function agentRoutes(app: FastifyInstance) {
     if (!agent) throw new HttpError(404, "not_found", "Companion not found");
     if (agent.isHead && status === "archived") throw new HttpError(400, "invalid", "The head agent can't be archived");
     if (agent.isHead && body.managerId) throw new HttpError(400, "invalid", "The head agent reports to you, not to another companion");
-    if (agent.managerId !== body.managerId || agent.departmentId !== body.departmentId) {
-      await checkRelations(id, agentId, body.departmentId, body.managerId);
+    if (agent.managerId !== body.managerId || agent.departmentId !== body.departmentId || (body.connectionId && body.connectionId !== agent.connectionId)) {
+      await checkRelations(id, agentId, body.departmentId, body.managerId, body.connectionId);
     }
     const structural = (body.departmentId !== undefined && body.departmentId !== agent.departmentId) || (status !== undefined && status !== agent.status);
     const action = status && status !== agent.status ? { archived: "agent.archive", paused: "agent.pause", active: "agent.resume" }[status] : "agent.update";
@@ -116,6 +124,8 @@ export async function agentRoutes(app: FastifyInstance) {
           role: src.role,
           kind: src.kind,
           workingStyle: src.workingStyle,
+          connectionId: src.connectionId,
+          model: src.model,
           departmentId: src.departmentId,
           // A copy of the head agent reports to the head agent.
           managerId: src.isHead ? src.id : src.managerId,

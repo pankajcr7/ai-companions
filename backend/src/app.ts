@@ -7,6 +7,7 @@ import { workspaceRoutes } from "./routes/workspaces.js";
 import { agentRoutes } from "./routes/agents.js";
 import { connectionRoutes } from "./routes/connections.js";
 import { chatgptRoutes } from "./routes/chatgpt.js";
+import { chatRoutes } from "./routes/chat.js";
 import { waitlistRoutes } from "./routes/waitlist.js";
 
 export async function buildApp() {
@@ -20,6 +21,7 @@ export async function buildApp() {
   await app.register(agentRoutes);
   await app.register(connectionRoutes);
   await app.register(chatgptRoutes);
+  await app.register(chatRoutes);
   await app.register(waitlistRoutes);
   return app;
 }
