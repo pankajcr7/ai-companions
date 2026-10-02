@@ -1,5 +1,5 @@
 import type { ServerResponse } from "node:http";
-import { afterAll, beforeEach, expect, test } from "vitest";
+import { afterAll, beforeEach, expect, test, vi } from "vitest";
 import { encryptSecret } from "../src/crypto.js";
 import { prisma } from "../src/db.js";
 import { trimTurns } from "../src/companion.js";
@@ -194,6 +194,31 @@ test("a rejected ChatGPT token marks the connection as needing sign-in", async (
   const events = parseEvents((await req("POST", `/api/workspaces/${id}/agents/${nova.id}/chat`, { message: "Hi" })).body);
   expect(events.at(-1)).toMatchObject({ event: "error", data: { code: "reauth" } });
   expect((await prisma.providerConnection.findUniqueOrThrow({ where: { id: conn.id } })).status).toBe("reauth");
+  // The saved message must say the same thing the user saw.
+  const saved = await prisma.chatMessage.findFirstOrThrow({ where: { agentId: nova.id, role: "assistant" }, orderBy: { createdAt: "desc" } });
+  expect(saved).toMatchObject({ errorCode: "reauth", errorMessage: expect.stringMatching(/Sign in to ChatGPT again/) });
+  // Testing the connection keeps it in "sign in again", not a generic error.
+  fake.routes["GET /v1/models"] = (_q, res) => json(res, 401, { error: { message: "expired" } });
+  await prisma.providerConnection.update({ where: { id: conn.id }, data: { status: "connected" } });
+  const r = (await req("POST", `/api/workspaces/${id}/connections/${conn.id}/test`)).json();
+  expect(r.ok).toBe(false);
+  expect((await prisma.providerConnection.findUniqueOrThrow({ where: { id: conn.id } })).status).toBe("reauth");
+  fake.routes["GET /v1/models"] = (_q, res) => json(res, 200, { data: [{ id: "fake-1" }] });
+});
+
+test("a failed save still ends the stream with an error event", async () => {
+  const { req, id, cid, nova } = await setup();
+  await req("PATCH", `/api/workspaces/${id}/agents/${nova.id}`, { connectionId: cid, model: "fake-1" });
+  const original = prisma.chatMessage.create.bind(prisma.chatMessage);
+  const spy = vi.spyOn(prisma.chatMessage, "create").mockImplementation(((args: { data: { role: string } }) =>
+    args.data.role === "assistant" ? Promise.reject(new Error("db blip")) : original(args as never)) as never);
+  try {
+    const res = await req("POST", `/api/workspaces/${id}/agents/${nova.id}/chat`, { message: "Hi" });
+    const events = parseEvents(res.body);
+    expect(events.at(-1)).toMatchObject({ event: "error", data: { code: "server_error" } });
+  } finally {
+    spy.mockRestore();
+  }
 });
 
 test("stopping before the first word arrives still saves the reply as stopped", async () => {

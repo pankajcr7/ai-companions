@@ -5,7 +5,7 @@ import type { ProviderKind } from "../generated/prisma/client.js";
 import { anthropicClient } from "./anthropic.js";
 import { openAiChatClient } from "./openai-chat.js";
 import { openAiResponsesClient } from "./openai-responses.js";
-import type { ProviderClient } from "./types.js";
+import { ProviderError, type ProviderClient } from "./types.js";
 
 export const PRESETS = {
   openrouter: "https://openrouter.ai/api/v1",
@@ -31,6 +31,22 @@ export function clientFor(conn: ConnectionLike): ProviderClient {
     case "custom":
       return openAiChatClient({ baseUrl: conn.baseUrl ?? "", apiKey: secret });
     case "chatgpt":
-      return openAiResponsesClient({ baseUrl: openaiBase(), token: () => chatgptAccessToken(conn.id), modelList: "chatgpt" });
+      return asReauth(openAiResponsesClient({ baseUrl: openaiBase(), token: () => chatgptAccessToken(conn.id), modelList: "chatgpt" }));
   }
+}
+
+/** For ChatGPT a rejected token means the session ended: report "sign in again", not "bad key". */
+function asReauth(client: ProviderClient): ProviderClient {
+  const map = (e: unknown) =>
+    e instanceof ProviderError && e.code === "auth" ? new ProviderError("reauth", "Sign in to ChatGPT again to keep using it.", e.status) : e;
+  return {
+    listModels: (signal) => client.listModels(signal).catch((e) => Promise.reject(map(e))),
+    async *stream(args) {
+      try {
+        yield* client.stream(args);
+      } catch (e) {
+        throw map(e);
+      }
+    },
+  };
 }

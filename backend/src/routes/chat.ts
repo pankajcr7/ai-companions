@@ -124,31 +124,38 @@ export async function chatRoutes(app: FastifyInstance) {
       }
 
       const status = clientGone ? "stopped" : failure ? "error" : "complete";
-      const saved = await prisma.chatMessage.create({
-        data: {
-          workspaceId: id,
-          agentId,
-          userId: user.id,
-          role: "assistant",
-          content: text,
-          status,
-          connectionId: conn.id,
-          kind: conn.kind,
-          model: done?.model ?? agent.model,
-          inputTokens: done?.usage.inputTokens ?? null,
-          outputTokens: done?.usage.outputTokens ?? null,
-          errorCode: failure?.code ?? null,
-          errorMessage: failure?.message ?? null,
-        },
-      });
-      if (conn.kind === "chatgpt" && failure && (failure.code === "auth" || failure.code === "reauth")) {
-        await prisma.providerConnection.update({ where: { id: conn.id }, data: { status: "reauth", lastError: "Sign in to ChatGPT again" } });
-        failure = { code: "reauth", message: "Sign in to ChatGPT again to keep using it." };
+      // The response is already hijacked: whatever happens below, the stream must end.
+      try {
+        const saved = await prisma.chatMessage.create({
+          data: {
+            workspaceId: id,
+            agentId,
+            userId: user.id,
+            role: "assistant",
+            content: text,
+            status,
+            connectionId: conn.id,
+            kind: conn.kind,
+            model: done?.model ?? agent.model,
+            inputTokens: done?.usage.inputTokens ?? null,
+            outputTokens: done?.usage.outputTokens ?? null,
+            errorCode: failure?.code ?? null,
+            errorMessage: failure?.message ?? null,
+          },
+        });
+        if (conn.kind === "chatgpt" && failure && (failure.code === "auth" || failure.code === "reauth")) {
+          await prisma.providerConnection.update({ where: { id: conn.id }, data: { status: "reauth", lastError: "Sign in to ChatGPT again" } });
+          failure = { code: "reauth", message: "Sign in to ChatGPT again to keep using it." };
+        }
+        if (clientGone) return;
+        if (failure) send("error", { messageId: saved.id, ...failure });
+        else send("done", { messageId: saved.id, model: saved.model, inputTokens: saved.inputTokens, outputTokens: saved.outputTokens });
+      } catch (e) {
+        req.log.error(e);
+        if (!clientGone) send("error", { messageId: null, code: "server_error", message: "The reply couldn't be saved. Try again." });
+      } finally {
+        if (!raw.writableEnded) raw.end();
       }
-      if (clientGone) return;
-      if (failure) send("error", { messageId: saved.id, ...failure });
-      else send("done", { messageId: saved.id, model: saved.model, inputTokens: saved.inputTokens, outputTokens: saved.outputTokens });
-      raw.end();
     },
   );
 }

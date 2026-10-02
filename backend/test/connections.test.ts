@@ -112,3 +112,20 @@ test("removing a connection unassigns companions that use it", async () => {
   expect(del.json()).toEqual({ revoked: null });
   expect((await prisma.agent.findUniqueOrThrow({ where: { id: agent.id } })).connectionId).toBeNull();
 });
+
+test("junk extra cookies don't create new rate-limit buckets for the same user", async () => {
+  const { cookie } = await signUp(app);
+  const req = client(app, cookie);
+  const id = (await req("POST", "/api/workspaces", { name: "Limit Co", template: "head-only" })).json().id as string;
+  const codes: number[] = [];
+  for (let i = 0; i < 6; i++) {
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/workspaces/${id}/connections/chatgpt/start`,
+      headers: { cookie: `${cookie}; junk=${i}`, origin: "http://localhost:3000" },
+      payload: {},
+    });
+    codes.push(res.statusCode);
+  }
+  expect(codes.at(-1)).toBe(429);
+});

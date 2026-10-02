@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { replyArrived } from "@/lib/chat";
 import { readEvents } from "@/lib/sse";
 import { canEdit, CHATGPT_USAGE_URL, type Agent, type ChatMessageDTO } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace";
@@ -50,7 +51,7 @@ export function CompanionChat({ agent, onEdit, onThinking }: { agent: Agent; onE
     onThinking(true);
     const ac = new AbortController();
     abort.current = ac;
-    const before = messages?.length ?? 0;
+    const lastIdBeforeSend = messages?.at(-1)?.id ?? null;
     let stopped = false;
     try {
       const res = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message }), signal: ac.signal });
@@ -68,14 +69,15 @@ export function CompanionChat({ agent, onEdit, onThinking }: { agent: Agent; onE
       if (stopped) {
         // The server saves the stopped reply a moment later; keep it on screen until the saved copy arrives.
         setPending((p) => (p ? { ...p, stopped: true } : p));
+        let latest: ChatMessageDTO[] | null = null;
         for (let i = 0; i < 8; i++) {
           const r = await api<{ messages: ChatMessageDTO[] }>(path).catch(() => null);
-          if (r && r.messages.length >= before + 2) {
-            setMessages(r.messages);
-            break;
-          }
+          if (r) latest = r.messages;
+          if (latest && replyArrived(latest, lastIdBeforeSend)) break;
           await new Promise((res) => setTimeout(res, 1000));
         }
+        // Always show the newest history we got, even if the stopped reply never appeared.
+        if (latest) setMessages(latest);
       } else {
         await load().catch(() => {});
       }

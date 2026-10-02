@@ -58,5 +58,6 @@ export function audit(
   return db.auditLog.create({ data: { workspaceId, actorUserId, action, targetType, targetId, data } });
 }
 
-/** Rate-limit key: the session cookie (one bucket per signed-in user), falling back to the IP. */
-export const perUser = (req: FastifyRequest) => req.headers.cookie ?? req.ip;
+/** Rate-limit key: the Better Auth session token only (extra cookies can't mint new buckets), else the IP. */
+export const perUser = (req: FastifyRequest) =>
+  /(?:^|;\s*)(?:__Secure-)?better-auth\.session_token=([^;]+)/.exec(req.headers.cookie ?? "")?.[1] ?? req.ip;
