@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+/* Light "blueprint" theme: grey paper, white panels, ink text, one lime accent used as fills only (never as text on light). */
+:root {
+  --bg: #f3f4f6;
+  --paper: #ffffff;
+  --ink: #0b0d10;
+  --muted: #5b6270;
+  --line: #e1e3e8;
+  --lime: #a6ff00;
+  --dark: #1c1f23;
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-lime: var(--lime);
+  --color-dark: var(--dark);
+  --font-sans: var(--font-urbanist);
+  --font-display: var(--font-space-grotesk);
+}
+
+/* Radius system: buttons and cards 10-12px, chips 2px, photos square. */
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+::selection {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.grid-paper {
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 62px 62px;
+}
+
+.hatch {
+  background-image: repeating-linear-gradient(135deg, var(--line) 0 1px, transparent 1px 10px);
+}
+
+/* Dark "3D" button from the reference: gradient face, hard bottom edge, soft drop shadow. */
+.btn-dark {
+  background: linear-gradient(180deg, #4a4e55 0%, #2a2d32 55%, #1f2226 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    0 3px 0 #0b0d10,
+    0 18px 30px -10px rgb(11 13 16 / 0.45);
+}
+
+.btn-light {
+  background: var(--paper);
+  box-shadow:
+    0 3px 0 var(--line),
+    0 14px 26px -12px rgb(11 13 16 / 0.25);
+}
+
+.card-lift {
+  box-shadow: 0 4px 0 var(--line);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .marquee-left {
+    animation: marquee 38s linear infinite;
+  }
+  .marquee-right {
+    animation: marquee 38s linear infinite reverse;
+  }
+  .rise {
+    animation: rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--i, 0) * 90ms);
+  }
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 35%;
+    }
+  }
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+details > summary {
+  list-style: none;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}
