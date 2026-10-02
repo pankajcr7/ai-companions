@@ -58,6 +58,8 @@ body {
 
 /* Dark "3D" button from the reference: gradient face, hard bottom edge, soft drop shadow. */
 .btn-dark {
+  /* The face is always dark, so its text is always light, in either theme. */
+  color: #f5f6f8;
   background: linear-gradient(180deg, #4a4e55 0%, #2a2d32 55%, #1f2226 100%);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.18),

@@ -1,8 +1,5 @@
-"use client";
-
-import { useWorkspace } from "@/lib/workspace";
+import { Office } from "@/components/app/office/Office";
 
 export default function OfficePage() {
-  const { snapshot } = useWorkspace();
-  return <p className="p-8">{snapshot.agents.length} companions in {snapshot.workspace.name}</p>;
+  return <Office />;
 }
