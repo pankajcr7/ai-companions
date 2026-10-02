@@ -116,6 +116,7 @@ model Workspace {
   auditLogs    AuditLog[]
   connections  ProviderConnection[]
   chatMessages ChatMessage[]
+  projects     Project[]
 }
 
 model Membership {
@@ -287,4 +288,95 @@ model ChatMessage {
 
   @@index([agentId, userId, createdAt])
   @@index([workspaceId])
+}
+
+enum EntryKind {
+  file
+  dir
+}
+
+enum RevisionReason {
+  upload
+  edit
+  restore
+  rename
+}
+
+enum ImportStatus {
+  running
+  complete
+  failed
+  cancelled
+}
+
+enum ImportSource {
+  folder
+  zip
+  files
+}
+
+model Project {
+  id          String          @id @default(cuid())
+  workspaceId String
+  name        String
+  createdById String
+  totalBytes  Int             @default(0)
+  fileCount   Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  entries     ProjectEntry[]
+  imports     ProjectImport[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model ProjectEntry {
+  id          String         @id @default(cuid())
+  projectId   String
+  path        String
+  pathLower   String
+  kind        EntryKind
+  blobHash    String?
+  size        Int            @default(0)
+  isText      Boolean        @default(false)
+  revision    Int            @default(0)
+  updatedById String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revisions   FileRevision[]
+
+  @@unique([projectId, pathLower])
+}
+
+model FileRevision {
+  id          String         @id @default(cuid())
+  entryId     String
+  projectId   String
+  blobHash    String
+  size        Int
+  revision    Int
+  reason      RevisionReason
+  fromPath    String?
+  createdById String
+  createdAt   DateTime       @default(now())
+  entry       ProjectEntry   @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([entryId, revision])
+}
+
+model ProjectImport {
+  id          String       @id @default(cuid())
+  projectId   String
+  source      ImportSource
+  status      ImportStatus @default(running)
+  added       Int          @default(0)
+  skipped     Json         @default("[]")
+  createdNew  Boolean      @default(false)
+  createdById String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
