@@ -269,28 +269,33 @@ model ProviderConnection {
 }
 
 model ChatMessage {
-  id           String              @id @default(cuid())
-  workspaceId  String
-  agentId      String
-  userId       String
-  role         MessageRole
-  content      String
-  status       MessageStatus       @default(complete)
-  connectionId String?
-  kind         ProviderKind?
-  model        String?
-  inputTokens  Int?
-  outputTokens Int?
-  errorCode    String?
-  errorMessage String?
-  createdAt    DateTime            @default(now())
-  workspace    Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  agent        Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  connection   ProviderConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  id             String              @id @default(cuid())
+  workspaceId    String
+  agentId        String
+  userId         String
+  role           MessageRole
+  content        String
+  status         MessageStatus       @default(complete)
+  connectionId   String?
+  kind           ProviderKind?
+  model          String?
+  inputTokens    Int?
+  outputTokens   Int?
+  errorCode      String?
+  errorMessage   String?
+  createdAt      DateTime            @default(now())
+  workspace      Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent          Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection     ProviderConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  conversationId String?
+  conversation   Conversation?       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  goalId         String?
+  planBlocked    String?
 
   @@index([agentId, userId, createdAt])
   @@index([workspaceId])
+  @@index([conversationId, createdAt])
 }
 
 enum EntryKind {
@@ -544,4 +549,16 @@ model GoalMessage {
   goal         Goal          @relation(fields: [goalId], references: [id], onDelete: Cascade)
 
   @@index([goalId, userId, createdAt])
+}
+
+model Conversation {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  title       String        @default("New chat")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  messages    ChatMessage[]
+
+  @@index([workspaceId, userId, updatedAt])
 }

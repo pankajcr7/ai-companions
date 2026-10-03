@@ -40,7 +40,7 @@ export async function chatRoutes(app: FastifyInstance) {
     const { id, agentId } = AgentParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
     await loadAgent(id, agentId);
-    const rows = await prisma.chatMessage.findMany({ where: { agentId, userId: user.id }, orderBy: { createdAt: "desc" }, take: HISTORY });
+    const rows = await prisma.chatMessage.findMany({ where: { agentId, userId: user.id, conversationId: null }, orderBy: { createdAt: "desc" }, take: HISTORY });
     return { messages: rows.reverse().map(dto) };
   });
 
@@ -48,7 +48,7 @@ export async function chatRoutes(app: FastifyInstance) {
     const { id, agentId } = AgentParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
     await loadAgent(id, agentId);
-    await prisma.chatMessage.deleteMany({ where: { agentId, userId: user.id } });
+    await prisma.chatMessage.deleteMany({ where: { agentId, userId: user.id, conversationId: null } });
     return reply.code(204).send();
   });
 
@@ -67,7 +67,7 @@ export async function chatRoutes(app: FastifyInstance) {
       if (!conn || !agent.model) throw new HttpError(409, "unassigned", `Choose an AI model for ${agent.name} first`);
       if (conn.status === "reauth") throw new HttpError(409, "reauth", "Sign in to ChatGPT again on the AI providers page");
 
-      const history = await prisma.chatMessage.findMany({ where: { agentId, userId: user.id, status: "complete" }, orderBy: { createdAt: "desc" }, take: CONTEXT_MESSAGES });
+      const history = await prisma.chatMessage.findMany({ where: { agentId, userId: user.id, status: "complete", conversationId: null }, orderBy: { createdAt: "desc" }, take: CONTEXT_MESSAGES });
       const userMsg = await prisma.chatMessage.create({ data: { workspaceId: id, agentId, userId: user.id, role: "user", content: message } });
       const turns = trimTurns([...history.reverse().map((m): ChatTurn => ({ role: m.role, content: m.content })), { role: "user", content: message }], CONTEXT_CHARS);
       // Nova leads the team, so its chat knows the roster and can hand work to it; other companions just chat.
