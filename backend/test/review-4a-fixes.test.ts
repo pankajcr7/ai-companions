@@ -69,8 +69,11 @@ test("two tasks creating the same file at once: both finish, one saves it and th
 
 test("a busy work request can be planned later from its message, linked into the conversation", async () => {
   const co = await company(app, llm);
+  // Planning waits until the test opens the gate, so the first goal is still busy however slow the database is.
+  let open!: () => void;
+  const gate = new Promise<void>((r) => (open = r));
   llm.setScript(async (s, u) => {
-    if (isPlan(s)) return fence({ tasks: [task(co.nova.id, "t")] });
+    if (isPlan(s)) return (await gate, fence({ tasks: [task(co.nova.id, "t")] }));
     if (isNova(s)) return `On it.\n\n${fence({ suggest: { goal: u } })}`;
     return "ok";
   });
@@ -81,6 +84,7 @@ test("a busy work request can be planned later from its message, linked into the
   const msgs = (await co.req("GET", cbase)).json().messages.filter((m: { role: string }) => m.role === "assistant");
   const firstGoal = msgs[0].goalId as string;
   expect(msgs[1].planBlocked).toBe("busy");
+  open();
   await waitFor(async () => (await co.req("GET", `/api/workspaces/${co.id}/goals/${firstGoal}`)).json().goal, (x) => x.status === "awaiting_approval");
   const res = await co.req("POST", `${cbase}/messages/${msgs[1].id}/plan`);
   expect(res.statusCode).toBe(200);

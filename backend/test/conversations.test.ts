@@ -1,7 +1,7 @@
 import { afterAll, expect, test, vi } from "vitest";
 import { prisma } from "../src/db.js";
 import { client, makeApp, signUp } from "./helpers.js";
-import { company, fakeLLM, fence, sleep, systemOf, waitFor } from "./goal-helpers.js";
+import { company, fakeLLM, fence, systemOf, waitFor } from "./goal-helpers.js";
 
 vi.setConfig({ testTimeout: 240_000 });
 const llm = await fakeLLM();
@@ -80,8 +80,11 @@ test("Nova sees the conversation's goal results; the chip picks the project; new
 
 test("a second work request while a goal is busy is marked, not planned; hire-only creates nothing", async () => {
   const co = await company(app, llm);
+  // Planning waits until the test opens the gate, so the first goal is still busy however slow the database is.
+  let open!: () => void;
+  const gate = new Promise<void>((r) => (open = r));
   llm.setScript(async (s, u) => {
-    if (isPlan(s)) return (await sleep(6000), fence({ tasks: [{ agentId: co.nova.id, title: "t", instructions: "i", deliverable: "d", criteria: ["c"], dependsOn: [] }] }));
+    if (isPlan(s)) return (await gate, fence({ tasks: [{ agentId: co.nova.id, title: "t", instructions: "i", deliverable: "d", criteria: ["c"], dependsOn: [] }] }));
     if (isNova(s)) return u.includes("hire") ? `No marketer.\n\n${fence({ suggest: { hire: [{ role: "Marketing lead" }] } })}` : suggest(u);
     return "ok";
   });
@@ -95,6 +98,7 @@ test("a second work request while a goal is busy is marked, not planned; hire-on
     [false, "busy"],
     [false, null],
   ]);
+  open();
 });
 
 test("titles are cut; deleting a conversation keeps its goal; others' conversations are private; viewers read only", async () => {
