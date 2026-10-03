@@ -172,7 +172,7 @@ export function Office() {
         )}
         {!selected && goalId && (
           <div className="fixed inset-x-0 bottom-0 z-20 max-h-[75dvh] overflow-auto rounded-t-[16px] shadow-2xl lg:static lg:max-h-none lg:w-96 lg:rounded-none lg:shadow-none">
-            <GoalPanel key={goalId} goalId={goalId} onClose={() => setGoalId(null)} onWorking={setGoalWorking} />
+            <GoalPanel key={goalId} goalId={goalId} onClose={() => setGoalId(null)} onWorking={setGoalWorking} onOpenGoal={(id) => setGoalId(id)} />
           </div>
         )}
       </div>

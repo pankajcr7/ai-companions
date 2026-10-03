@@ -6,6 +6,7 @@ import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { api } from "@/lib/api";
 import type { EditDTO } from "@/lib/goals";
+import { CopyButton } from "../chat/CopyButton";
 
 /** Side-by-side, read-only: the current file on the left, the companion's proposal on the right. */
 export function EditReview({ goalPath, edit, onClose }: { goalPath: string; edit: EditDTO; onClose: () => void }) {
@@ -33,7 +34,10 @@ export function EditReview({ goalPath, edit, onClose }: { goalPath: string; edit
     <dialog ref={dialog} onClose={onClose} aria-labelledby="edit-title" className="m-auto w-[min(1000px,calc(100vw-32px))] rounded-[16px] border border-line bg-paper p-5 text-ink backdrop:bg-black/40">
       <div className="flex items-center justify-between gap-2">
         <h2 id="edit-title" className="truncate font-mono text-sm font-semibold">{edit.path}</h2>
-        <button onClick={() => dialog.current?.close()} className="rounded-[8px] px-2 py-1 text-sm hover:bg-bg">Close</button>
+        <div className="flex shrink-0 items-center gap-1">
+          {data && <CopyButton text={data.content} label="Copy new file" />}
+          <button onClick={() => dialog.current?.close()} className="rounded-[8px] px-2 py-1 text-sm hover:bg-bg">Close</button>
+        </div>
       </div>
       <p className="mt-1 text-xs text-muted">
         {data?.current === null ? "New file. Right: proposed content." : "Left: current file. Right: proposed change."}

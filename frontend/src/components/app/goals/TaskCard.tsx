@@ -6,6 +6,8 @@ import { api } from "@/lib/api";
 import { RATING_REASONS, type EditDTO, type TaskDTO } from "@/lib/goals";
 import { useWorkspace } from "@/lib/workspace";
 import { CompanionAvatar } from "../CompanionAvatar";
+import { CopyButton } from "../chat/CopyButton";
+import { RichText } from "../chat/RichText";
 import { EditReview } from "./EditReview";
 
 const LABEL: Record<TaskDTO["status"], string> = { pending: "Waiting", running: "Working...", done: "Done", failed: "Failed", skipped: "Skipped", interrupted: "Interrupted" };
@@ -48,7 +50,14 @@ export function TaskCard({ task, edits, goalPath, editable, onChanged }: { task:
       </div>
       {task.verdictNote && <p className="mt-1 text-xs text-muted">{task.verdictNote}</p>}
       {task.error && <p className="mt-2 text-xs text-[#b42318]">{task.error}</p>}
-      {open && task.result && <div className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap rounded-[8px] bg-bg p-2.5 text-sm">{task.result}</div>}
+      {open && task.result && (
+        <div className="mt-2 max-h-96 overflow-auto rounded-[8px] bg-bg p-2.5">
+          <RichText text={task.result} />
+          <div className="mt-1 flex justify-end">
+            <CopyButton text={task.result} label="Copy result" />
+          </div>
+        </div>
+      )}
       {open && task.filesRead.length > 0 && <p className="mt-1 text-xs text-muted">Read: {task.filesRead.map((f) => f.path).join(", ")}</p>}
       {edits.length > 0 && (
         <ul className="mt-2 space-y-1.5" aria-label="Proposed changes">

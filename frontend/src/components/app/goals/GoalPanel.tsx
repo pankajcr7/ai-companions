@@ -5,11 +5,15 @@ import { X } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
 import { isActive, STATUS_LABEL, type DraftTask, type GoalDTO } from "@/lib/goals";
 import { canEdit } from "@/lib/types";
+import { goalAsMarkdown } from "@/lib/rich";
 import { useWorkspace } from "@/lib/workspace";
+import { CopyButton } from "../chat/CopyButton";
+import { RichText } from "../chat/RichText";
+import { GoalChat } from "./GoalChat";
 import { PlanEditor } from "./PlanEditor";
 import { TaskCard } from "./TaskCard";
 
-export function GoalPanel({ goalId, onClose, onWorking }: { goalId: string; onClose: () => void; onWorking: (ids: string[]) => void }) {
+export function GoalPanel({ goalId, onClose, onWorking, onOpenGoal }: { goalId: string; onClose: () => void; onWorking: (ids: string[]) => void; onOpenGoal: (id: string) => void }) {
   const { snapshot, wsPath } = useWorkspace();
   const [goal, setGoal] = useState<GoalDTO | null>(null);
   const [error, setError] = useState("");
@@ -61,6 +65,11 @@ export function GoalPanel({ goalId, onClose, onWorking }: { goalId: string; onCl
         <button aria-label="Close goal" onClick={onClose} className="grid size-9 place-items-center rounded-[8px] hover:bg-bg"><X size={18} /></button>
       </div>
       <h2 className="text-lg font-semibold">{goal?.text ?? "Loading..."}</h2>
+      {goal?.parent && (
+        <button onClick={() => onOpenGoal(goal.parent!.id)} className="mt-1 block max-w-full truncate text-left text-xs text-muted underline">
+          Continues: {goal.parent.text}
+        </button>
+      )}
       {goal && (
         <p role="status" className="mt-1 text-sm text-muted">
           {STATUS_LABEL[goal.status]}
@@ -73,22 +82,23 @@ export function GoalPanel({ goalId, onClose, onWorking }: { goalId: string; onCl
       {goal?.status === "awaiting_approval" && <PlanEditor goal={goal} editable={editable} busy={busy} onStart={start} onCancel={cancel} />}
       {goal?.summary && (
         <section className="mt-4 rounded-[12px] bg-bg p-3" aria-label="Nova's summary">
-          <h3 className="text-sm font-semibold">Nova&apos;s summary</h3>
-          <p className="mt-1 whitespace-pre-wrap text-sm">{goal.summary}</p>
-          <button
-            onClick={() => {
-              const copying = navigator.clipboard?.writeText(goal.summary ?? "");
-              if (copying) copying.catch(() => setError("Couldn't copy. Select the text instead."));
-              else setError("Couldn't copy. Select the text instead.");
-            }}
-            className="mt-2 text-xs underline"
-          >
-            Copy summary
-          </button>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold">Nova&apos;s summary</h3>
+            <div className="flex gap-1">
+              <CopyButton text={goal.summary} label="Copy summary" />
+              <CopyButton text={goalAsMarkdown(goal)} label="Copy all results" />
+            </div>
+          </div>
+          <div className="mt-1">
+            <RichText text={goal.summary} />
+          </div>
         </section>
       )}
       {goal && goal.status !== "awaiting_approval" && goal.status !== "planning" &&
         goal.tasks.map((t) => <TaskCard key={t.id} task={t} edits={goal.edits.filter((e) => e.taskId === t.id)} goalPath={path} editable={editable} onChanged={load} />)}
+      {goal && ["running", "reviewing", "done", "failed", "cancelled"].includes(goal.status) && (
+        <GoalChat goalId={goal.id} goalPath={path} canSend={editable} projectId={goal.projectId} onOpenGoal={onOpenGoal} />
+      )}
       {editable && goal?.status === "failed" && goal.tasks.length === 0 && (
         <button disabled={busy} onClick={() => act(() => api(`${path}/replan`, { method: "POST" }))} className="btn-dark mt-4 rounded-[10px] px-4 py-2 text-sm font-semibold">Try again</button>
       )}
