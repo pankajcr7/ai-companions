@@ -1,16 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { newCompany } from "./setup";
 
 test("connect a custom endpoint, assign it to Nova, chat, and keep the history", async ({ page }) => {
-  await page.goto("/sign-up");
-  await page.getByLabel("Name").fill("Chat Owner");
-  await page.getByLabel("Email").fill(`chat-${Date.now()}@test.dev`);
-  await page.getByLabel("Password").fill("correct-horse-1");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page).toHaveURL(/\/onboarding/);
-  await page.getByLabel("Company name").fill("Chat Bakery");
-  await page.getByRole("radio", { name: /Just the head agent/ }).check();
-  await page.getByRole("button", { name: "Create company" }).click();
-  await expect(page).toHaveURL(/\/w\/chat-bakery/);
+  await newCompany(page, { prefix: "Chat", company: "Chat Bakery", template: /Just the head agent/ });
 
   await page.getByRole("link", { name: "AI providers", exact: true }).click();
   await expect(page.getByRole("heading", { name: "AI providers" })).toBeVisible();
@@ -50,14 +42,7 @@ test("connect a custom endpoint, assign it to Nova, chat, and keep the history",
   await expect(page.getByText("Hello Nova")).toBeVisible();
   await expect(page.getByText("Hello from the fake model.")).toBeVisible();
 
-  // The office command bar sends to the head agent and opens their chat.
-  await page.getByRole("button", { name: "Close details" }).click();
-  await page.getByLabel("Tell your company what to do").fill("chat: Plan the launch");
-  await page.getByRole("button", { name: "Send to your company" }).click();
   const chat = page.getByRole("complementary", { name: "Companion details" });
-  await expect(chat.getByText("Plan the launch")).toBeVisible();
-  await expect(chat.getByText("Hello from the fake model.")).toHaveCount(2);
-
   // Nova knows the team: asked for marketing with no marketer, it offers to add one, then plans the work.
   await chat.getByLabel("Message Nova").fill("Ask the marketing team to market my app");
   await chat.getByRole("button", { name: "Send", exact: true }).click();

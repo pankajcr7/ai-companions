@@ -1,36 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { connectFakeLLM, newCompany } from "./setup";
 
 test("ask Nova for work on the home screen, start, stop, resume, and ask about the results", async ({ page }) => {
-  await page.goto("/sign-up");
-  await page.getByLabel("Name").fill("Home Owner");
-  await page.getByLabel("Email").fill(`home-${Date.now()}@test.dev`);
-  await page.getByLabel("Password").fill("correct-horse-1");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page).toHaveURL(/\/onboarding/);
-  await page.getByLabel("Company name").fill("Home Bakery");
-  await page.getByRole("radio", { name: /Just the head agent/ }).check();
-  await page.getByRole("button", { name: "Create company" }).click();
-  await expect(page).toHaveURL(/\/w\/home-bakery/);
-  await expect(page.getByText("Nova needs an AI model")).toBeVisible();
-
-  await page.getByRole("link", { name: "AI providers", exact: true }).click();
-  await page.getByRole("button", { name: "Add endpoint" }).click();
-  const conn = page.getByRole("dialog");
-  await conn.getByLabel("Provider").selectOption("other");
-  await conn.getByLabel("Base URL").fill("http://127.0.0.1:4199/v1");
-  await conn.getByLabel("Name").fill("Fake LLM");
-  await conn.getByRole("button", { name: "Test and save" }).click();
-  await expect(page.getByText(/Connected/).first()).toBeVisible();
-  await page.getByRole("link", { name: "Office map", exact: true }).click();
-  await page.getByRole("button", { name: "Nova, Head agent, Idle" }).focus();
-  await page.keyboard.press("Enter");
-  const panel = page.getByRole("complementary", { name: "Companion details" });
-  await panel.getByRole("button", { name: "Customize" }).click();
-  const form = page.getByRole("dialog");
-  await form.getByLabel("Provider").selectOption({ label: "Fake LLM (127.0.0.1:4199)" });
-  await form.getByLabel("Model").fill("fake-model");
-  await form.getByRole("button", { name: "Save" }).click();
-  await expect(form).toBeHidden();
+  const co = await newCompany(page, { prefix: "Home", company: "Home Bakery", template: /Just the head agent/ });
+  await connectFakeLLM(page, co.id);
 
   await page.getByRole("link", { name: "Home", exact: true }).click();
   const chat = page.getByRole("region", { name: "Chat with Nova" });
