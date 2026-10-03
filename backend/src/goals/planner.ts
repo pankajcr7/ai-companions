@@ -3,7 +3,7 @@ import { prisma } from "../db.js";
 import { CallError, completeJson, readiness } from "./llm.js";
 import { goalContext, loadHead, stepLog } from "./load.js";
 import { normalizeAssignees, Plan, planProblems } from "./plan.js";
-import { planInstructions, planPrompt } from "./prompts.js";
+import { planInstructions, planPrompt, previousGoal } from "./prompts.js";
 import { controllerFor, release } from "./runner.js";
 
 /** Asks Nova for a plan; stores tasks and waits for approval, unless the goal was cancelled meanwhile. */
@@ -23,8 +23,12 @@ export async function planGoal(goalId: string): Promise<void> {
       }),
     );
     const entries = roster.map((a) => ({ id: a.id, name: a.name, role: a.role, workingStyle: a.workingStyle, department: a.department?.name ?? null, ready: readiness(a) === null }));
+    const parent = goal.parentGoalId
+      ? await prisma.goal.findUnique({ where: { id: goal.parentGoalId }, include: { tasks: { orderBy: { position: "asc" }, include: { agent: { select: { name: true } } } } } })
+      : null;
+    const previous = parent ? previousGoal({ text: parent.text, summary: parent.summary, tasks: parent.tasks.map((t) => ({ title: t.title, agentName: t.agent.name, result: t.result })) }) : null;
     const signal = AbortSignal.any([ctl.signal, AbortSignal.timeout(300_000)]);
-    const { value, calls } = await completeJson(nova, planInstructions(goal.workspace.name), planPrompt(goal.text, entries, ctx), schema, signal, stepLog(goal.workspaceId, goalId, null, "plan"));
+    const { value, calls } = await completeJson(nova, planInstructions(goal.workspace.name), planPrompt(goal.text, entries, ctx, previous), schema, signal, stepLog(goal.workspaceId, goalId, null, "plan"));
     const inputTokens = calls.reduce((n, c) => n + (c.inputTokens ?? 0), 0);
     const outputTokens = calls.reduce((n, c) => n + (c.outputTokens ?? 0), 0);
     await prisma.$transaction(async (tx) => {

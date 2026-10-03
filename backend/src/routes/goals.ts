@@ -17,7 +17,7 @@ const TaskParams = GoalParams.extend({ tid: z.string().min(1).max(64) });
 const ACTIVE = ["planning", "running", "reviewing"] as const;
 export const RATING_REASONS = ["wrong facts", "off-brand", "too generic", "ignored files", "too long"] as const;
 
-const withTasks = { tasks: { orderBy: { position: "asc" }, include: { agent: { select: { name: true } } } }, edits: { orderBy: { createdAt: "asc" } } } satisfies Prisma.GoalInclude;
+const withTasks = { parent: { select: { id: true, text: true } }, tasks: { orderBy: { position: "asc" }, include: { agent: { select: { name: true } } } }, edits: { orderBy: { createdAt: "asc" } } } satisfies Prisma.GoalInclude;
 type FullGoal = Prisma.GoalGetPayload<{ include: typeof withTasks }>;
 
 async function loadGoal(workspaceId: string, gid: string) {
@@ -40,6 +40,7 @@ async function goalDTO(goal: FullGoal) {
     outputTokens: goal.outputTokens,
     createdAt: goal.createdAt,
     working,
+    parent: goal.parent,
     tasks: goal.tasks.map((t) => ({
       id: t.id,
       position: t.position,
@@ -81,13 +82,19 @@ export async function goalRoutes(app: FastifyInstance) {
   app.post("/api/workspaces/:id/goals", { config: { rateLimit: { max: 10, timeWindow: "1 minute", keyGenerator: perUser } } }, async (req, reply) => {
     const { id } = WsParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
-    const body = z.object({ text: z.string().trim().min(1).max(4000), projectId: z.string().min(1).max(64).nullish() }).parse(req.body);
-    if (body.projectId) await loadProject(id, body.projectId);
+    const body = z.object({ text: z.string().trim().min(1).max(4000), projectId: z.string().min(1).max(64).nullish(), parentGoalId: z.string().min(1).max(64).nullish() }).parse(req.body);
+    let projectId = body.projectId ?? null;
+    if (body.parentGoalId) {
+      const parent = await prisma.goal.findFirst({ where: { id: body.parentGoalId, workspaceId: id } });
+      if (!parent) throw new HttpError(404, "not_found", "Goal not found");
+      if (body.projectId === undefined) projectId = parent.projectId;
+    }
+    if (projectId) await loadProject(id, projectId);
     const nova = await loadHead(id);
     const problem = nova ? readiness(nova) : "Your company has no head agent";
     if (problem) throw new HttpError(409, "unassigned", `${problem}. Choose a model on the companion's Customize form.`);
     await assertNoActiveGoal(id);
-    const goal = await prisma.goal.create({ data: { workspaceId: id, projectId: body.projectId ?? null, text: body.text, createdById: user.id } });
+    const goal = await prisma.goal.create({ data: { workspaceId: id, projectId, parentGoalId: body.parentGoalId ?? null, text: body.text, createdById: user.id } });
     await audit(prisma, id, user.id, "goal.create", "goal", goal.id);
     void planGoal(goal.id);
     return reply.code(201).send({ id: goal.id });
