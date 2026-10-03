@@ -27,7 +27,7 @@ export function ChatThread({ path, name, inputLabel, logLabel, placeholder, empt
   onCommandSent?: () => void;
   onThinking?: (busy: boolean) => void;
   /** When set, Nova's suggest blocks become cards that plan work or add companions. */
-  suggestions?: { onPlan?: (goal: string, newProject: boolean) => Promise<void>; onHire?: (hire: HireSuggestion) => void };
+  suggestions?: { onPlan?: (goal: string, newProject: boolean, messageId: string) => Promise<void>; onHire?: (hire: HireSuggestion) => void };
   /** Where messages are sent, when it differs from where history loads. */
   postPath?: string;
   extraBody?: () => Record<string, unknown>;
@@ -134,7 +134,7 @@ export function ChatThread({ path, name, inputLabel, logLabel, placeholder, empt
           return (
             <div key={m.id} className={bubble(m.role)}>
               {m.role === "user" ? m.content : text ? <RichText text={text} /> : m.status !== "complete" ? <span className="italic text-muted">No reply</span> : null}
-              {suggestion && !m.goalId && <SuggestionCard suggestion={suggestion} onPlan={canSend ? suggestions?.onPlan : undefined} onHire={canSend ? suggestions?.onHire : undefined} />}
+              {suggestion && !m.goalId && <SuggestionCard suggestion={suggestion} onPlan={canSend && suggestions?.onPlan ? (goal, newProject) => suggestions.onPlan!(goal, newProject, m.id) : undefined} onHire={canSend ? suggestions?.onHire : undefined} />}
               {renderExtra?.(m)}
             {m.role === "assistant" && (
               <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-[11px] text-muted">

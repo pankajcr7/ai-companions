@@ -76,3 +76,9 @@ export function planSentence(agentName: string, title: string): string {
   const t = title.trim();
   return VERBS.test(t) ? `${agentName} will ${t[0].toLowerCase()}${t.slice(1)}` : `${agentName} will work on: ${t}`;
 }
+
+/** Suggested changes still waiting for the owner, and the first task that has one. */
+export function pendingChanges(goal: Pick<GoalDTO, "edits">): { count: number; firstTaskId: string | null } {
+  const pending = goal.edits.filter((e) => e.status === "pending");
+  return { count: pending.length, firstTaskId: pending[0]?.taskId ?? null };
+}

@@ -51,6 +51,7 @@ test("ask Nova for work on the home screen, start, stop, resume, and ask about t
   await card.getByRole("button", { name: "Resume" }).click();
   await expect(card.getByText("Done", { exact: true })).toBeVisible({ timeout: 60_000 });
   await expect(card.getByText("Nova's summary")).toBeVisible();
+  await expect(card.getByRole("link", { name: "Details" })).toBeVisible();
 
   await chat.getByLabel("Message Nova").fill("What did the team write?");
   await chat.getByRole("button", { name: "Send", exact: true }).click();
@@ -59,4 +60,14 @@ test("ask Nova for work on the home screen, start, stop, resume, and ask about t
   await page.reload();
   await expect(page.getByRole("navigation", { name: "Conversations" }).getByText("Write the launch posts for my bakery")).toBeVisible();
   await expect(page.getByRole("group", { name: /Goal: Write the launch posts/ }).getByText("Done", { exact: true })).toBeVisible();
+
+  // Chats can be renamed and deleted from the list.
+  const list = page.getByRole("navigation", { name: "Conversations" });
+  page.once("dialog", (d) => d.accept("Bakery launch"));
+  await list.getByRole("button", { name: "Rename Write the launch posts for my bakery" }).click();
+  await expect(list.getByText("Bakery launch")).toBeVisible();
+  page.once("dialog", (d) => d.accept());
+  await list.getByRole("button", { name: "Delete Bakery launch" }).click();
+  await expect(list.getByText("Bakery launch")).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Chat with Nova" }).getByText("What should the team work on today?")).toBeVisible();
 });

@@ -1,9 +1,10 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { credentialsKey } from "../crypto.js";
 
 export const PREVIEW_TTL_MS = 60 * 60 * 1000;
 
 // A separate key derived from CREDENTIALS_KEY, used only for preview links.
-const key = () => createHash("sha256").update(`project-preview:${process.env.CREDENTIALS_KEY ?? ""}`).digest();
+const key = () => createHash("sha256").update("project-preview:").update(credentialsKey()).digest();
 const mac = (body: string) => createHmac("sha256", key()).update(body).digest();
 
 /** "<base64url(projectId.expiry)>.<hmac>": names one project and expires after an hour. */

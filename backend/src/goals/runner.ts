@@ -123,6 +123,7 @@ async function runTask(goalId: string, taskId: string) {
     // A goal that created its project saves new files right away; changes to existing files still wait for Apply.
     const decided: { raw: (typeof checked)[number]["raw"]; check: Omit<(typeof checked)[number]["check"], "status"> & { status: "pending" | "rejected" | "applied" }; decidedById: string | null }[] = [];
     for (const { raw, check } of checked) {
+      if (signal.aborted) break; // Stopped: save nothing more, but still record what was saved.
       if (!goal.newProject || !goal.project || check.status !== "pending" || check.baseRevision !== 0) {
         decided.push({ raw, check, decidedById: null });
         continue;
@@ -131,20 +132,24 @@ async function runTask(goalId: string, taskId: string) {
         await saveText(goal.project, goal.createdById, check.path, raw.content, 0);
         decided.push({ raw, check: { ...check, status: "applied" }, decidedById: goal.createdById });
       } catch (e) {
-        if (!(e instanceof HttpError)) throw e;
-        decided.push({ raw, check: { ...check, status: "rejected", reason: e.message }, decidedById: null });
+        // P2002: a task running alongside created the same file a moment earlier.
+        const reason = e instanceof HttpError ? e.message : (e as { code?: string }).code === "P2002" ? "Another task already created this file." : null;
+        if (!reason) throw e;
+        decided.push({ raw, check: { ...check, status: "rejected", reason }, decidedById: null });
       }
     }
     const result = cap([split.visible, split.error].filter(Boolean).join("\n\n"), RESULT_CAP, "result");
     await prisma.$transaction(async (tx) => {
       const r = await tx.goalTask.updateMany({
-        where: { id: taskId, status: "running" },
+        // startedAt pins this run: after Stop and Resume, a newer run owns the task.
+        where: { id: taskId, status: "running", startedAt: task.startedAt },
         data: { status: "done", result, filesRead: files.map((f) => ({ path: f.path, revision: f.revision })), contextRevisions: ctx.sharedRevisions, inputTokens: input, outputTokens: output, finishedAt: new Date() },
       });
-      if (!r.count) return; // cancelled while working
-      if (decided.length) {
+      // Cancelled while working: only files already saved are recorded, so every saved file is listed.
+      const rows = r.count ? decided : decided.filter((d) => d.check.status === "applied");
+      if (rows.length) {
         await tx.proposedEdit.createMany({
-          data: decided.map(({ raw, check, decidedById }) => ({ taskId, goalId, path: check.path, baseRevision: check.baseRevision, content: raw.content, note: raw.note, status: check.status, reason: check.reason, decidedById })),
+          data: rows.map(({ raw, check, decidedById }) => ({ taskId, goalId, path: check.path, baseRevision: check.baseRevision, content: raw.content, note: raw.note, status: check.status, reason: check.reason, decidedById })),
         });
       }
     });

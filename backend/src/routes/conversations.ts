@@ -76,8 +76,27 @@ export async function conversationRoutes(app: FastifyInstance) {
     const { id, cid } = ConvParams.parse(req.params);
     const { user } = await requireMember(req, id);
     const c = await loadConversation(id, user.id, cid);
-    const rows = await prisma.chatMessage.findMany({ where: { conversationId: cid }, orderBy: { createdAt: "asc" }, take: 200 });
-    return { conversation: { id: c.id, title: c.title }, messages: rows.map(dto) };
+    const rows = await prisma.chatMessage.findMany({ where: { conversationId: cid }, orderBy: { createdAt: "desc" }, take: 200 });
+    return { conversation: { id: c.id, title: c.title }, messages: rows.reverse().map(dto) };
+  });
+
+  // A work request that couldn't be planned when it was asked (the team was busy) is planned from its message later.
+  app.post("/api/workspaces/:id/conversations/:cid/messages/:mid/plan", async (req) => {
+    const { id, cid, mid } = ConvParams.extend({ mid: z.string().min(1).max(64) }).parse(req.params);
+    const { user } = await requireMember(req, id, "member");
+    await loadConversation(id, user.id, cid);
+    const msg = await prisma.chatMessage.findFirst({ where: { id: mid, conversationId: cid, role: "assistant" } });
+    const suggestion = msg ? parseSuggestion(msg.content) : null;
+    if (!msg || !suggestion?.goal) throw new HttpError(404, "not_found", "Message not found");
+    if (msg.goalId) throw new HttpError(409, "planned", "This request already has a plan.");
+    // The owner may have edited the request on the card before planning it.
+    const { text } = z.object({ text: z.string().trim().min(1).max(4000).optional() }).parse(req.body ?? {});
+    const latest = await prisma.chatMessage.findFirst({ where: { conversationId: cid, goalId: { not: null } }, orderBy: { createdAt: "desc" }, select: { goalId: true } });
+    const goal = await createGoal({ workspaceId: id, userId: user.id, text: text ?? suggestion.goal, newProject: suggestion.newProject, parentGoalId: latest?.goalId ?? null, projectId: latest ? undefined : null, log: (e) => req.log.error(e) });
+    // Conditional, so two clicks can't link two goals to one message.
+    const linked = await prisma.chatMessage.updateMany({ where: { id: mid, goalId: null }, data: { goalId: goal.id, planBlocked: null } });
+    if (!linked.count) throw new HttpError(409, "planned", "This request already has a plan.");
+    return { goalId: goal.id };
   });
 
   app.post("/api/workspaces/:id/conversations/:cid/messages", { config: { rateLimit: { max: 20, timeWindow: "1 minute", keyGenerator: perUser } } }, async (req, reply) => {

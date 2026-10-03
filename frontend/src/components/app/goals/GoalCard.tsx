@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { isActive, planSentence, type DraftTask, type GoalDTO, type TaskDTO } from "@/lib/goals";
+import { isActive, pendingChanges, planSentence, type DraftTask, type GoalDTO, type TaskDTO } from "@/lib/goals";
 import { goalAsMarkdown } from "@/lib/rich";
 import { canEdit } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace";
@@ -74,6 +75,7 @@ export function GoalCard({ goalId, onStatus }: { goalId: string; onStatus?: (goa
   if (!goal) return <div className="mt-2 h-16 animate-pulse rounded-[12px] bg-bg" aria-busy="true" />;
   const done = goal.tasks.filter((t) => t.status === "done").length;
   const agent = (id: string) => snapshot.agents.find((a) => a.id === id);
+  const waiting = pendingChanges(goal);
 
   return (
     <div role="group" aria-label={`Goal: ${goal.text}`} className="mt-2 rounded-[14px] border border-line bg-paper p-3 text-sm">
@@ -142,7 +144,14 @@ export function GoalCard({ goalId, onStatus }: { goalId: string; onStatus?: (goa
           <RichText text={goal.summary} />
         </div>
       )}
+      {waiting.count > 0 && (
+        <p className="mt-3 rounded-[10px] bg-[#fff8e5] px-3 py-2 text-xs">
+          {waiting.count} suggested {waiting.count === 1 ? "change" : "changes"} waiting for you ·{" "}
+          <button onClick={() => setOpen(waiting.firstTaskId)} className="font-semibold underline">Review</button>
+        </p>
+      )}
       <FilesCreated goal={goal} />
+      <Link href={`/w/${snapshot.workspace.slug}/goals/${goal.id}`} className="mt-2 inline-block text-xs text-muted underline">Details</Link>
       {error && <p role="alert" className="mt-2 text-xs text-[#b42318]">{error}</p>}
     </div>
   );

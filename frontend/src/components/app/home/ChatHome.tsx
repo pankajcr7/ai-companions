@@ -4,9 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { isActive, type GoalDTO } from "@/lib/goals";
 import type { ProjectSummary } from "@/lib/projects";
+import type { HireSuggestion } from "@/lib/suggest";
 import { canEdit } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace";
 import { ChatThread } from "../chat/ChatThread";
+import { CompanionForm } from "../CompanionForm";
 import { GoalCard } from "../goals/GoalCard";
 import { ConversationList } from "./ConversationList";
 import { TeamStrip } from "./TeamStrip";
@@ -15,7 +17,7 @@ const EXAMPLES = ["Build a landing page for my bakery", "Write a week of Instagr
 
 /** Home: a full-page conversation with Nova. Work requests become plan cards in the chat. */
 export function ChatHome() {
-  const { snapshot, wsPath } = useWorkspace();
+  const { snapshot, wsPath, reload } = useWorkspace();
   const editable = canEdit(snapshot.role);
   const head = snapshot.agents.find((a) => a.isHead);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -25,6 +27,8 @@ export function ChatHome() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [chip, setChip] = useState("");
   const [error, setError] = useState("");
+  const [threadKey, setThreadKey] = useState(0);
+  const [hire, setHire] = useState<HireSuggestion | null>(null);
 
   const convPath = wsPath("/conversations");
   const newChat = useCallback(async () => {
@@ -65,7 +69,13 @@ export function ChatHome() {
   return (
     <div className="flex min-h-0 flex-1">
       <aside className={`${showList ? "block" : "hidden"} w-full shrink-0 border-r border-line bg-paper p-3 md:block md:w-64`}>
-        <ConversationList activeId={activeId} onOpen={(id) => { setActiveId(id); setGoals({}); setShowList(false); }} onNew={newChat} refreshKey={refreshKey} />
+        <ConversationList activeId={activeId} onOpen={(id) => { setActiveId(id); setGoals({}); setShowList(false); }} onNew={newChat} refreshKey={refreshKey} onDeleted={(id, rest) => {
+          if (id !== activeId) return;
+          setGoals({});
+          if (rest[0]) setActiveId(rest[0].id);
+          else if (editable) newChat();
+          else setActiveId(null);
+        }} />
       </aside>
       <section className={`${showList ? "hidden" : "flex"} min-w-0 flex-1 flex-col md:flex`} aria-label="Chat with Nova">
         <div className="flex flex-wrap items-center gap-2 border-b border-line bg-paper px-4 py-2.5">
@@ -85,7 +95,7 @@ export function ChatHome() {
           {!headReady && <p className="mb-3 rounded-[10px] bg-bg px-3 py-2 text-sm">Nova needs an AI model before it can help. Open <b>See whole team</b>, choose Nova, and press Customize.</p>}
           {activeId && (
             <ChatThread
-              key={activeId}
+              key={`${activeId}:${threadKey}`}
               fill
               hideMeta
               // When Nova finishes a reply, the chat list picks up the new title.
@@ -101,12 +111,20 @@ export function ChatHome() {
               examples={EXAMPLES}
               canSend={editable && headReady}
               goalStop={stop && running?.status !== "planning" ? stop : null}
-              renderExtra={(m) => (m.goalId ? <GoalCard goalId={m.goalId} onStatus={onStatus} /> : null)}
+              renderExtra={(m) =>
+                m.goalId ? (
+                  <GoalCard goalId={m.goalId} onStatus={onStatus} />
+                ) : m.planBlocked ? (
+                  <p className="mt-2 text-xs text-muted">{m.planBlocked === "busy" ? "The team was busy when you asked, so this wasn't planned yet. Press Plan it once they finish." : `This wasn't planned: ${m.planBlocked}`}</p>
+                ) : null
+              }
               suggestions={{
-                onPlan: async (goal, newProject) => {
-                  await api(wsPath("/goals"), { method: "POST", body: { text: goal, newProject } });
-                  setRefreshKey((k) => k + 1);
+                // Planned from its message, so the plan card appears right here in the chat.
+                onPlan: async (goal, _newProject, messageId) => {
+                  await api(`${convPath}/${activeId}/messages/${messageId}/plan`, { method: "POST", body: { text: goal } });
+                  setThreadKey((k) => k + 1);
                 },
+                onHire: setHire,
               }}
             />
           )}
@@ -124,6 +142,17 @@ export function ChatHome() {
           )}
         </div>
       </section>
+      {hire && (
+        <CompanionForm
+          agent={null}
+          preset={hire}
+          onClose={() => setHire(null)}
+          onSaved={async () => {
+            setHire(null);
+            await reload();
+          }}
+        />
+      )}
     </div>
   );
 }
