@@ -13,7 +13,7 @@ import { SuggestionCard } from "./SuggestionCard";
 type Pending = { sent: string; text: string; stopped?: boolean; error?: { code: string; message: string } };
 
 /** A streaming chat against any endpoint that speaks the start/delta/error/done SSE protocol. */
-export function ChatThread({ path, name, inputLabel, logLabel, placeholder, emptyText, canSend, usageLink, footer, command, onCommandSent, onThinking, suggestions, postPath, extraBody, examples, renderExtra, goalStop, fill }: {
+export function ChatThread({ path, name, inputLabel, logLabel, placeholder, emptyText, canSend, usageLink, footer, command, onCommandSent, onThinking, suggestions, postPath, extraBody, examples, renderExtra, goalStop, fill, hideMeta }: {
   path: string;
   name: string;
   inputLabel: string;
@@ -39,6 +39,8 @@ export function ChatThread({ path, name, inputLabel, logLabel, placeholder, empt
   goalStop?: { label: string; onClick: () => void } | null;
   /** Fill the available height (full-page chat) instead of a fixed-height panel. */
   fill?: boolean;
+  /** Hide the model name and token counts (the home chat is for non-technical owners). */
+  hideMeta?: boolean;
 }) {
   const inputId = useId();
   const [messages, setMessages] = useState<ChatMessageDTO[] | null>(null);
@@ -139,8 +141,8 @@ export function ChatThread({ path, name, inputLabel, logLabel, placeholder, empt
                 <span>
                   {m.status === "stopped" ? "Stopped. " : ""}
                   {m.status === "error" ? `${m.errorMessage} ` : ""}
-                  {m.model}
-                  {m.outputTokens != null ? ` · ${(m.inputTokens ?? 0) + m.outputTokens} tokens` : ""}
+                  {!hideMeta && m.model}
+                  {!hideMeta && m.outputTokens != null ? ` · ${(m.inputTokens ?? 0) + m.outputTokens} tokens` : ""}
                 </span>
                 {text && <CopyButton text={text} label="Copy message" />}
               </div>

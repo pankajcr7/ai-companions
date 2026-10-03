@@ -87,6 +87,9 @@ export function ChatHome() {
             <ChatThread
               key={activeId}
               fill
+              hideMeta
+              // When Nova finishes a reply, the chat list picks up the new title.
+              onThinking={(busy) => !busy && setRefreshKey((k) => k + 1)}
               path={`${convPath}/${activeId}`}
               postPath={`${convPath}/${activeId}/messages`}
               extraBody={() => ({ project })}

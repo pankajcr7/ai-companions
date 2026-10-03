@@ -41,6 +41,9 @@ test("ask Nova for work on the home screen, start, stop, resume, and ask about t
 
   const card = chat.getByRole("group", { name: /Goal: Write the launch posts/ });
   await expect(card.getByText("Nova will write the launch posts")).toBeVisible();
+  // The chat list picks up the new title, and the home chat shows no technical details.
+  await expect(page.getByRole("navigation", { name: "Conversations" }).getByText("Write the launch posts for my bakery")).toBeVisible();
+  await expect(chat.getByText(/tokens/)).toHaveCount(0);
   await card.getByRole("button", { name: "Start" }).click();
   await expect(card.getByText(/Working/)).toBeVisible();
   await page.getByRole("status").getByRole("button", { name: /Stop/ }).click();
