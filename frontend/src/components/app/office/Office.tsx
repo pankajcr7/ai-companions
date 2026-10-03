@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ListChecks, MagnifyingGlass, PaperPlaneTilt, Plus } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
 import { parseCommand } from "@/lib/goals";
+import type { HireSuggestion } from "@/lib/suggest";
 import type { ProjectSummary } from "@/lib/projects";
 import { canEdit, type Snapshot } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace";
@@ -23,11 +24,13 @@ export function Office() {
   const [deptFilter, setDeptFilter] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState<"new" | string | null>(null);
+  const [hire, setHire] = useState<HireSuggestion | null>(null);
   const [error, setError] = useState("");
   const [thinkingId, setThinkingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [command, setCommand] = useState<{ agentId: string; text: string } | null>(null);
   const [goalId, setGoalId] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   const [goalWorking, setGoalWorking] = useState<string[]>([]);
   const [showGoals, setShowGoals] = useState(false);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -63,6 +66,8 @@ export function Office() {
       setCommand({ agentId: head.id, text: parsed.text });
       return;
     }
+    if (sending) return;
+    setSending(true);
     try {
       const { id } = await api<{ id: string }>(wsPath("/goals"), { method: "POST", body: { text: parsed.text, projectId: projectId || null } });
       setDraft("");
@@ -71,6 +76,8 @@ export function Office() {
       setGoalId(id);
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setSending(false);
     }
   }
 
@@ -86,6 +93,12 @@ export function Office() {
       await reload();
     }
   }
+
+  // Nova suggested a role nobody covers: open the new-companion form with it filled in.
+  const hireCompanion = (h: HireSuggestion) => {
+    setHire(h);
+    setEditing("new");
+  };
 
   const closePanel = () => {
     const id = selectedId;
@@ -138,7 +151,7 @@ export function Office() {
           <ListChecks size={14} /> Goals
         </button>
         {editable && (
-          <button onClick={() => setEditing("new")} className="btn-dark flex items-center gap-1.5 rounded-[10px] px-3 py-2 text-sm font-semibold text-paper">
+          <button onClick={() => { setHire(null); setEditing("new"); }} className="btn-dark flex items-center gap-1.5 rounded-[10px] px-3 py-2 text-sm font-semibold text-paper">
             <Plus size={14} weight="bold" /> New companion
           </button>
         )}
@@ -167,12 +180,12 @@ export function Office() {
         </div>
         {selected && (
           <div className="fixed inset-x-0 bottom-0 z-20 max-h-[70dvh] overflow-auto rounded-t-[16px] shadow-2xl lg:static lg:max-h-none lg:w-80 lg:rounded-none lg:shadow-none">
-            <CompanionPanel key={selected.id} command={command?.agentId === selected.id ? command.text : undefined} onCommandSent={() => setCommand(null)} agent={selected} onClose={closePanel} onEdit={() => setEditing(selected.id)} onSelect={setSelectedId} onThinking={(busy) => setThinkingId(busy ? selected.id : null)} />
+            <CompanionPanel key={selected.id} command={command?.agentId === selected.id ? command.text : undefined} onCommandSent={() => setCommand(null)} agent={selected} onClose={closePanel} onEdit={() => setEditing(selected.id)} onSelect={setSelectedId} onThinking={(busy) => setThinkingId(busy ? selected.id : null)} onOpenGoal={(id) => { setSelectedId(null); setGoalId(id); }} onHire={hireCompanion} />
           </div>
         )}
         {!selected && goalId && (
           <div className="fixed inset-x-0 bottom-0 z-20 max-h-[75dvh] overflow-auto rounded-t-[16px] shadow-2xl lg:static lg:max-h-none lg:w-96 lg:rounded-none lg:shadow-none">
-            <GoalPanel key={goalId} goalId={goalId} onClose={() => setGoalId(null)} onWorking={setGoalWorking} onOpenGoal={(id) => setGoalId(id)} />
+            <GoalPanel key={goalId} goalId={goalId} onClose={() => setGoalId(null)} onWorking={setGoalWorking} onOpenGoal={(id) => setGoalId(id)} onHire={hireCompanion} />
           </div>
         )}
       </div>
@@ -204,7 +217,7 @@ export function Office() {
             aria-describedby="command-help"
             className="min-w-0 flex-1 bg-transparent text-sm focus:outline-none"
           />
-          <button type="submit" disabled={!editable || !headReady || !draft.trim() || !!thinkingId} aria-label="Send to your company" className="grid size-9 place-items-center rounded-full bg-[#0b0d10] text-lime disabled:opacity-60">
+          <button type="submit" disabled={!editable || !headReady || !draft.trim() || !!thinkingId || sending} aria-label="Send to your company" className="grid size-9 place-items-center rounded-full bg-[#0b0d10] text-lime disabled:opacity-60">
             <PaperPlaneTilt size={15} weight="fill" />
           </button>
         </form>
@@ -219,9 +232,14 @@ export function Office() {
       {editing && (
         <CompanionForm
           agent={editing === "new" ? null : (snapshot.agents.find((a) => a.id === editing) ?? null)}
-          onClose={() => setEditing(null)}
+          preset={editing === "new" ? hire : null}
+          onClose={() => {
+            setEditing(null);
+            setHire(null);
+          }}
           onSaved={async (id) => {
             setEditing(null);
+            setHire(null);
             await reload();
             setSelectedId(id);
           }}

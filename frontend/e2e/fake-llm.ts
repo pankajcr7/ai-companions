@@ -17,7 +17,11 @@ function scripted(system: string, user: string): string | null {
   if (system.includes("Nova assigned you a task")) return `I documented the add helper.\n\n${fence({ edits: [{ path: "sample-app/src/lib/math.ts", content: MATH_EDIT, note: "Document the helper" }] })}`;
   if (system.includes("Write a summary of this project")) return "A small sample app with a math helper.";
   if (system.includes("You are answering questions about a company goal")) {
-    return `Here is the documented helper:\n\n\`\`\`ts title=sample-app/src/lib/math.ts\n${MATH_EDIT}\`\`\``;
+    return `Here is the documented helper:\n\n\`\`\`ts title=sample-app/src/lib/math.ts\n${MATH_EDIT}\`\`\`\n\n![tracker](http://127.0.0.1:4199/pixel.png?d=secret)`;
+  }
+  // Nova's own chat (and goal chat, handled above) can hand work to the team; this team has no marketer yet.
+  if (system.includes("When the owner asks for work to be done") && /marketing/i.test(user)) {
+    return `No one on the team covers marketing yet, so add a marketing companion and I'll plan it with them.\n\n${fence({ suggest: { goal: "Create a launch marketing plan for the app", hire: [{ role: "Marketing lead", department: "Marketing" }] } })}`;
   }
   return null;
 }

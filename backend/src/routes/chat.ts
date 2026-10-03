@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { streamReply, watchClient } from "../chat-stream.js";
 import { companionInstructions, trimTurns } from "../companion.js";
+import { loadRoster } from "../goals/load.js";
+import { headInstructions } from "../goals/prompts.js";
 import { prisma } from "../db.js";
 import type { ChatMessage } from "../generated/prisma/client.js";
 import { HttpError, perUser, requireMember } from "../http.js";
@@ -68,7 +70,10 @@ export async function chatRoutes(app: FastifyInstance) {
       const history = await prisma.chatMessage.findMany({ where: { agentId, userId: user.id, status: "complete" }, orderBy: { createdAt: "desc" }, take: CONTEXT_MESSAGES });
       const userMsg = await prisma.chatMessage.create({ data: { workspaceId: id, agentId, userId: user.id, role: "user", content: message } });
       const turns = trimTurns([...history.reverse().map((m): ChatTurn => ({ role: m.role, content: m.content })), { role: "user", content: message }], CONTEXT_CHARS);
-      const instructions = companionInstructions(agent, agent.workspace.name, agent.department?.name ?? null);
+      // Nova leads the team, so its chat knows the roster and can hand work to it; other companions just chat.
+      const instructions = agent.isHead
+        ? headInstructions(agent, agent.workspace.name, agent.department?.name ?? null, await loadRoster(id))
+        : companionInstructions(agent, agent.workspace.name, agent.department?.name ?? null);
       await streamReply(req, reply, watch, {
         conn,
         model: agent.model,

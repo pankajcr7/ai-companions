@@ -5,7 +5,7 @@ import { trimTurns } from "../companion.js";
 import { prisma } from "../db.js";
 import type { GoalMessage } from "../generated/prisma/client.js";
 import { readiness } from "../goals/llm.js";
-import { goalContext, loadHead } from "../goals/load.js";
+import { goalContext, loadHead, loadRoster } from "../goals/load.js";
 import { goalChatContext, goalChatInstructions } from "../goals/prompts.js";
 import { HttpError, perUser, requireMember } from "../http.js";
 import type { ChatTurn } from "../providers/types.js";
@@ -73,7 +73,7 @@ export async function goalChatRoutes(app: FastifyInstance) {
     const turns = trimTurns([...history.reverse().map((m): ChatTurn => ({ role: m.role, content: m.content })), { role: "user", content: message }], 24_000);
     const ctx = await goalContext(goal.project);
     const tasks = goal.tasks.map((t) => ({ position: t.position, title: t.title, agentName: t.agent.name, status: t.status, verdict: t.verdict, result: t.result, error: t.error }));
-    const instructions = `${goalChatInstructions(goal.workspace.name)}\n\n${goalChatContext(goal, tasks, goal.edits, ctx)}`;
+    const instructions = `${goalChatInstructions(goal.workspace.name, await loadRoster(id))}\n\n${goalChatContext(goal, tasks, goal.edits, ctx)}`;
 
     await streamReply(req, reply, watch, {
       conn,

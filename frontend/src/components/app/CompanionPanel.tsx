@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { Archive, Copy, Pause, PencilSimple, Play, X } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
 import { canEdit, statusLabel, type Agent } from "@/lib/types";
+import type { HireSuggestion } from "@/lib/suggest";
 import { useWorkspace } from "@/lib/workspace";
 import { CompanionAvatar } from "./CompanionAvatar";
 import { CompanionChat } from "./CompanionChat";
 
-export function CompanionPanel({ agent, onClose, onEdit, onSelect, onThinking, command, onCommandSent }: { agent: Agent; onClose: () => void; onEdit: () => void; onSelect: (id: string) => void; onThinking: (busy: boolean) => void; command?: string; onCommandSent?: () => void }) {
+export function CompanionPanel({ agent, onClose, onEdit, onSelect, onThinking, command, onCommandSent, onOpenGoal, onHire }: { agent: Agent; onClose: () => void; onEdit: () => void; onSelect: (id: string) => void; onThinking: (busy: boolean) => void; command?: string; onCommandSent?: () => void; onOpenGoal?: (id: string) => void; onHire?: (hire: HireSuggestion) => void }) {
   const { snapshot, reload, wsPath } = useWorkspace();
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<"profile" | "chat">(command ? "chat" : "profile");
@@ -70,7 +71,7 @@ export function CompanionPanel({ agent, onClose, onEdit, onSelect, onThinking, c
       </div>
       {tab === "chat" && (
         <div role="tabpanel" className="mt-4">
-          <CompanionChat agent={agent} onEdit={onEdit} onThinking={onThinking} command={command} onCommandSent={onCommandSent} />
+          <CompanionChat agent={agent} onEdit={onEdit} onThinking={onThinking} command={command} onCommandSent={onCommandSent} onOpenGoal={onOpenGoal} onHire={onHire} />
         </div>
       )}
       {tab === "profile" && (

@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { isActive, STATUS_LABEL, type DraftTask, type GoalDTO } from "@/lib/goals";
 import { canEdit } from "@/lib/types";
 import { goalAsMarkdown } from "@/lib/rich";
+import type { HireSuggestion } from "@/lib/suggest";
 import { useWorkspace } from "@/lib/workspace";
 import { CopyButton } from "../chat/CopyButton";
 import { RichText } from "../chat/RichText";
@@ -13,7 +14,7 @@ import { GoalChat } from "./GoalChat";
 import { PlanEditor } from "./PlanEditor";
 import { TaskCard } from "./TaskCard";
 
-export function GoalPanel({ goalId, onClose, onWorking, onOpenGoal }: { goalId: string; onClose: () => void; onWorking: (ids: string[]) => void; onOpenGoal: (id: string) => void }) {
+export function GoalPanel({ goalId, onClose, onWorking, onOpenGoal, onHire }: { goalId: string; onClose: () => void; onWorking: (ids: string[]) => void; onOpenGoal: (id: string) => void; onHire?: (hire: HireSuggestion) => void }) {
   const { snapshot, wsPath } = useWorkspace();
   const [goal, setGoal] = useState<GoalDTO | null>(null);
   const [error, setError] = useState("");
@@ -97,7 +98,7 @@ export function GoalPanel({ goalId, onClose, onWorking, onOpenGoal }: { goalId: 
       {goal && goal.status !== "awaiting_approval" && goal.status !== "planning" &&
         goal.tasks.map((t) => <TaskCard key={t.id} task={t} edits={goal.edits.filter((e) => e.taskId === t.id)} goalPath={path} editable={editable} onChanged={load} />)}
       {goal && ["running", "reviewing", "done", "failed", "cancelled"].includes(goal.status) && (
-        <GoalChat goalId={goal.id} goalPath={path} canSend={editable} projectId={goal.projectId} onOpenGoal={onOpenGoal} />
+        <GoalChat goalId={goal.id} goalPath={path} canSend={editable} projectId={goal.projectId} onOpenGoal={onOpenGoal} onHire={onHire} />
       )}
       {editable && goal?.status === "failed" && goal.tasks.length === 0 && (
         <button disabled={busy} onClick={() => act(() => api(`${path}/replan`, { method: "POST" }))} className="btn-dark mt-4 rounded-[10px] px-4 py-2 text-sm font-semibold">Try again</button>

@@ -4,14 +4,16 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 
 import { api } from "@/lib/api";
 import { replyArrived } from "@/lib/chat";
 import { readEvents } from "@/lib/sse";
+import { splitSuggestion, visibleWhileStreaming, type HireSuggestion } from "@/lib/suggest";
 import { CHATGPT_USAGE_URL, type ChatMessageDTO } from "@/lib/types";
 import { CopyButton } from "./CopyButton";
 import { RichText } from "./RichText";
+import { SuggestionCard } from "./SuggestionCard";
 
 type Pending = { sent: string; text: string; stopped?: boolean; error?: { code: string; message: string } };
 
 /** A streaming chat against any endpoint that speaks the start/delta/error/done SSE protocol. */
-export function ChatThread({ path, name, inputLabel, logLabel, placeholder, emptyText, canSend, usageLink, footer, command, onCommandSent, onThinking }: {
+export function ChatThread({ path, name, inputLabel, logLabel, placeholder, emptyText, canSend, usageLink, footer, command, onCommandSent, onThinking, suggestions }: {
   path: string;
   name: string;
   inputLabel: string;
@@ -24,6 +26,8 @@ export function ChatThread({ path, name, inputLabel, logLabel, placeholder, empt
   command?: string;
   onCommandSent?: () => void;
   onThinking?: (busy: boolean) => void;
+  /** When set, Nova's suggest blocks become cards that plan work or add companions. */
+  suggestions?: { onPlan?: (goal: string) => Promise<void>; onHire?: (hire: HireSuggestion) => void };
 }) {
   const inputId = useId();
   const [messages, setMessages] = useState<ChatMessageDTO[] | null>(null);
@@ -99,9 +103,12 @@ export function ChatThread({ path, name, inputLabel, logLabel, placeholder, empt
       <div role="log" aria-label={logLabel} className="flex max-h-[45dvh] min-h-40 flex-col gap-2 overflow-y-auto pr-1 lg:max-h-[50dvh]">
         {messages === null && <div className="h-16 animate-pulse rounded-[12px] bg-bg" aria-busy="true" />}
         {messages?.length === 0 && !pending && <p className="py-6 text-center text-sm text-muted">{emptyText}</p>}
-        {messages?.map((m) => (
-          <div key={m.id} className={bubble(m.role)}>
-            {m.role === "user" ? m.content : m.content ? <RichText text={m.content} /> : m.status !== "complete" ? <span className="italic text-muted">No reply</span> : null}
+        {messages?.map((m) => {
+          const { text, suggestion } = suggestions && m.role === "assistant" ? splitSuggestion(m.content) : { text: m.content, suggestion: null };
+          return (
+            <div key={m.id} className={bubble(m.role)}>
+              {m.role === "user" ? m.content : text ? <RichText text={text} /> : m.status !== "complete" ? <span className="italic text-muted">No reply</span> : null}
+              {suggestion && <SuggestionCard suggestion={suggestion} onPlan={canSend ? suggestions?.onPlan : undefined} onHire={canSend ? suggestions?.onHire : undefined} />}
             {m.role === "assistant" && (
               <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-[11px] text-muted">
                 <span>
@@ -110,18 +117,19 @@ export function ChatThread({ path, name, inputLabel, logLabel, placeholder, empt
                   {m.model}
                   {m.outputTokens != null ? ` · ${(m.inputTokens ?? 0) + m.outputTokens} tokens` : ""}
                 </span>
-                {m.content && <CopyButton text={m.content} label="Copy message" />}
+                {text && <CopyButton text={text} label="Copy message" />}
               </div>
             )}
             {usageLink && m.errorCode === "usage_limit" && (
               <a href={CHATGPT_USAGE_URL} target="_blank" rel="noreferrer" className="mt-2 inline-block rounded-[8px] bg-[#0b0d10] px-3 py-1.5 text-xs font-semibold text-white">Manage usage</a>
             )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
         {pending && <div className={bubble("user")}>{pending.sent}</div>}
         {pending && (
           <div className={bubble("assistant")} aria-live="polite" aria-busy={!pending.error}>
-            {pending.text ? <RichText text={pending.text} /> : <span className="text-muted">{pending.stopped ? "No reply" : `${name} is thinking...`}</span>}
+            {pending.text ? <RichText text={suggestions ? visibleWhileStreaming(pending.text) : pending.text} /> : <span className="text-muted">{pending.stopped ? "No reply" : `${name} is thinking...`}</span>}
             {pending.error && <p className="mt-1.5 text-[11px] text-[#b42318]">{pending.error.message}</p>}
             {pending.stopped && <p className="mt-1.5 text-[11px] text-muted">Stopped.</p>}
           </div>

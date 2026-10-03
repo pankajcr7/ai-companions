@@ -2,7 +2,8 @@ import { prisma } from "../db.js";
 import type { Project, StepPhase } from "../generated/prisma/client.js";
 import { getBlob } from "../files/store.js";
 import { projectMap, revisionKey, sharedContext, type ProjectFile } from "./context.js";
-import type { StepLog } from "./llm.js";
+import { readiness, type StepLog } from "./llm.js";
+import type { RosterEntry } from "./prompts.js";
 
 export const loadHead = (workspaceId: string) => prisma.agent.findFirst({ where: { workspaceId, isHead: true }, include: { connection: true } });
 
@@ -31,3 +32,9 @@ export const stepLog =
   async (s) => {
     await prisma.goalStep.create({ data: { workspaceId, goalId, taskId, phase, ...s } });
   };
+
+/** Active AI companions as Nova sees them: who they are and whether they can work yet. */
+export async function loadRoster(workspaceId: string): Promise<RosterEntry[]> {
+  const agents = await prisma.agent.findMany({ where: { workspaceId, kind: "ai", status: "active" }, include: { department: true, connection: true }, orderBy: { createdAt: "asc" } });
+  return agents.map((a) => ({ id: a.id, name: a.name, role: a.role, workingStyle: a.workingStyle, department: a.department?.name ?? null, ready: readiness(a) === null }));
+}

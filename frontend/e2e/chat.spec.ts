@@ -57,4 +57,24 @@ test("connect a custom endpoint, assign it to Nova, chat, and keep the history",
   const chat = page.getByRole("complementary", { name: "Companion details" });
   await expect(chat.getByText("Plan the launch")).toBeVisible();
   await expect(chat.getByText("Hello from the fake model.")).toHaveCount(2);
+
+  // Nova knows the team: asked for marketing with no marketer, it offers to add one, then plans the work.
+  await chat.getByLabel("Message Nova").fill("Ask the marketing team to market my app");
+  await chat.getByRole("button", { name: "Send", exact: true }).click();
+  const suggestion = chat.getByRole("group", { name: "Nova's suggestion" });
+  await expect(suggestion).toContainText("No one on the team covers Marketing lead yet.");
+  await suggestion.getByRole("button", { name: "Add a Marketing lead companion" }).click();
+  const hireForm = page.getByRole("dialog");
+  await expect(hireForm.getByLabel("Role")).toHaveValue("Marketing lead");
+  await hireForm.getByLabel("Name").fill("Mira");
+  await hireForm.getByLabel("Provider").selectOption({ label: "Fake LLM (127.0.0.1:4199)" });
+  await hireForm.getByLabel("Model").fill("fake-model");
+  await hireForm.getByRole("button", { name: "Save" }).click();
+  await expect(hireForm).toBeHidden();
+  await page.getByRole("button", { name: "Nova, Head agent, Idle" }).focus();
+  await page.keyboard.press("Enter");
+  const novaPanel = page.getByRole("complementary", { name: "Companion details" });
+  await novaPanel.getByRole("tab", { name: "Chat" }).click();
+  await novaPanel.getByRole("group", { name: "Nova's suggestion" }).last().getByRole("button", { name: "Plan it" }).click();
+  await expect(page.getByRole("complementary", { name: "Company goal" }).getByText("Plan ready for your approval")).toBeVisible();
 });

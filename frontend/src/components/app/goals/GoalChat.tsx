@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import type { HireSuggestion } from "@/lib/suggest";
 import { useWorkspace } from "@/lib/workspace";
 import { ChatThread } from "../chat/ChatThread";
 
 /** Ask Nova about a goal's results, or continue the work as a follow-up goal. */
-export function GoalChat({ goalId, goalPath, canSend, projectId, onOpenGoal }: { goalId: string; goalPath: string; canSend: boolean; projectId: string | null; onOpenGoal: (id: string) => void }) {
+export function GoalChat({ goalId, goalPath, canSend, projectId, onOpenGoal, onHire }: { goalId: string; goalPath: string; canSend: boolean; projectId: string | null; onOpenGoal: (id: string) => void; onHire?: (hire: HireSuggestion) => void }) {
   const { snapshot, wsPath } = useWorkspace();
   const nova = snapshot.agents.find((a) => a.isHead);
   const name = nova?.name ?? "Nova";
@@ -14,13 +15,18 @@ export function GoalChat({ goalId, goalPath, canSend, projectId, onOpenGoal }: {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Follow-up goals carry this goal's results and project into planning.
+  async function planFollowUp(text: string) {
+    const { id } = await api<{ id: string }>(wsPath("/goals"), { method: "POST", body: { text, parentGoalId: goalId, projectId } });
+    onOpenGoal(id);
+  }
+
   async function continueGoal() {
     if (!next?.trim()) return;
     setBusy(true);
     setError("");
     try {
-      const { id } = await api<{ id: string }>(wsPath("/goals"), { method: "POST", body: { text: next.trim(), parentGoalId: goalId, projectId } });
-      onOpenGoal(id);
+      await planFollowUp(next.trim());
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -39,6 +45,7 @@ export function GoalChat({ goalId, goalPath, canSend, projectId, onOpenGoal }: {
         placeholder="Why this approach? Explain the code. What should we do next?"
         emptyText={`Ask ${name} about the results, the code, or what to do next.`}
         canSend={canSend}
+        suggestions={{ onPlan: planFollowUp, onHire }}
       />
       {canSend && next === null && (
         <button onClick={() => setNext("")} className="btn-light mt-3 rounded-[10px] px-3 py-2 text-sm font-semibold">Continue with a new goal</button>

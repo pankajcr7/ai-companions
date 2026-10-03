@@ -24,16 +24,17 @@ function selfAndReports(agents: Agent[], id: string) {
   return out;
 }
 
-export function CompanionForm({ agent, onClose, onSaved }: { agent: Agent | null; onClose: () => void; onSaved: (id: string) => void }) {
+export function CompanionForm({ agent, preset, onClose, onSaved }: { agent: Agent | null; preset?: { role: string; department: string | null } | null; onClose: () => void; onSaved: (id: string) => void }) {
   const { snapshot, wsPath } = useWorkspace();
   const dialog = useRef<HTMLDialogElement>(null);
   const head = snapshot.agents.find((a) => a.isHead);
   const [form, setForm] = useState(() => ({
     name: agent?.name ?? "",
-    role: agent?.role ?? "",
+    role: agent?.role ?? preset?.role ?? "",
     kind: agent?.kind ?? ("ai" as Agent["kind"]),
     workingStyle: agent?.workingStyle ?? "",
-    departmentId: agent?.departmentId ?? snapshot.departments[0]?.id ?? "",
+    // A companion Nova suggested lands in the matching department when one exists.
+    departmentId: agent?.departmentId ?? snapshot.departments.find((d) => d.name.toLowerCase() === preset?.department?.toLowerCase())?.id ?? snapshot.departments[0]?.id ?? "",
     managerId: agent ? (agent.managerId ?? "") : (head?.id ?? ""),
     connectionId: agent?.connectionId ?? "",
     model: agent?.model ?? "",

@@ -1,11 +1,13 @@
 "use client";
 
 import Image from "next/image";
+import { api } from "@/lib/api";
+import type { HireSuggestion } from "@/lib/suggest";
 import { canEdit, CHATGPT_USAGE_URL, type Agent } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace";
 import { ChatThread } from "./chat/ChatThread";
 
-export function CompanionChat({ agent, onEdit, onThinking, command, onCommandSent }: { agent: Agent; onEdit: () => void; onThinking: (busy: boolean) => void; command?: string; onCommandSent?: () => void }) {
+export function CompanionChat({ agent, onEdit, onThinking, command, onCommandSent, onOpenGoal, onHire }: { agent: Agent; onEdit: () => void; onThinking: (busy: boolean) => void; command?: string; onCommandSent?: () => void; onOpenGoal?: (id: string) => void; onHire?: (hire: HireSuggestion) => void }) {
   const { snapshot, wsPath } = useWorkspace();
   const conn = snapshot.connections.find((c) => c.id === agent.connectionId);
 
@@ -32,6 +34,17 @@ export function CompanionChat({ agent, onEdit, onThinking, command, onCommandSen
       command={command}
       onCommandSent={onCommandSent}
       onThinking={onThinking}
+      suggestions={
+        agent.isHead
+          ? {
+              onPlan: async (goal) => {
+                const { id } = await api<{ id: string }>(wsPath("/goals"), { method: "POST", body: { text: goal } });
+                onOpenGoal?.(id);
+              },
+              onHire,
+            }
+          : undefined
+      }
       footer={
         conn.kind === "chatgpt" ? (
           <p className="flex items-center gap-2 text-xs text-muted">
