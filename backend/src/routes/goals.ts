@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import type { Prisma } from "../generated/prisma/client.js";
-import { loadProject, saveText } from "../files/service.js";
+import { loadProject, saveText, uniqueProjectName } from "../files/service.js";
 import { getBlob } from "../files/store.js";
 import { readiness } from "../goals/llm.js";
 import { loadHead } from "../goals/load.js";
@@ -40,6 +40,8 @@ async function goalDTO(goal: FullGoal) {
     outputTokens: goal.outputTokens,
     createdAt: goal.createdAt,
     working,
+    newProject: goal.newProject,
+    projectName: goal.projectName,
     parent: goal.parent,
     tasks: goal.tasks.map((t) => ({
       id: t.id,
@@ -82,13 +84,15 @@ export async function goalRoutes(app: FastifyInstance) {
   app.post("/api/workspaces/:id/goals", { config: { rateLimit: { max: 10, timeWindow: "1 minute", keyGenerator: perUser } } }, async (req, reply) => {
     const { id } = WsParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
-    const body = z.object({ text: z.string().trim().min(1).max(4000), projectId: z.string().min(1).max(64).nullish(), parentGoalId: z.string().min(1).max(64).nullish() }).parse(req.body);
+    const body = z.object({ text: z.string().trim().min(1).max(4000), projectId: z.string().min(1).max(64).nullish(), parentGoalId: z.string().min(1).max(64).nullish(), newProject: z.boolean().optional() }).parse(req.body);
     let projectId = body.projectId ?? null;
     if (body.parentGoalId) {
       const parent = await prisma.goal.findFirst({ where: { id: body.parentGoalId, workspaceId: id } });
       if (!parent) throw new HttpError(404, "not_found", "Goal not found");
       if (body.projectId === undefined) projectId = parent.projectId;
     }
+    // A goal that builds something new gets its own project when it starts.
+    if (body.newProject) projectId = null;
     if (projectId) await loadProject(id, projectId);
     const nova = await loadHead(id);
     const problem = nova ? readiness(nova) : "Your company has no head agent";
@@ -98,7 +102,7 @@ export async function goalRoutes(app: FastifyInstance) {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${id}))`;
       const busy = await tx.goal.findFirst({ where: { workspaceId: id, status: { in: [...ACTIVE] } } });
       if (busy) throw new HttpError(409, "busy", "Another goal is still in progress. Wait for it to finish or cancel it.");
-      return tx.goal.create({ data: { workspaceId: id, projectId, parentGoalId: body.parentGoalId ?? null, text: body.text, createdById: user.id } });
+      return tx.goal.create({ data: { workspaceId: id, projectId, parentGoalId: body.parentGoalId ?? null, newProject: body.newProject ?? false, text: body.text, createdById: user.id } });
     });
     await audit(prisma, id, user.id, "goal.create", "goal", goal.id);
     planGoal(goal.id).catch((e) => req.log.error(e));
@@ -121,14 +125,16 @@ export async function goalRoutes(app: FastifyInstance) {
   app.put("/api/workspaces/:id/goals/:gid/plan", async (req) => {
     const { id, gid } = GoalParams.parse(req.params);
     await requireMember(req, id, "member");
-    await loadGoal(id, gid);
+    const goal = await loadGoal(id, gid);
     const plan = Plan.parse(req.body);
+    if (goal.newProject && !plan.projectName) throw new HttpError(400, "invalid", "Give the new project a name.");
     const problems = planProblems(plan, await rosterIds(id));
     if (problems.length) throw new HttpError(400, "invalid", problems.join("; "));
     const saved = await prisma.$transaction(async (tx) => {
       // A conditional write locks the goal row, so a Start in progress finishes first and this then finds it running.
       const locked = await tx.goal.updateMany({ where: { id: gid, status: "awaiting_approval" }, data: { updatedAt: new Date() } });
       if (!locked.count) return false;
+      await tx.goal.update({ where: { id: gid }, data: { projectName: goal.newProject ? (plan.projectName ?? null) : null } });
       await tx.goalTask.deleteMany({ where: { goalId: gid } });
       await tx.goalTask.createMany({ data: plan.tasks.map((t, position) => ({ goalId: gid, position, ...t })) });
       return true;
@@ -146,8 +152,16 @@ export async function goalRoutes(app: FastifyInstance) {
     const problems = [...new Set(agents.map(readiness).filter((p): p is string => !!p))];
     if (problems.length) throw new HttpError(400, "unassigned", `Fix these before starting: ${problems.join("; ")}.`);
     await assertNoActiveGoal(id, gid);
-    const r = await prisma.goal.updateMany({ where: { id: gid, status: "awaiting_approval" }, data: { status: "running" } });
-    if (!r.count) throw new HttpError(409, "conflict", "This goal has already started.");
+    const started = await prisma.$transaction(async (tx) => {
+      const claim = await tx.goal.updateMany({ where: { id: gid, status: "awaiting_approval" }, data: { status: "running" } });
+      if (!claim.count) return null;
+      if (!goal.newProject || goal.projectId) return { projectId: goal.projectId };
+      const name = await uniqueProjectName(tx, id, goal.projectName ?? goal.text);
+      const project = await tx.project.create({ data: { workspaceId: id, name, createdById: user.id } });
+      await tx.goal.update({ where: { id: gid }, data: { projectId: project.id } });
+      return { projectId: project.id };
+    });
+    if (!started) throw new HttpError(409, "conflict", "This goal has already started.");
     await audit(prisma, id, user.id, "goal.start", "goal", gid);
     kickGoal(gid);
     return { ok: true };

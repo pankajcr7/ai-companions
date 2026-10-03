@@ -8,7 +8,7 @@ export const PlanTask = z.object({
   criteria: z.array(z.string().trim().min(1).max(300)).min(1).max(5),
   dependsOn: z.array(z.number().int().min(0).max(5)).max(5).default([]),
 });
-export const Plan = z.object({ tasks: z.array(PlanTask).min(1).max(6) });
+export const Plan = z.object({ projectName: z.string().trim().min(1).max(60).optional(), tasks: z.array(PlanTask).min(1).max(6) });
 export type PlanT = z.infer<typeof Plan>;
 
 /** Problems the schema can't see: unknown assignees, bad dependency indexes, loops. */

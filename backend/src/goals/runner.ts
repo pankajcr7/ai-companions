@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { prisma } from "../db.js";
+import { saveText } from "../files/service.js";
+import { HttpError } from "../http.js";
 import { cap, DEP_RESULT_CAP, FILE_BUDGET, pickFiles, RESULT_CAP, type Loaded } from "./context.js";
 import { checkEdit, splitEdits } from "./edits.js";
 import { CallError, complete, completeJson, type Call } from "./llm.js";
@@ -118,6 +120,21 @@ async function runTask(goalId: string, taskId: string) {
     const read = new Map(files.map((f) => [f.path.toLowerCase(), f]));
     const existing = new Map((ctx.entries ?? []).map((e) => [e.path.toLowerCase(), e]));
     const checked = split.edits.map((raw) => ({ raw, check: checkEdit(raw, read, existing) }));
+    // A goal that created its project saves new files right away; changes to existing files still wait for Apply.
+    const decided: { raw: (typeof checked)[number]["raw"]; check: Omit<(typeof checked)[number]["check"], "status"> & { status: "pending" | "rejected" | "applied" }; decidedById: string | null }[] = [];
+    for (const { raw, check } of checked) {
+      if (!goal.newProject || !goal.project || check.status !== "pending" || check.baseRevision !== 0) {
+        decided.push({ raw, check, decidedById: null });
+        continue;
+      }
+      try {
+        await saveText(goal.project, goal.createdById, check.path, raw.content, 0);
+        decided.push({ raw, check: { ...check, status: "applied" }, decidedById: goal.createdById });
+      } catch (e) {
+        if (!(e instanceof HttpError)) throw e;
+        decided.push({ raw, check: { ...check, status: "rejected", reason: e.message }, decidedById: null });
+      }
+    }
     const result = cap([split.visible, split.error].filter(Boolean).join("\n\n"), RESULT_CAP, "result");
     await prisma.$transaction(async (tx) => {
       const r = await tx.goalTask.updateMany({
@@ -125,9 +142,9 @@ async function runTask(goalId: string, taskId: string) {
         data: { status: "done", result, filesRead: files.map((f) => ({ path: f.path, revision: f.revision })), contextRevisions: ctx.sharedRevisions, inputTokens: input, outputTokens: output, finishedAt: new Date() },
       });
       if (!r.count) return; // cancelled while working
-      if (checked.length) {
+      if (decided.length) {
         await tx.proposedEdit.createMany({
-          data: checked.map(({ raw, check }) => ({ taskId, goalId, path: check.path, baseRevision: check.baseRevision, content: raw.content, note: raw.note, status: check.status, reason: check.reason })),
+          data: decided.map(({ raw, check, decidedById }) => ({ taskId, goalId, path: check.path, baseRevision: check.baseRevision, content: raw.content, note: raw.note, status: check.status, reason: check.reason, decidedById })),
         });
       }
     });

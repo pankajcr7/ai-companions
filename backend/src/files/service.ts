@@ -200,3 +200,12 @@ export async function saveText(project: Project, userId: string, rawPath: string
   if (!updated) throw new HttpError(409, "conflict", "This file changed since you opened it. Reload to see the latest version.");
   return { revision: next };
 }
+
+/** "Bakery site", then "Bakery site 2", "Bakery site 3"... within a workspace. */
+export async function uniqueProjectName(db: Db, workspaceId: string, base: string): Promise<string> {
+  const root = base.trim().slice(0, 56) || "New project";
+  const taken = new Set((await db.project.findMany({ where: { workspaceId, name: { startsWith: root } }, select: { name: true } })).map((p) => p.name));
+  let name = root;
+  for (let n = 2; taken.has(name); n++) name = `${root} ${n}`;
+  return name;
+}
