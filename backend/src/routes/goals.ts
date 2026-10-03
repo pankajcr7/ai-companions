@@ -7,6 +7,7 @@ import { getBlob } from "../files/store.js";
 import { readiness } from "../goals/llm.js";
 import { loadHead } from "../goals/load.js";
 import { Plan, planProblems } from "../goals/plan.js";
+import { ACTIVE, createGoal } from "../goals/create.js";
 import { planGoal } from "../goals/planner.js";
 import { abortGoal, kickGoal } from "../goals/runner.js";
 import { audit, HttpError, perUser, requireMember } from "../http.js";
@@ -14,7 +15,6 @@ import { WsParams } from "./workspaces.js";
 
 const GoalParams = WsParams.extend({ gid: z.string().min(1).max(64) });
 const TaskParams = GoalParams.extend({ tid: z.string().min(1).max(64) });
-const ACTIVE = ["planning", "running", "reviewing"] as const;
 export const RATING_REASONS = ["wrong facts", "off-brand", "too generic", "ignored files", "too long"] as const;
 
 const withTasks = { parent: { select: { id: true, text: true } }, tasks: { orderBy: { position: "asc" }, include: { agent: { select: { name: true } } } }, edits: { orderBy: { createdAt: "asc" } } } satisfies Prisma.GoalInclude;
@@ -62,6 +62,8 @@ async function goalDTO(goal: FullGoal) {
       verdictNote: t.verdictNote,
       rating: t.rating,
       ratingReason: t.ratingReason,
+      startedAt: t.startedAt,
+      finishedAt: t.finishedAt,
       inputTokens: t.inputTokens,
       outputTokens: t.outputTokens,
     })),
@@ -85,28 +87,8 @@ export async function goalRoutes(app: FastifyInstance) {
     const { id } = WsParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
     const body = z.object({ text: z.string().trim().min(1).max(4000), projectId: z.string().min(1).max(64).nullish(), parentGoalId: z.string().min(1).max(64).nullish(), newProject: z.boolean().optional() }).parse(req.body);
-    let projectId = body.projectId ?? null;
-    if (body.parentGoalId) {
-      const parent = await prisma.goal.findFirst({ where: { id: body.parentGoalId, workspaceId: id } });
-      if (!parent) throw new HttpError(404, "not_found", "Goal not found");
-      if (body.projectId === undefined) projectId = parent.projectId;
-    }
-    // A goal that builds something new gets its own project when it starts.
-    if (body.newProject) projectId = null;
-    if (projectId) await loadProject(id, projectId);
-    const nova = await loadHead(id);
-    const problem = nova ? readiness(nova) : "Your company has no head agent";
-    if (problem) throw new HttpError(409, "unassigned", `${problem}. Choose a model on the companion's Customize form.`);
-    // One check-and-create at a time per company, so a double submit can't start two goals.
-    const goal = await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${id}))`;
-      const busy = await tx.goal.findFirst({ where: { workspaceId: id, status: { in: [...ACTIVE] } } });
-      if (busy) throw new HttpError(409, "busy", "Another goal is still in progress. Wait for it to finish or cancel it.");
-      return tx.goal.create({ data: { workspaceId: id, projectId, parentGoalId: body.parentGoalId ?? null, newProject: body.newProject ?? false, text: body.text, createdById: user.id } });
-    });
-    await audit(prisma, id, user.id, "goal.create", "goal", goal.id);
-    planGoal(goal.id).catch((e) => req.log.error(e));
-    return reply.code(201).send({ id: goal.id });
+    const { id: goalId } = await createGoal({ workspaceId: id, userId: user.id, text: body.text, projectId: body.projectId, parentGoalId: body.parentGoalId, newProject: body.newProject, log: (e) => req.log.error(e) });
+    return reply.code(201).send({ id: goalId });
   });
 
   app.get("/api/workspaces/:id/goals", async (req) => {
@@ -176,6 +158,26 @@ export async function goalRoutes(app: FastifyInstance) {
     abortGoal(gid);
     await prisma.goalTask.updateMany({ where: { goalId: gid, status: { in: ["pending", "running"] } }, data: { status: "skipped", error: "Cancelled" } });
     await audit(prisma, id, user.id, "goal.cancel", "goal", gid);
+    return { ok: true };
+  });
+
+  app.post("/api/workspaces/:id/goals/:gid/resume", async (req) => {
+    const { id, gid } = GoalParams.parse(req.params);
+    const { user } = await requireMember(req, id, "member");
+    const goal = await loadGoal(id, gid);
+    if (goal.status !== "cancelled") throw new HttpError(409, "conflict", "Only a stopped goal can be resumed.");
+    // A plan that was cancelled before Start was never approved: resuming it would run unapproved work.
+    if (!goal.tasks.some((t) => t.startedAt || t.status === "done")) throw new HttpError(409, "conflict", "This plan was never started. Ask Nova again to make a new plan.");
+    await assertNoActiveGoal(id, gid);
+    const reopened = await prisma.$transaction(async (tx) => {
+      const r = await tx.goal.updateMany({ where: { id: gid, status: "cancelled" }, data: { status: "running", summary: null, error: null } });
+      if (!r.count) return false;
+      await tx.goalTask.updateMany({ where: { goalId: gid, status: { not: "done" } }, data: { status: "pending", result: null, error: null, errorCode: null, verdict: null, verdictNote: null, startedAt: null, finishedAt: null } });
+      return true;
+    });
+    if (!reopened) throw new HttpError(409, "conflict", "This goal was already resumed.");
+    await audit(prisma, id, user.id, "goal.resume", "goal", gid);
+    kickGoal(gid);
     return { ok: true };
   });
 
