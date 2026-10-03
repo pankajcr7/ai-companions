@@ -425,6 +425,7 @@ enum StepPhase {
   execute
   summary
   project_summary
+  chat
 }
 
 model Goal {
@@ -445,6 +446,10 @@ model Goal {
   tasks        GoalTask[]
   edits        ProposedEdit[]
   steps        GoalStep[]
+  parentGoalId String?
+  parent       Goal?          @relation("GoalFollowUps", fields: [parentGoalId], references: [id], onDelete: SetNull)
+  followUps    Goal[]         @relation("GoalFollowUps")
+  messages     GoalMessage[]
 
   @@index([workspaceId, createdAt])
 }
@@ -518,4 +523,23 @@ model GoalStep {
   goal         Goal?     @relation(fields: [goalId], references: [id], onDelete: Cascade)
 
   @@index([goalId])
+}
+
+model GoalMessage {
+  id           String        @id @default(cuid())
+  goalId       String
+  workspaceId  String
+  userId       String
+  role         MessageRole
+  content      String
+  status       MessageStatus @default(complete)
+  model        String?
+  inputTokens  Int?
+  outputTokens Int?
+  errorCode    String?
+  errorMessage String?
+  createdAt    DateTime      @default(now())
+  goal         Goal          @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, userId, createdAt])
 }
