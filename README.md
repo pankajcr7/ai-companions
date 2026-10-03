@@ -52,6 +52,14 @@ Open **Projects** in the sidebar to upload a folder, a ZIP, or files, then brows
 - Limits: 2,000 files and folders, 50 MB per project, 10 MB per file, 1 MB for files edited in the browser.
 - Files are stored on the server's disk under `backend/data/blobs` (set `FILES_DIR` to change). Nothing uploaded is ever run.
 
+## Company goals
+
+Type a goal in the bar at the bottom of the office and pick a project (optional). Nova plans tasks for your companions; edit, reassign, or remove tasks, then press **Start**. Each companion works with its own AI model and reads the files it needs from the project. Developers can propose file changes: open **View changes**, then **Apply** or **Reject**. When everything finishes, Nova reviews each result against its acceptance criteria and writes a summary. Start a message with `chat:` to talk to Nova directly instead.
+
+- On a project page, **Read my project** asks Nova for a summary every companion reuses. `.company/brief.md` and `.company/brand.md` are shared with every companion on that project.
+- Limits: 6 tasks per goal, 3 running at once, one goal in progress per company. Nothing runs until you press Start.
+- Every AI call is logged with its tokens; rate each result with thumbs up or down to help improve the prompts.
+
 ## Test
 
 ```
