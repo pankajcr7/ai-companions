@@ -114,10 +114,11 @@ test("one active goal per company; Nova needs a model; viewers read only; other 
 
 test("cancelling during planning wins over a late plan", async () => {
   const co = await company(app, llm);
-  llm.setScript(async (s) => (isPlan(s) ? (await sleep(2500), fence(planFor([co.nova.id]))) : "ok"));
+  // The plan arrives well after Cancel, even at remote-database latency.
+  llm.setScript(async (s) => (isPlan(s) ? (await sleep(10_000), fence(planFor([co.nova.id]))) : "ok"));
   const g = await goal(co);
   expect((await co.req("POST", `${g.base}/cancel`)).statusCode).toBe(200);
-  await sleep(3500);
+  await sleep(11_000);
   expect(await g.get()).toMatchObject({ status: "cancelled", tasks: [] });
   const list = (await co.req("GET", `/api/workspaces/${co.id}/goals`)).json().goals;
   expect(list[0]).toMatchObject({ id: g.gid, status: "cancelled", text: "Launch the bakery site" });
