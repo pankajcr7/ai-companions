@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { exclusionReason, LIMITS, normalizePath, PRIVATE_KEY } from "../files/rules.js";
+import { findJsonBlock, hasUnclosedBlock } from "./json-block.js";
 
 const EditList = z.object({
   edits: z
@@ -10,14 +11,19 @@ export type RawEdit = { path: string; content: string; note: string };
 
 /** Separates a task reply into the visible result and its trailing edits block, if any. */
 export function splitEdits(text: string): { visible: string; edits: RawEdit[]; error: string | null } {
-  const last = [...text.matchAll(/```(?:json)?\s*\n([\s\S]*?)```/g)].at(-1);
-  if (!last || last.index === undefined || !/"edits"\s*:/.test(last[1])) return { visible: text.trim(), edits: [], error: null };
-  const visible = (text.slice(0, last.index) + text.slice(last.index + last[0].length)).trim();
-  try {
-    return { visible, edits: EditList.parse(JSON.parse(last[1])).edits, error: null };
-  } catch {
-    return { visible, edits: [], error: "The proposed edits couldn't be read, so none were saved." };
+  const block = findJsonBlock(text, "edits");
+  if (!block) {
+    // The model started a file-changes block but the reply ended before it finished.
+    if (hasUnclosedBlock(text, "edits")) {
+      const cut = text.lastIndexOf("```", text.search(/\{\s*"edits"\s*:[\s\S]*$/));
+      return { visible: text.slice(0, cut >= 0 ? cut : text.search(/\{\s*"edits"/)).trim(), edits: [], error: "The reply was cut off before the file changes finished, so none were saved. Ask for fewer files at a time." };
+    }
+    return { visible: text.trim(), edits: [], error: null };
   }
+  const visible = (text.slice(0, block.start) + text.slice(block.end)).trim();
+  const parsed = EditList.safeParse(block.value);
+  if (!parsed.success) return { visible, edits: [], error: "The proposed file changes weren't in the expected format, so none were saved." };
+  return { visible, edits: parsed.data.edits, error: null };
 }
 
 export type EditCheck = { path: string; baseRevision: number; status: "pending" | "rejected"; reason: string | null };

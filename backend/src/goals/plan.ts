@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { findJsonBlock } from "./json-block.js";
 
 export const PlanTask = z.object({
   agentId: z.string().trim().min(1).max(64),
@@ -35,13 +36,11 @@ export function hasCycle(deps: number[][]): boolean {
   return deps.some((_, i) => visit(i));
 }
 
-/** The JSON in a model reply: the last fenced block, otherwise the outermost braces. */
+/** The JSON object in a model reply, read properly so code fences inside its strings cannot cut it short. */
 export function extractJson(text: string): unknown {
-  const fenced = [...text.matchAll(/```(?:json)?\s*\n([\s\S]*?)```/g)].at(-1)?.[1];
-  const start = text.indexOf("{");
-  const candidate = fenced ?? (start >= 0 ? text.slice(start, text.lastIndexOf("}") + 1) : "");
-  if (!candidate.trim()) throw new Error("No JSON found in the reply");
-  return JSON.parse(candidate);
+  const block = findJsonBlock(text);
+  if (!block) throw new Error("No JSON found in the reply");
+  return block.value;
 }
 
 /** Models sometimes write a companion's name instead of its id; map exact names (any case) to ids. */

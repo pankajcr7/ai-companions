@@ -89,7 +89,7 @@ test("splitEdits strips the trailing edits block", () => {
   const reply = 'Done.\n\n```json\n{"edits":[{"path":"a.ts","content":"x","note":"why"}]}\n```';
   expect(splitEdits(reply)).toEqual({ visible: "Done.", edits: [{ path: "a.ts", content: "x", note: "why" }], error: null });
   expect(splitEdits("No edits here.\n```json\n{\"other\":1}\n```").edits).toEqual([]);
-  expect(splitEdits('Oops\n```json\n{"edits":[{"path":1}]}\n```')).toEqual({ visible: "Oops", edits: [], error: "The proposed edits couldn't be read, so none were saved." });
+  expect(splitEdits('Oops\n```json\n{"edits":[{"path":1}]}\n```')).toEqual({ visible: "Oops", edits: [], error: "The proposed file changes weren't in the expected format, so none were saved." });
 });
 
 test("checkEdit applies the upload rules and requires the file to have been read", () => {
@@ -106,4 +106,30 @@ test("checkEdit applies the upload rules and requires the file to have been read
   expect(checkEdit({ path: "k.txt", content: "-----BEGIN RSA PRIVATE KEY-----", note: "" }, read, existing).reason).toBe("contains a private key");
   expect(checkEdit({ path: "../x", content: "x", note: "" }, read, existing).reason).toMatch(/invalid path/);
   expect(checkEdit({ path: "docs", content: "x", note: "" }, read, existing).reason).toBe("a folder has this name");
+});
+
+test("edits whose file content contains code fences are read whole (README with ```bash examples)", () => {
+  const readme = "# App\n\nRun it:\n\n```bash\nnpm start\n```\n\nOpen:\n\n```text\nhttp://localhost:4173\n```\n";
+  const reply = `Here is the project.\n\n\`\`\`json\n${JSON.stringify({ edits: [{ path: "README.md", content: readme, note: "Docs" }, { path: "index.html", content: "<h1>Hi</h1>" }] })}\n\`\`\``;
+  expect(splitEdits(reply)).toEqual({
+    visible: "Here is the project.",
+    edits: [
+      { path: "README.md", content: readme, note: "Docs" },
+      { path: "index.html", content: "<h1>Hi</h1>", note: "" },
+    ],
+    error: null,
+  });
+});
+
+test("a cut-off edits block says so and keeps the prose", () => {
+  const reply = 'Done.\n\n```json\n{"edits":[{"path":"a.ts","content":"const a = 1;';
+  const out = splitEdits(reply);
+  expect(out.edits).toEqual([]);
+  expect(out.visible).toBe("Done.");
+  expect(out.error).toMatch(/cut off/);
+});
+
+test("plan and summary JSON is found even when its text contains code fences", () => {
+  const summary = { summary: "Run:\n\n```bash\nnpm start\n```\n\nThen open the page.", verdicts: [] };
+  expect(extractJson(`Here you go.\n\n\`\`\`json\n${JSON.stringify(summary)}\n\`\`\``)).toEqual(summary);
 });
