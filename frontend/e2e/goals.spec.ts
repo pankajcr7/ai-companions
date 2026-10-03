@@ -62,6 +62,8 @@ test("give the company a goal, approve the plan, and apply a proposed edit", asy
   await goal.getByRole("button", { name: "View changes" }).click();
   const review = page.getByRole("dialog");
   await expect(review.getByText("Left: current file. Right: proposed change.")).toBeVisible();
+  await expect(review).toContainText("Adds two numbers.");
+  await expect(review.getByRole("button", { name: "Copy new file" })).toBeVisible();
   await review.getByRole("button", { name: "Close" }).click();
   await goal.getByRole("button", { name: "Apply" }).click();
   await expect(goal.getByText(/applied/)).toBeVisible();

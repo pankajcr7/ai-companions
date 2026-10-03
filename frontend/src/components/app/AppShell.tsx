@@ -27,7 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="app flex min-h-[100dvh] flex-col lg:flex-row" data-theme={theme} data-still={reducedMotion || calmMode}>
+    <div className="app flex min-h-[100dvh] flex-col lg:h-[100dvh] lg:flex-row" data-theme={theme} data-still={reducedMotion || calmMode}>
       <aside className="flex items-center justify-between gap-2 border-b border-line bg-paper px-4 py-3 lg:w-60 lg:flex-col lg:items-stretch lg:justify-start lg:border-b-0 lg:border-r lg:p-5">
         <Link href={base} aria-label="Office home"><Logo compact className="text-base sm:text-lg" /></Link>
         <p className="hidden truncate text-sm font-medium text-muted lg:mt-6 lg:block">{snapshot.workspace.name}</p>
@@ -39,6 +39,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={href}
                 href={href}
                 aria-current={active ? "page" : undefined}
+                aria-label={label}
+                title={label}
                 className={`flex items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm font-medium sm:px-3 ${active ? "bg-ink text-paper" : "text-ink hover:bg-bg"}`}
               >
                 <Icon size={18} /> <span className="hidden sm:inline">{label}</span>
@@ -46,11 +48,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <button onClick={signOut} className="flex items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm text-muted hover:bg-bg sm:px-3 lg:mt-auto">
+        <button onClick={signOut} aria-label="Sign out" title="Sign out" className="flex items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm text-muted hover:bg-bg sm:px-3 lg:mt-auto">
           <SignOut size={18} /> <span className="hidden sm:inline">Sign out</span>
         </button>
       </aside>
-      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+      {/* On desktop the window is the frame: each page scrolls inside it, so side panels scroll on their own. */}
+      <div className="flex min-h-0 flex-1 flex-col lg:overflow-y-auto">{children}</div>
     </div>
   );
 }
