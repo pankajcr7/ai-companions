@@ -19,8 +19,12 @@ export function TaskCard({ task, edits, goalPath, editable, onChanged }: { task:
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const [viewing, setViewing] = useState<EditDTO | null>(null);
+  const [busy, setBusy] = useState(false);
 
+  // One request at a time: a double click must not apply a change twice.
   async function run(fn: () => Promise<unknown>) {
+    if (busy) return;
+    setBusy(true);
     setError("");
     try {
       await fn();
@@ -28,6 +32,7 @@ export function TaskCard({ task, edits, goalPath, editable, onChanged }: { task:
       setError((e as Error).message);
     }
     await onChanged().catch(() => {});
+    setBusy(false);
   }
   const rate = (rating: 1 | -1, reason?: string) => run(() => api(`${goalPath}/tasks/${task.id}/rating`, { method: "POST", body: { rating, reason } }));
 
@@ -69,8 +74,8 @@ export function TaskCard({ task, edits, goalPath, editable, onChanged }: { task:
               <button onClick={() => setViewing(e)} className="underline">View changes</button>
               {editable && e.status === "pending" && (
                 <>
-                  <button onClick={() => run(() => api(`${goalPath}/edits/${e.id}/apply`, { method: "POST" }))} className="font-semibold underline">Apply</button>
-                  <button onClick={() => run(() => api(`${goalPath}/edits/${e.id}/reject`, { method: "POST" }))} className="underline">Reject</button>
+                  <button onClick={() => run(() => api(`${goalPath}/edits/${e.id}/apply`, { method: "POST" }))} disabled={busy} className="font-semibold underline disabled:opacity-50">Apply</button>
+                  <button onClick={() => run(() => api(`${goalPath}/edits/${e.id}/reject`, { method: "POST" }))} disabled={busy} className="underline disabled:opacity-50">Reject</button>
                 </>
               )}
             </li>

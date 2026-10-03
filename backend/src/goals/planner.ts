@@ -8,9 +8,10 @@ import { controllerFor, release } from "./runner.js";
 
 /** Asks Nova for a plan; stores tasks and waits for approval, unless the goal was cancelled meanwhile. */
 export async function planGoal(goalId: string): Promise<void> {
-  const goal = await prisma.goal.findUniqueOrThrow({ where: { id: goalId }, include: { workspace: true, project: true } });
   const ctl = controllerFor(goalId);
   try {
+    // Loaded inside the try so a database error fails the goal instead of escaping.
+    const goal = await prisma.goal.findUniqueOrThrow({ where: { id: goalId }, include: { workspace: true, project: true } });
     const nova = await loadHead(goal.workspaceId);
     if (!nova) throw new CallError("unassigned", "Your company has no head agent");
     const roster = await prisma.agent.findMany({ where: { workspaceId: goal.workspaceId, kind: "ai", status: "active" }, include: { department: true, connection: true }, orderBy: { createdAt: "asc" } });

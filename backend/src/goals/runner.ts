@@ -63,27 +63,30 @@ async function tick(goalId: string) {
   await Promise.all(
     ready.slice(0, Math.max(0, MAX_PARALLEL - running)).map(async (t) => {
       const claimed = await prisma.goalTask.updateMany({ where: { id: t.id, status: "pending" }, data: { status: "running", startedAt: new Date() } });
-      if (claimed.count) void runTask(goalId, t.id).finally(() => kickGoal(goalId));
+      if (claimed.count) void runTask(goalId, t.id).catch((e) => console.error("goal task", e)).finally(() => kickGoal(goalId));
     }),
   );
   if (![...status.values()].some((s) => s === "pending" || s === "running")) await finishGoal(goalId);
 }
 
 async function runTask(goalId: string, taskId: string) {
-  const task = await prisma.goalTask.findUniqueOrThrow({
-    where: { id: taskId },
-    include: { agent: { include: { connection: true, department: true } }, goal: { include: { workspace: true, project: true, tasks: { include: { agent: { select: { name: true } } } } } } },
-  });
-  const { goal, agent } = task;
   const ctl = controllerFor(goalId);
   const signal = AbortSignal.any([ctl.signal, AbortSignal.timeout(300_000)]);
   let input = 0;
   let output = 0;
+  let connectionId: string | null = null;
   const add = (c: Call) => {
     input += c.inputTokens ?? 0;
     output += c.outputTokens ?? 0;
   };
   try {
+    // Loaded inside the try so a database error fails this task instead of escaping the runner.
+    const task = await prisma.goalTask.findUniqueOrThrow({
+      where: { id: taskId },
+      include: { agent: { include: { connection: true, department: true } }, goal: { include: { workspace: true, project: true, tasks: { include: { agent: { select: { name: true } } } } } } },
+    });
+    const { goal, agent } = task;
+    connectionId = agent.connection?.id ?? null;
     const ctx = await goalContext(goal.project);
     let files: Loaded[] = [];
     const notes: string[] = [];
@@ -131,14 +134,14 @@ async function runTask(goalId: string, taskId: string) {
   } catch (e) {
     const err = e instanceof CallError ? e : new CallError("server_error", "Something went wrong while working on this task.");
     if (!(e instanceof CallError)) console.error("goal task", e);
-    if (err.code === "reauth" && agent.connection) await prisma.providerConnection.update({ where: { id: agent.connection.id }, data: { status: "reauth", lastError: "Sign in to ChatGPT again" } });
+    if (err.code === "reauth" && connectionId) await prisma.providerConnection.update({ where: { id: connectionId }, data: { status: "reauth", lastError: "Sign in to ChatGPT again" } });
     await prisma.goalTask.updateMany({
       where: { id: taskId, status: "running" },
       data: { status: err.code === "aborted" ? "skipped" : "failed", error: err.code === "aborted" ? "Cancelled" : err.message, errorCode: err.code, inputTokens: input, outputTokens: output, finishedAt: new Date() },
     });
   } finally {
     release(goalId, ctl);
-    if (input || output) await prisma.goal.update({ where: { id: goalId }, data: { inputTokens: { increment: input }, outputTokens: { increment: output } } });
+    if (input || output) await prisma.goal.update({ where: { id: goalId }, data: { inputTokens: { increment: input }, outputTokens: { increment: output } } }).catch((e) => console.error("goal tokens", e));
   }
 }
 
@@ -176,6 +179,9 @@ async function finishGoal(goalId: string) {
 
 /** Work that was running when the server stopped is marked so the owner can retry it; nothing reruns by itself. */
 export async function recoverInterrupted() {
-  await prisma.goalTask.updateMany({ where: { status: "running" }, data: { status: "interrupted", error: "Interrupted by a server restart. Retry to run it again." } });
+  const interrupted = { status: "interrupted" as const, error: "Interrupted by a server restart. Retry to run it again." };
+  await prisma.goalTask.updateMany({ where: { status: "running" }, data: interrupted });
+  // Tasks still waiting in a running goal would otherwise be stranded: the goal fails below and has nothing to retry.
+  await prisma.goalTask.updateMany({ where: { status: "pending", goal: { status: "running" } }, data: interrupted });
   await prisma.goal.updateMany({ where: { status: { in: ["planning", "running", "reviewing"] } }, data: { status: "failed", error: "Interrupted by a server restart." } });
 }

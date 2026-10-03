@@ -24,6 +24,10 @@ const components: Components = {
       </a>
     );
   },
+  // Images are never fetched: a prompt-injected image URL could leak data to another site.
+  img({ alt }) {
+    return <span className="text-muted">[image{alt ? `: ${alt}` : ""}]</span>;
+  },
   table({ children }) {
     return (
       <div className="overflow-x-auto">

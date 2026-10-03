@@ -93,10 +93,15 @@ export async function goalRoutes(app: FastifyInstance) {
     const nova = await loadHead(id);
     const problem = nova ? readiness(nova) : "Your company has no head agent";
     if (problem) throw new HttpError(409, "unassigned", `${problem}. Choose a model on the companion's Customize form.`);
-    await assertNoActiveGoal(id);
-    const goal = await prisma.goal.create({ data: { workspaceId: id, projectId, parentGoalId: body.parentGoalId ?? null, text: body.text, createdById: user.id } });
+    // One check-and-create at a time per company, so a double submit can't start two goals.
+    const goal = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${id}))`;
+      const busy = await tx.goal.findFirst({ where: { workspaceId: id, status: { in: [...ACTIVE] } } });
+      if (busy) throw new HttpError(409, "busy", "Another goal is still in progress. Wait for it to finish or cancel it.");
+      return tx.goal.create({ data: { workspaceId: id, projectId, parentGoalId: body.parentGoalId ?? null, text: body.text, createdById: user.id } });
+    });
     await audit(prisma, id, user.id, "goal.create", "goal", goal.id);
-    void planGoal(goal.id);
+    planGoal(goal.id).catch((e) => req.log.error(e));
     return reply.code(201).send({ id: goal.id });
   });
 
@@ -121,8 +126,9 @@ export async function goalRoutes(app: FastifyInstance) {
     const problems = planProblems(plan, await rosterIds(id));
     if (problems.length) throw new HttpError(400, "invalid", problems.join("; "));
     const saved = await prisma.$transaction(async (tx) => {
-      const g = await tx.goal.findFirst({ where: { id: gid, status: "awaiting_approval" } });
-      if (!g) return false;
+      // A conditional write locks the goal row, so a Start in progress finishes first and this then finds it running.
+      const locked = await tx.goal.updateMany({ where: { id: gid, status: "awaiting_approval" }, data: { updatedAt: new Date() } });
+      if (!locked.count) return false;
       await tx.goalTask.deleteMany({ where: { goalId: gid } });
       await tx.goalTask.createMany({ data: plan.tasks.map((t, position) => ({ goalId: gid, position, ...t })) });
       return true;
@@ -166,7 +172,7 @@ export async function goalRoutes(app: FastifyInstance) {
     if (goal.status !== "failed" || goal.tasks.length) throw new HttpError(409, "conflict", "Only a goal whose planning failed can be planned again.");
     await assertNoActiveGoal(id, gid);
     await prisma.goal.update({ where: { id: gid }, data: { status: "planning", error: null } });
-    void planGoal(gid);
+    planGoal(gid).catch((e) => req.log.error(e));
     return { ok: true };
   });
 
@@ -184,7 +190,7 @@ export async function goalRoutes(app: FastifyInstance) {
     let grew = true;
     while (grew) {
       grew = false;
-      for (const t of goal.tasks) if (!reopen.has(t.position) && t.status === "skipped" && t.dependsOn.some((d) => reopen.has(d))) (reopen.add(t.position), (grew = true));
+      for (const t of goal.tasks) if (!reopen.has(t.position) && (t.status === "skipped" || t.status === "interrupted") && t.dependsOn.some((d) => reopen.has(d))) (reopen.add(t.position), (grew = true));
     }
     await prisma.$transaction([
       prisma.goalTask.updateMany({ where: { goalId: gid, position: { in: [...reopen] } }, data: { status: "pending", result: null, error: null, errorCode: null, verdict: null, verdictNote: null, startedAt: null, finishedAt: null } }),
@@ -231,29 +237,37 @@ export async function goalRoutes(app: FastifyInstance) {
     const { id, gid, eid } = EditParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
     const { goal, edit } = await loadEdit(id, gid, eid);
-    if (edit.status !== "pending") throw new HttpError(409, "conflict", "This change was already decided.");
     if (!goal.projectId) throw new HttpError(409, "conflict", "The project was deleted, so this change can't be applied.");
     const project = await loadProject(id, goal.projectId);
-    try {
-      const saved = await saveText(project, user.id, edit.path, edit.content, edit.baseRevision);
-      await prisma.proposedEdit.update({ where: { id: eid }, data: { status: "applied", decidedById: user.id } });
-      await audit(prisma, id, user.id, "goal.edit.apply", "proposedEdit", eid, { path: edit.path });
-      return saved;
-    } catch (e) {
-      if (e instanceof HttpError && e.status === 409) {
-        await prisma.proposedEdit.update({ where: { id: eid }, data: { status: "stale", reason: "The file changed after the companion read it.", decidedById: user.id } });
-        throw new HttpError(409, "stale", "The file changed after the companion read it, so this change is out of date.");
-      }
-      throw e;
-    }
+    // The edit row stays locked while saving, so a second Apply waits and then sees the decision.
+    const outcome = await prisma.$transaction(
+      async (tx) => {
+        const [row] = await tx.$queryRaw<{ status: string }[]>`SELECT status FROM "ProposedEdit" WHERE id = ${eid} FOR UPDATE`;
+        if (row?.status !== "pending") return { kind: "decided" as const };
+        try {
+          const saved = await saveText(project, user.id, edit.path, edit.content, edit.baseRevision);
+          await tx.proposedEdit.update({ where: { id: eid }, data: { status: "applied", decidedById: user.id } });
+          return { kind: "applied" as const, saved };
+        } catch (e) {
+          if (!(e instanceof HttpError) || e.status !== 409) throw e;
+          await tx.proposedEdit.update({ where: { id: eid }, data: { status: "stale", reason: "The file changed after the companion read it.", decidedById: user.id } });
+          return { kind: "stale" as const };
+        }
+      },
+      { timeout: 60_000 },
+    );
+    if (outcome.kind === "decided") throw new HttpError(409, "conflict", "This change was already decided.");
+    if (outcome.kind === "stale") throw new HttpError(409, "stale", "The file changed after the companion read it, so this change is out of date.");
+    await audit(prisma, id, user.id, "goal.edit.apply", "proposedEdit", eid, { path: edit.path });
+    return outcome.saved;
   });
 
   app.post("/api/workspaces/:id/goals/:gid/edits/:eid/reject", async (req) => {
     const { id, gid, eid } = EditParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
-    const { edit } = await loadEdit(id, gid, eid);
-    if (edit.status !== "pending") throw new HttpError(409, "conflict", "This change was already decided.");
-    await prisma.proposedEdit.update({ where: { id: eid }, data: { status: "rejected", decidedById: user.id } });
+    await loadEdit(id, gid, eid);
+    const r = await prisma.proposedEdit.updateMany({ where: { id: eid, status: "pending" }, data: { status: "rejected", decidedById: user.id } });
+    if (!r.count) throw new HttpError(409, "conflict", "This change was already decided.");
     return { ok: true };
   });
 }

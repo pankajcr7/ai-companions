@@ -74,6 +74,9 @@ test("give the company a goal, approve the plan, and apply a proposed edit", asy
   await goal.getByRole("button", { name: "Send", exact: true }).click();
   const card = goal.getByRole("figure", { name: "Code: sample-app/src/lib/math.ts" });
   await expect(card).toContainText("Adds two numbers.");
+  // Images in model output are never fetched: a prompt injection could use one to leak data.
+  await expect(goal.locator('img[src*="pixel"]')).toHaveCount(0);
+  await expect(goal.getByText("[image: tracker]")).toBeVisible();
   await card.getByRole("button", { name: "Copy", exact: true }).click();
   await expect(card.getByRole("button", { name: "Copied" })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("export const add");
