@@ -28,6 +28,7 @@ export type GoalDTO = {
   text: string;
   status: GoalStatus;
   projectId: string | null;
+  parent: { id: string; text: string } | null;
   summary: string | null;
   error: string | null;
   inputTokens: number;
