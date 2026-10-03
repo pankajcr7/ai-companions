@@ -19,7 +19,7 @@ A non-technical owner understands their team at a glance and never gets lost. On
    - **Office** view: the existing animated map without the command bar; clicking a companion opens their page.
    - **Organize** menu (admins): opens a dialog with the existing department tools (add, rename, reorder, delete) and reporting lines, moved from the Organization page.
 2. **Companion page** `/w/[slug]/team/[id]`:
-   - Left: big avatar, name, role, "Now working on" (task title linking to its goal: the chat goal card when the goal has a conversation, else the full goal page), "Recent work" (last 5 finished tasks: title, date, link to the goal), **Edit** (existing companion form), **Set up** when they have no AI model.
+   - Left: big avatar, name, role, "Now working on" (task title linking to the goal's full page), "Recent work" (last 5 finished tasks: title, date, link to the goal), **Edit** (existing companion form), **Set up** when they have no AI model.
    - Right: full-height one-to-one chat (the existing companion chat).
    - Under 1024px: profile on top, chat below. **Back to team** link at the top.
    - Unknown id shows "This teammate wasn't found" with a link back to the Team page.
@@ -27,14 +27,14 @@ A non-technical owner understands their team at a glance and never gets lost. On
 4. **Settings** `/w/[slug]/settings` has tabs **Company** (today's settings content) and **AI services** (today's providers page content), selected by `?tab=company|ai`.
 5. **Redirects**: `/w/[slug]/office` and `/w/[slug]/organization` go to `/w/[slug]/team`; `/w/[slug]/providers` goes to `/w/[slug]/settings?tab=ai`. Every link inside the app points to the new URLs.
 6. **First-run setup card** on home, shown until Nova can answer:
-   - Step 1 "Connect an AI service": opens the existing add-service dialog in place. ✓ when the company has a connected service.
+   - Step 1 "Connect an AI service": goes to Settings › AI services (the ChatGPT sign-in leaves the page, so a dialog can't hold it). After a service connects there, a notice says "Next: choose Nova's AI model" with a link back home. ✓ when the company has a connected service.
    - Step 2 "Choose Nova's AI model": opens Nova's edit form. ✓ when Nova has a model on a connected service.
    - Viewers see "Ask the company owner to finish setup" instead of buttons. The card replaces today's "Nova needs an AI model" notice.
 7. **Plain language** on app screens (not the landing page; code, API, and database names unchanged):
 
    | Today | Becomes |
    |---|---|
-   | Head agent | Team lead |
+   | Head agent (the head's role, shown as is when the owner renamed it) | Team lead |
    | Idle | Free |
    | Needs reauth / reauth | Sign in again |
    | AI providers, Provider | AI services, AI service |
@@ -45,7 +45,7 @@ A non-technical owner understands their team at a glance and never gets lost. On
    | Model (form labels) | AI model |
 
    Token counts and cost details appear only behind "Details" links (goal page, chat meta already hidden on home).
-8. **Backend**: `GET /api/workspaces/:id/agents/:aid/tasks?limit=5` (limit 1–20, default 5) returns the agent's finished (`done`) tasks newest first: `{ tasks: [{ id, title, finishedAt, goalId, goalText, conversationId }] }`. Members of the workspace only; another workspace's agent returns 404.
+8. **Backend**: `GET /api/workspaces/:id/agents/:aid/tasks?limit=5` (limit 1–20, default 5) returns the agent's finished (`done`) tasks newest first: `{ tasks: [{ id, title, finishedAt, goalId, goalText }] }`. Members of the workspace only; another workspace's agent returns 404.
 9. Lint, type checks, backend tests, unit tests, E2E, and builds pass; screens checked at 1440px and 390px, light and dark.
 
 ### Out of scope
@@ -58,12 +58,12 @@ New team features (hiring templates, playbooks), renaming code/API identifiers, 
 - New: `app/w/[slug]/team/page.tsx` (TeamPage), `app/w/[slug]/team/[id]/page.tsx` (CompanionPage), `components/app/team/TeamCard.tsx`, `components/app/team/OrganizeDialog.tsx` (moved from the Organization page), `components/app/home/SetupCard.tsx`.
 - `office/Office.tsx` loses its command bar, goals list button, and side panels; it becomes the map view used inside TeamPage (selecting a companion navigates to their page). `OfficeList.tsx` is replaced by the cards.
 - `CompanionPanel` is replaced by CompanionPage; `CompanionChat` is reused as is.
-- Old pages `office`, `organization`, `providers` become `redirect()` stubs; the providers content moves into a component rendered by the Settings AI services tab.
+- Old pages `office`, `organization`, `providers` become `redirect()` stubs (providers keeps its query string); the providers content moves into a component rendered by the Settings AI services tab.
 - "Working on": the Team and companion pages fetch `GET /goals`, and if one has status planning, running, or reviewing, fetch `GET /goals/:gid` and poll it every 3 seconds while it stays active; its `running` tasks give each companion's current task title. No backend change.
 - Home input prefill: Team's Give a task navigates to `/w/[slug]?ask=@Name%20`; ChatHome reads `ask` once and fills the input.
 
 ## 3. Testing
 
-- **Backend**: recent-tasks route returns done tasks newest first, honours limit, excludes other statuses, 404 for another workspace's agent, viewer allowed.
+- **Backend**: ChatGPT sign-in returns to `/settings?tab=ai` (with `connected` / `chatgpt_error`); recent-tasks route returns done tasks newest first, honours limit, excludes other statuses, 404 for another workspace's agent, viewer allowed.
 - **E2E** (new `team.spec.ts`): sign up, follow the setup card (connect service, choose Nova's model, card disappears), open Team (cards, "Team lead", "Free"), switch to Office and back, open Nova's page and chat, Give a task lands on home with "@Nova " in the input, Organize: add a department, old `/office`, `/organization`, `/providers` URLs redirect. Existing specs updated for the new navigation and wording.
 - **Unit**: status-pill logic (working / free / needs setup) and card grouping.
