@@ -1,5 +1,5 @@
-import { Office } from "@/components/app/office/Office";
+import { ChatHome } from "@/components/app/home/ChatHome";
 
-export default function OfficePage() {
-  return <Office />;
+export default function HomePage() {
+  return <ChatHome />;
 }

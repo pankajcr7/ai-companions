@@ -1,5 +1,5 @@
 export type HireSuggestion = { role: string; department: string | null };
-export type Suggestion = { goal: string | null; hire: HireSuggestion[] };
+export type Suggestion = { goal: string | null; hire: HireSuggestion[]; newProject: boolean; projectName: string | null };
 
 const str = (v: unknown, max: number) => (typeof v === "string" && v.trim() && v.trim().length <= max ? v.trim() : null);
 
@@ -9,13 +9,13 @@ export function splitSuggestion(content: string): { text: string; suggestion: Su
   if (!last || last.index === undefined || !/"suggest"\s*:/.test(last[1])) return { text: content, suggestion: null };
   const text = (content.slice(0, last.index) + content.slice(last.index + last[0].length)).trim();
   try {
-    const raw = (JSON.parse(last[1]) as { suggest?: { goal?: unknown; hire?: unknown } }).suggest;
+    const raw = (JSON.parse(last[1]) as { suggest?: { goal?: unknown; hire?: unknown; newProject?: unknown; projectName?: unknown } }).suggest;
     const goal = str(raw?.goal, 4000);
     const hire = (Array.isArray(raw?.hire) ? (raw.hire as { role?: unknown; department?: unknown }[]) : [])
       .map((h) => ({ role: str(h?.role, 60), department: str(h?.department, 60) }))
       .filter((h): h is HireSuggestion => !!h.role)
       .slice(0, 3);
-    return { text, suggestion: goal || hire.length ? { goal, hire } : null };
+    return { text, suggestion: goal || hire.length ? { goal, hire, newProject: raw?.newProject === true, projectName: str(raw?.projectName, 60) } : null };
   } catch {
     return { text, suggestion: null };
   }

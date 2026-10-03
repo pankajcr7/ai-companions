@@ -61,6 +61,8 @@ export type ChatMessageDTO = {
   errorCode: string | null;
   errorMessage: string | null;
   createdAt: string;
+  goalId?: string | null;
+  planBlocked?: string | null;
 };
 export const PROVIDER_NAMES: Record<ProviderKind, string> = { chatgpt: "ChatGPT", openai: "OpenAI", anthropic: "Anthropic", gemini: "Google Gemini", custom: "Custom endpoint" };
 export const CHATGPT_USAGE_URL = "https://chatgpt.com/settings/usage";

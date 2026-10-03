@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Buildings, FolderSimple, GearSix, Plugs, SignOut, TreeStructure } from "@phosphor-icons/react";
+import { Buildings, ChatCircle, FolderSimple, GearSix, Plugs, SignOut, TreeStructure } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/lib/workspace";
 import { Logo } from "@/components/landing/ui";
@@ -13,7 +13,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const base = `/w/${snapshot.workspace.slug}`;
   const nav = [
-    { href: base, label: "Office", icon: Buildings },
+    { href: base, label: "Home", icon: ChatCircle },
+    { href: `${base}/office`, label: "Office map", icon: Buildings },
     { href: `${base}/projects`, label: "Projects", icon: FolderSimple },
     { href: `${base}/organization`, label: "Organization", icon: TreeStructure },
     { href: `${base}/providers`, label: "AI providers", icon: Plugs },
@@ -29,7 +30,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="app flex min-h-[100dvh] flex-col lg:h-[100dvh] lg:flex-row" data-theme={theme} data-still={reducedMotion || calmMode}>
       <aside className="flex items-center justify-between gap-2 border-b border-line bg-paper px-4 py-3 lg:w-60 lg:flex-col lg:items-stretch lg:justify-start lg:border-b-0 lg:border-r lg:p-5">
-        <Link href={base} aria-label="Office home"><Logo compact className="text-base sm:text-lg" /></Link>
+        <Link href={base} aria-label="Agent Company home"><Logo compact className="text-base sm:text-lg" /></Link>
         <p className="hidden truncate text-sm font-medium text-muted lg:mt-6 lg:block">{snapshot.workspace.name}</p>
         <nav aria-label="App" className="flex gap-1 lg:mt-4 lg:flex-col">
           {nav.map(({ href, label, icon: Icon }) => {

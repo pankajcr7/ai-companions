@@ -12,6 +12,8 @@ export type TaskDTO = {
   dependsOn: number[];
   status: TaskStatus;
   result: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
   filesRead: { path: string; revision: number }[];
   error: string | null;
   errorCode: string | null;
@@ -29,6 +31,8 @@ export type GoalDTO = {
   status: GoalStatus;
   projectId: string | null;
   parent: { id: string; text: string } | null;
+  newProject: boolean;
+  projectName: string | null;
   summary: string | null;
   error: string | null;
   inputTokens: number;
@@ -63,4 +67,12 @@ export function parseCommand(text: string): { kind: "chat" | "goal"; text: strin
 /** Removes a task from a draft plan and renumbers dependencies that pointed past it. */
 export function removeTask(tasks: DraftTask[], index: number): DraftTask[] {
   return tasks.filter((_, i) => i !== index).map((t) => ({ ...t, dependsOn: t.dependsOn.filter((d) => d !== index).map((d) => (d > index ? d - 1 : d)) }));
+}
+
+const VERBS = /^(add|analy[sz]e|build|check|create|design|draft|edit|find|fix|improve|make|outline|plan|prepare|research|review|test|update|write)\b/i;
+
+/** "Lina will design the landing page"; titles that don't start with a verb read "will work on: ...". */
+export function planSentence(agentName: string, title: string): string {
+  const t = title.trim();
+  return VERBS.test(t) ? `${agentName} will ${t[0].toLowerCase()}${t.slice(1)}` : `${agentName} will work on: ${t}`;
 }

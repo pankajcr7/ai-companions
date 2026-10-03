@@ -37,8 +37,8 @@ export function CompanionChat({ agent, onEdit, onThinking, command, onCommandSen
       suggestions={
         agent.isHead
           ? {
-              onPlan: async (goal) => {
-                const { id } = await api<{ id: string }>(wsPath("/goals"), { method: "POST", body: { text: goal } });
+              onPlan: async (goal, newProject) => {
+                const { id } = await api<{ id: string }>(wsPath("/goals"), { method: "POST", body: { text: goal, newProject } });
                 onOpenGoal?.(id);
               },
               onHire,

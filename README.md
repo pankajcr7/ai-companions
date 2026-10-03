@@ -54,9 +54,11 @@ Open **Projects** in the sidebar to upload a folder, a ZIP, or files, then brows
 
 ## Company goals
 
-Type a goal in the bar at the bottom of the office and pick a project (optional). Nova plans tasks for your companions; edit, reassign, or remove tasks, then press **Start**. Each companion works with its own AI model and reads the files it needs from the project. Developers can propose file changes: open **View changes**, then **Apply** or **Reject**. When everything finishes, Nova reviews each result against its acceptance criteria and writes a summary. Start a message with `chat:` to talk to Nova directly instead.
+The home screen is a chat with Nova. Ask a question and Nova answers; ask for work ("Build a landing page for my bakery") and Nova's plan appears in the chat: press **Start**, or **Change** it first. While the team works, the top bar and the Send button show a red **Stop**; a stopped goal can **Resume**. Results, Nova's summary, suggested file changes, and any files created (with **Preview**) appear in the same chat, and you can keep asking about them. Past chats are listed on the left. The "Working on" picker under the chat chooses a project, or a new one.
 
 After you press Start, ask Nova about the goal right in the panel: why something was done, what a piece of code does, or what to do next. **Continue with a new goal** plans the next step with this goal's results in mind. Code in any AI message shows as a code card with a Copy button, and every message, result, and summary can be copied.
+
+To build something new, pick **New project** in the bar's project picker. Nova names the project in its plan, the project is created when you press Start, and files the companions create are saved straight into it (changes to existing files still wait for Apply). The goal lists **Files created** with View, Download, Download ZIP, and **Preview**, which shows a website project live in a sandboxed frame. Projects with HTML files have a Preview button too.
 
 - On a project page, **Read my project** asks Nova for a summary every companion reuses. `.company/brief.md` and `.company/brand.md` are shared with every companion on that project.
 - Limits: 6 tasks per goal, 3 running at once, one goal in progress per company. Nothing runs until you press Start.

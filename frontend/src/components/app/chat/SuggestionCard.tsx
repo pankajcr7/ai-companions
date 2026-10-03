@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { HireSuggestion, Suggestion } from "@/lib/suggest";
 
 /** Nova's hand-off: plan the work with the team in one click, or add a missing companion first. */
-export function SuggestionCard({ suggestion, onPlan, onHire }: { suggestion: Suggestion; onPlan?: (goal: string) => Promise<void>; onHire?: (hire: HireSuggestion) => void }) {
+export function SuggestionCard({ suggestion, onPlan, onHire }: { suggestion: Suggestion; onPlan?: (goal: string, newProject: boolean) => Promise<void>; onHire?: (hire: HireSuggestion) => void }) {
   const [text, setText] = useState(suggestion.goal ?? "");
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -15,7 +15,7 @@ export function SuggestionCard({ suggestion, onPlan, onHire }: { suggestion: Sug
     setBusy(true);
     setError("");
     try {
-      await onPlan(text.trim());
+      await onPlan(text.trim(), suggestion.newProject);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -45,10 +45,11 @@ export function SuggestionCard({ suggestion, onPlan, onHire }: { suggestion: Sug
           ) : (
             <p className="mt-1 whitespace-pre-wrap">{text}</p>
           )}
+          {suggestion.newProject && <p className="mt-1 text-muted">New project{suggestion.projectName ? `: ${suggestion.projectName}` : ""}</p>}
           {onPlan && (
             <div className="mt-2 flex gap-2">
               <button type="button" disabled={busy || !text.trim()} onClick={plan} className="btn-dark rounded-[8px] px-3 py-1 font-semibold disabled:opacity-60">
-                {busy ? "Planning..." : "Plan it"}
+                {busy ? "Planning..." : suggestion.newProject ? "Plan it in a new project" : "Plan it"}
               </button>
               {!editing && (
                 <button type="button" onClick={() => setEditing(true)} className="btn-light rounded-[8px] px-3 py-1 font-semibold">

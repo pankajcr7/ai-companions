@@ -10,6 +10,7 @@ import type { HireSuggestion } from "@/lib/suggest";
 import { useWorkspace } from "@/lib/workspace";
 import { CopyButton } from "../chat/CopyButton";
 import { RichText } from "../chat/RichText";
+import { FilesCreated } from "./FilesCreated";
 import { GoalChat } from "./GoalChat";
 import { PlanEditor } from "./PlanEditor";
 import { TaskCard } from "./TaskCard";
@@ -51,9 +52,9 @@ export function GoalPanel({ goalId, onClose, onWorking, onOpenGoal, onHire }: { 
       setBusy(false);
     }
   }
-  const start = (tasks: DraftTask[]) =>
+  const start = (tasks: DraftTask[], projectName?: string) =>
     act(async () => {
-      await api(`${path}/plan`, { method: "PUT", body: { tasks } });
+      await api(`${path}/plan`, { method: "PUT", body: { tasks, projectName } });
       await api(`${path}/start`, { method: "POST" });
     });
   const cancel = () => act(() => api(`${path}/cancel`, { method: "POST" }));
@@ -77,6 +78,7 @@ export function GoalPanel({ goalId, onClose, onWorking, onOpenGoal, onHire }: { 
           {tokens > 0 ? ` · ${tokens.toLocaleString()} tokens` : ""}
         </p>
       )}
+      {goal?.newProject && goal.projectName && <p className="text-xs text-muted">New project: {goal.projectName}</p>}
       {error && <p role="alert" className="mt-3 text-sm text-[#b42318]">{error}</p>}
       {goal?.error && <p className="mt-3 rounded-[10px] bg-[#fde8e6] px-3 py-2 text-sm text-[#7a1b12]">{goal.error}</p>}
       {goal?.status === "planning" && <div className="mt-4 h-24 animate-pulse rounded-[12px] bg-bg" aria-busy="true" />}
@@ -95,6 +97,7 @@ export function GoalPanel({ goalId, onClose, onWorking, onOpenGoal, onHire }: { 
           </div>
         </section>
       )}
+      {goal && <FilesCreated goal={goal} />}
       {goal && goal.status !== "awaiting_approval" && goal.status !== "planning" &&
         goal.tasks.map((t) => <TaskCard key={t.id} task={t} edits={goal.edits.filter((e) => e.taskId === t.id)} goalPath={path} editable={editable} onChanged={load} />)}
       {goal && ["running", "reviewing", "done", "failed", "cancelled"].includes(goal.status) && (

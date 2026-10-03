@@ -22,7 +22,7 @@ test("connect a custom endpoint, assign it to Nova, chat, and keep the history",
   await dialog.getByRole("button", { name: "Test and save" }).click();
   await expect(page.getByText(/Connected/).first()).toBeVisible();
 
-  await page.getByRole("link", { name: "Office", exact: true }).click();
+  await page.getByRole("link", { name: "Office map", exact: true }).click();
   await page.getByRole("button", { name: "Nova, Head agent, Idle" }).focus();
   await page.keyboard.press("Enter");
   const panel = page.getByRole("complementary", { name: "Companion details" });

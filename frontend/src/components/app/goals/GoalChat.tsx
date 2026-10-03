@@ -16,8 +16,9 @@ export function GoalChat({ goalId, goalPath, canSend, projectId, onOpenGoal, onH
   const [busy, setBusy] = useState(false);
 
   // Follow-up goals carry this goal's results and project into planning.
-  async function planFollowUp(text: string) {
-    const { id } = await api<{ id: string }>(wsPath("/goals"), { method: "POST", body: { text, parentGoalId: goalId, projectId } });
+  async function planFollowUp(text: string, newProject = false) {
+    const body = newProject ? { text, parentGoalId: goalId, newProject: true } : { text, parentGoalId: goalId, projectId };
+    const { id } = await api<{ id: string }>(wsPath("/goals"), { method: "POST", body });
     onOpenGoal(id);
   }
 

@@ -22,7 +22,7 @@ test("give the company a goal, approve the plan, and apply a proposed edit", asy
   await conn.getByRole("button", { name: "Test and save" }).click();
   await expect(page.getByText(/Connected/).first()).toBeVisible();
 
-  await page.getByRole("link", { name: "Office", exact: true }).click();
+  await page.getByRole("link", { name: "Office map", exact: true }).click();
   await page.getByRole("button", { name: "Nova, Head agent, Idle" }).focus();
   await page.keyboard.press("Enter");
   const panel = page.getByRole("complementary", { name: "Companion details" });
@@ -44,7 +44,7 @@ test("give the company a goal, approve the plan, and apply a proposed edit", asy
   await upload.getByRole("button", { name: "Open project" }).click();
   await expect(page.getByRole("heading", { name: "Sample app" })).toBeVisible();
 
-  await page.getByRole("link", { name: "Office", exact: true }).click();
+  await page.getByRole("link", { name: "Office map", exact: true }).click();
   await page.getByLabel("Project for this goal").selectOption({ label: "Sample app" });
   await page.getByLabel("Tell your company what to do").fill("Document the math helper");
   await page.getByRole("button", { name: "Send to your company" }).click();

@@ -14,6 +14,7 @@ test("sign up, onboard, customize a companion, and it survives refresh", async (
   await page.getByRole("button", { name: "Create company" }).click();
 
   await expect(page).toHaveURL(/\/w\/asha-bakery/);
+  await page.getByRole("link", { name: "Office map", exact: true }).click();
   const companions = page.getByRole("button", { name: /, Idle$/ });
   await expect(companions).toHaveCount(5);
 

@@ -69,7 +69,7 @@ export function Office() {
     if (sending) return;
     setSending(true);
     try {
-      const { id } = await api<{ id: string }>(wsPath("/goals"), { method: "POST", body: { text: parsed.text, projectId: projectId || null } });
+      const { id } = await api<{ id: string }>(wsPath("/goals"), { method: "POST", body: { text: parsed.text, ...(projectId === "__new__" ? { newProject: true } : { projectId: projectId || null }) } });
       setDraft("");
       setError("");
       setSelectedId(null);
@@ -198,9 +198,10 @@ export function Office() {
           }}
           className={`flex items-center gap-3 rounded-full border border-line bg-bg py-2 pl-3 pr-2 ${editable && headReady ? "" : "opacity-70"}`}
         >
-          {editable && projects.length > 0 && (
+          {editable && (
             <select value={projectId} onChange={(e) => setProjectId(e.target.value)} aria-label="Project for this goal" className="max-w-36 shrink-0 rounded-full border border-line bg-paper px-2 py-1 text-xs">
               <option value="">No project</option>
+              <option value="__new__">New project</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
