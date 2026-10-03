@@ -16,6 +16,9 @@ function scripted(system: string, user: string): string | null {
   if (system.includes("Review each task result")) return fence({ summary: "Nova checked the work: the helper is documented.", verdicts: [{ position: 0, verdict: "meets", note: "Clear change." }] });
   if (system.includes("Nova assigned you a task")) return `I documented the add helper.\n\n${fence({ edits: [{ path: "sample-app/src/lib/math.ts", content: MATH_EDIT, note: "Document the helper" }] })}`;
   if (system.includes("Write a summary of this project")) return "A small sample app with a math helper.";
+  if (system.includes("You are answering questions about a company goal")) {
+    return `Here is the documented helper:\n\n\`\`\`ts title=sample-app/src/lib/math.ts\n${MATH_EDIT}\`\`\``;
+  }
   return null;
 }
 

@@ -56,6 +56,8 @@ Open **Projects** in the sidebar to upload a folder, a ZIP, or files, then brows
 
 Type a goal in the bar at the bottom of the office and pick a project (optional). Nova plans tasks for your companions; edit, reassign, or remove tasks, then press **Start**. Each companion works with its own AI model and reads the files it needs from the project. Developers can propose file changes: open **View changes**, then **Apply** or **Reject**. When everything finishes, Nova reviews each result against its acceptance criteria and writes a summary. Start a message with `chat:` to talk to Nova directly instead.
 
+After you press Start, ask Nova about the goal right in the panel: why something was done, what a piece of code does, or what to do next. **Continue with a new goal** plans the next step with this goal's results in mind. Code in any AI message shows as a code card with a Copy button, and every message, result, and summary can be copied.
+
 - On a project page, **Read my project** asks Nova for a summary every companion reuses. `.company/brief.md` and `.company/brand.md` are shared with every companion on that project.
 - Limits: 6 tasks per goal, 3 running at once, one goal in progress per company. Nothing runs until you press Start.
 - Every AI call is logged with its tokens; rate each result with thumbs up or down to help improve the prompts.

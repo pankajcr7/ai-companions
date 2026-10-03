@@ -67,6 +67,21 @@ test("give the company a goal, approve the plan, and apply a proposed edit", asy
   await expect(goal.getByText(/applied/)).toBeVisible();
   await goal.getByRole("button", { name: "Good result" }).click();
   await expect(goal.getByRole("button", { name: "Good result" })).toHaveAttribute("aria-pressed", "true");
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await goal.getByLabel("Ask Nova about this goal").fill("Show me the helper");
+  await goal.getByRole("button", { name: "Send", exact: true }).click();
+  const card = goal.getByRole("figure", { name: "Code: sample-app/src/lib/math.ts" });
+  await expect(card).toContainText("Adds two numbers.");
+  await card.getByRole("button", { name: "Copy", exact: true }).click();
+  await expect(card.getByRole("button", { name: "Copied" })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("export const add");
+
+  await goal.getByRole("button", { name: "Continue with a new goal" }).click();
+  await goal.getByLabel("What should happen next?").fill("Add a subtract helper too");
+  await goal.getByRole("button", { name: "Plan it" }).click();
+  const followUp = page.getByRole("complementary", { name: "Company goal" });
+  await expect(followUp.getByRole("button", { name: /Continues: Document the math helper/ })).toBeVisible();
+  await expect(followUp.getByText("Plan ready for your approval")).toBeVisible();
 
   await page.getByRole("link", { name: "Projects", exact: true }).click();
   await page.getByRole("link", { name: /Sample app/ }).click();

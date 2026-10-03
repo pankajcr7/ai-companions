@@ -38,6 +38,10 @@ test("connect a custom endpoint, assign it to Nova, chat, and keep the history",
   await panel.getByRole("button", { name: "Send" }).click();
   await expect(panel.getByText("Hello from the fake model.")).toBeVisible();
   await expect(panel.getByText(/fake-model · 56 tokens/)).toBeVisible();
+  // Without clipboard access (for example on a plain-HTTP network address) the button says so.
+  await page.evaluate(() => Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true }));
+  await panel.getByRole("button", { name: "Copy message" }).first().click();
+  await expect(panel.getByRole("button", { name: "Couldn't copy, select the text instead" })).toBeVisible();
 
   await page.reload();
   await page.getByRole("button", { name: "Nova, Head agent, Idle" }).focus();
