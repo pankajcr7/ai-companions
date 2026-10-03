@@ -12,6 +12,7 @@ import { projectRoutes } from "./routes/projects.js";
 import { uploadRoutes } from "./routes/uploads.js";
 import { fileRoutes } from "./routes/files.js";
 import { goalChatRoutes } from "./routes/goal-chat.js";
+import { previewRoutes } from "./routes/preview.js";
 import { goalRoutes } from "./routes/goals.js";
 import { waitlistRoutes } from "./routes/waitlist.js";
 
@@ -32,6 +33,7 @@ export async function buildApp() {
   await app.register(fileRoutes);
   await app.register(goalRoutes);
   await app.register(goalChatRoutes);
+  await app.register(previewRoutes);
   await app.register(waitlistRoutes);
   return app;
 }
