@@ -108,7 +108,7 @@ async function tokenRequest(form: Record<string, string>) {
 
 export async function completeAuthorization(query: Record<string, string | undefined>) {
   const p = query.state ? pending.get(query.state) : undefined;
-  if (!p || p.expires < Date.now()) throw new OAuthError("This ChatGPT sign-in expired. Start again from AI providers.");
+  if (!p || p.expires < Date.now()) throw new OAuthError("This ChatGPT sign-in expired. Start again from Settings › AI services.");
   pending.delete(query.state!);
   if (query.error === "access_denied") throw new OAuthError("ChatGPT plan use wasn't allowed, so nothing was connected.", p);
   if (query.error) throw new OAuthError(`ChatGPT sign-in failed (${query.error}).`, p);

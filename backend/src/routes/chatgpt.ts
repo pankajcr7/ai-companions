@@ -47,12 +47,12 @@ export async function chatgptRoutes(app: FastifyInstance) {
         const conn = await prisma.providerConnection.create({ data: { ...data, workspaceId: pending.workspaceId, kind: "chatgpt", label: "ChatGPT", createdById: pending.userId } });
         await audit(prisma, pending.workspaceId, pending.userId, "connection.create", "connection", conn.id, { kind: "chatgpt" });
       }
-      return reply.redirect(`${frontend()}/w/${pending.slug}/providers?connected=chatgpt`);
+      return reply.redirect(`${frontend()}/w/${pending.slug}/settings?tab=ai&connected=chatgpt`);
     } catch (e) {
       const message = e instanceof OAuthError ? e.message : "ChatGPT sign-in failed. Try again.";
       const p = e instanceof OAuthError ? e.pending : undefined;
-      const target = p ? `/w/${p.slug}/providers` : "/app";
-      return reply.redirect(`${frontend()}${target}?chatgpt_error=${encodeURIComponent(message)}`);
+      const target = p ? `/w/${p.slug}/settings?tab=ai&` : "/app?";
+      return reply.redirect(`${frontend()}${target}chatgpt_error=${encodeURIComponent(message)}`);
     }
   });
 }

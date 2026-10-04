@@ -138,4 +138,20 @@ export async function agentRoutes(app: FastifyInstance) {
     });
     return reply.code(201).send({ id: copy.id });
   });
+
+  // A companion's recent finished work, for their profile page.
+  app.get("/api/workspaces/:id/agents/:agentId/tasks", async (req) => {
+    const { id, agentId } = AgentParams.parse(req.params);
+    const { limit } = z.object({ limit: z.coerce.number().int().min(1).max(20).default(5) }).parse(req.query);
+    await requireMember(req, id);
+    const agent = await prisma.agent.findFirst({ where: { id: agentId, workspaceId: id }, select: { id: true } });
+    if (!agent) throw new HttpError(404, "not_found", "Companion not found");
+    const rows = await prisma.goalTask.findMany({
+      where: { agentId, status: "done", goal: { workspaceId: id } },
+      orderBy: { finishedAt: "desc" },
+      take: limit,
+      select: { id: true, title: true, finishedAt: true, goalId: true, goal: { select: { text: true } } },
+    });
+    return { tasks: rows.map((t) => ({ id: t.id, title: t.title, finishedAt: t.finishedAt, goalId: t.goalId, goalText: t.goal.text })) };
+  });
 }

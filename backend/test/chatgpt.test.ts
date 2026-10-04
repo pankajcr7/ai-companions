@@ -103,7 +103,7 @@ test("successful sign-in saves an encrypted ChatGPT connection and redirects to 
   const { req, id, slug } = await owner();
   const { cb } = await signInFlow(req, id);
   expect(cb.statusCode).toBe(302);
-  expect(cb.headers.location).toBe(`http://localhost:3000/w/${slug}/providers?connected=chatgpt`);
+  expect(cb.headers.location).toBe(`http://localhost:3000/w/${slug}/settings?tab=ai&connected=chatgpt`);
   const conn = await prisma.providerConnection.findFirstOrThrow({ where: { workspaceId: id, kind: "chatgpt" } });
   expect(conn).toMatchObject({ hint: "asha@example.com", status: "connected" });
   expect(conn.secret).not.toContain("access-1");

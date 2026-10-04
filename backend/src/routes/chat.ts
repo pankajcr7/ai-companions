@@ -65,7 +65,7 @@ export async function chatRoutes(app: FastifyInstance) {
       if (agent.status === "paused") throw new HttpError(409, "inactive", `Resume ${agent.name} before chatting`);
       const conn = agent.connection;
       if (!conn || !agent.model) throw new HttpError(409, "unassigned", `Choose an AI model for ${agent.name} first`);
-      if (conn.status === "reauth") throw new HttpError(409, "reauth", "Sign in to ChatGPT again on the AI providers page");
+      if (conn.status === "reauth") throw new HttpError(409, "reauth", "Sign in to ChatGPT again in Settings › AI services");
 
       const history = await prisma.chatMessage.findMany({ where: { agentId, userId: user.id, status: "complete", conversationId: null }, orderBy: { createdAt: "desc" }, take: CONTEXT_MESSAGES });
       const userMsg = await prisma.chatMessage.create({ data: { workspaceId: id, agentId, userId: user.id, role: "user", content: message } });
