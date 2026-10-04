@@ -5,7 +5,10 @@ import { companionInstructions, trimTurns } from "../companion.js";
 import { loadRoster } from "../goals/load.js";
 import { headInstructions } from "../goals/prompts.js";
 import { prisma } from "../db.js";
-import type { ChatMessage } from "../generated/prisma/client.js";
+import type { ChatEdit, ChatMessage } from "../generated/prisma/client.js";
+import { webTools } from "../harness/tools.js";
+import { loadSearchKey } from "../harness/web.js";
+import { chatEditDTO } from "./chat-edits.js";
 import { HttpError, perUser, requireMember } from "../http.js";
 import type { ChatTurn } from "../providers/types.js";
 import { WsParams } from "./workspaces.js";
@@ -16,7 +19,7 @@ const HISTORY = 50;
 const CONTEXT_MESSAGES = 20;
 const CONTEXT_CHARS = 24_000;
 
-const dto = (m: ChatMessage) => ({
+const dto = (m: ChatMessage & { edits?: ChatEdit[] }) => ({
   id: m.id,
   role: m.role,
   content: m.content,
@@ -27,6 +30,8 @@ const dto = (m: ChatMessage) => ({
   errorCode: m.errorCode,
   errorMessage: m.errorMessage,
   createdAt: m.createdAt,
+  toolUses: m.toolUses,
+  edits: (m.edits ?? []).map(chatEditDTO),
 });
 
 async function loadAgent(workspaceId: string, agentId: string) {
@@ -75,14 +80,15 @@ export async function chatRoutes(app: FastifyInstance) {
         ? headInstructions(agent, agent.workspace.name, agent.department?.name ?? null, await loadRoster(id))
         : companionInstructions(agent, agent.workspace.name, agent.department?.name ?? null);
       await streamReply(req, reply, watch, {
-        conn,
-        model: agent.model,
+        actor: { ...agent, model: agent.model, connection: conn },
+        tools: webTools(await loadSearchKey(id)),
+        limit: 6,
         instructions,
         turns,
         start: { userMessageId: userMsg.id },
         save: (r) =>
           prisma.chatMessage.create({
-            data: { workspaceId: id, agentId, userId: user.id, role: "assistant", content: r.text, status: r.status, connectionId: conn.id, kind: conn.kind, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens, errorCode: r.errorCode, errorMessage: r.errorMessage },
+            data: { workspaceId: id, agentId, userId: user.id, role: "assistant", content: r.text, status: r.status, connectionId: conn.id, kind: conn.kind, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens, errorCode: r.errorCode, errorMessage: r.errorMessage, toolUses: r.toolUses },
           }),
       });
     },

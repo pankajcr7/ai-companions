@@ -7,6 +7,8 @@ import type { GoalMessage } from "../generated/prisma/client.js";
 import { readiness } from "../goals/llm.js";
 import { goalContext, loadHead, loadRoster } from "../goals/load.js";
 import { goalChatContext, goalChatInstructions } from "../goals/prompts.js";
+import { projectTools, webTools } from "../harness/tools.js";
+import { loadSearchKey } from "../harness/web.js";
 import { HttpError, perUser, requireMember } from "../http.js";
 import type { ChatTurn } from "../providers/types.js";
 import { WsParams } from "./workspaces.js";
@@ -76,8 +78,10 @@ export async function goalChatRoutes(app: FastifyInstance) {
     const instructions = `${goalChatInstructions(goal.workspace.name, await loadRoster(id))}\n\n${goalChatContext(goal, tasks, goal.edits, ctx)}`;
 
     await streamReply(req, reply, watch, {
-      conn,
-      model,
+      actor: { ...nova, model, connection: conn },
+      // Read-only here: goal chat messages have nowhere to keep suggested changes; "Continue with a new goal" makes changes.
+      tools: [...(goal.project ? projectTools(goal.project, { write: null, read: new Map() }) : []), ...webTools(await loadSearchKey(id))],
+      limit: 6,
       instructions,
       turns,
       start: { userMessageId: userMsg.id },

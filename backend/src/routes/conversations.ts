@@ -3,7 +3,11 @@ import { z } from "zod";
 import { streamReply, watchClient } from "../chat-stream.js";
 import { trimTurns } from "../companion.js";
 import { prisma } from "../db.js";
-import type { ChatMessage } from "../generated/prisma/client.js";
+import type { ChatEdit, ChatMessage } from "../generated/prisma/client.js";
+import { loadProject } from "../files/service.js";
+import { projectTools, webTools } from "../harness/tools.js";
+import { loadSearchKey } from "../harness/web.js";
+import { chatEditDTO, chatWriter, saveChatEdits } from "./chat-edits.js";
 import { createGoal } from "../goals/create.js";
 import { readiness } from "../goals/llm.js";
 import { loadHead, loadRoster } from "../goals/load.js";
@@ -17,7 +21,7 @@ const ConvParams = WsParams.extend({ cid: z.string().min(1).max(64) });
 const Project = z.discriminatedUnion("kind", [z.object({ kind: z.literal("none") }), z.object({ kind: z.literal("existing"), id: z.string().min(1).max(64) }), z.object({ kind: z.literal("new") })]);
 const Send = z.object({ message: z.string().trim().min(1).max(8000), project: Project.default({ kind: "none" }) });
 
-const dto = (m: ChatMessage) => ({
+const dto = (m: ChatMessage & { edits?: ChatEdit[] }) => ({
   id: m.id,
   role: m.role,
   content: m.content,
@@ -28,6 +32,8 @@ const dto = (m: ChatMessage) => ({
   errorCode: m.errorCode,
   errorMessage: m.errorMessage,
   createdAt: m.createdAt,
+  toolUses: m.toolUses,
+  edits: (m.edits ?? []).map(chatEditDTO),
   goalId: m.goalId,
   planBlocked: m.planBlocked,
 });
@@ -76,7 +82,7 @@ export async function conversationRoutes(app: FastifyInstance) {
     const { id, cid } = ConvParams.parse(req.params);
     const { user } = await requireMember(req, id);
     const c = await loadConversation(id, user.id, cid);
-    const rows = await prisma.chatMessage.findMany({ where: { conversationId: cid }, orderBy: { createdAt: "desc" }, take: 200 });
+    const rows = await prisma.chatMessage.findMany({ where: { conversationId: cid }, orderBy: { createdAt: "desc" }, take: 200, include: { edits: { orderBy: { createdAt: "asc" } } } });
     return { conversation: { id: c.id, title: c.title }, messages: rows.reverse().map(dto) };
   });
 
@@ -109,6 +115,11 @@ export async function conversationRoutes(app: FastifyInstance) {
     const problem = nova ? readiness(nova) : "Your company has no head agent";
     if (problem || !nova?.connection || !nova.model) throw new HttpError(409, "unassigned", `${problem}. Choose a model on the companion's Customize form.`);
     const conn = nova.connection;
+    const model = nova.model;
+    // Companions can look through the project chosen in the "Working on" chip; their file changes become suggestions.
+    const projectRow = project.kind === "existing" ? await loadProject(id, project.id) : null;
+    const writer = chatWriter();
+    const tools = [...(projectRow ? projectTools(projectRow, { write: writer.write, read: new Map() }) : []), ...webTools(await loadSearchKey(id))];
 
     const history = await prisma.chatMessage.findMany({ where: { conversationId: cid, status: "complete" }, orderBy: { createdAt: "desc" }, take: 20 });
     const userMsg = await prisma.chatMessage.create({ data: { workspaceId: id, agentId: nova.id, userId: user.id, conversationId: cid, role: "user", content: message } });
@@ -127,15 +138,17 @@ export async function conversationRoutes(app: FastifyInstance) {
     const latestGoalId = goals.at(-1)?.id ?? null;
 
     await streamReply(req, reply, watch, {
-      conn,
-      model: nova.model,
+      actor: { ...nova, model, connection: conn },
+      tools,
+      limit: 6,
       instructions,
       turns,
       start: { userMessageId: userMsg.id },
       save: async (r) => {
         const saved = await prisma.chatMessage.create({
-          data: { workspaceId: id, agentId: nova.id, userId: user.id, conversationId: cid, role: "assistant", content: r.text, status: r.status, connectionId: conn.id, kind: conn.kind, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens, errorCode: r.errorCode, errorMessage: r.errorMessage },
+          data: { workspaceId: id, agentId: nova.id, userId: user.id, conversationId: cid, role: "assistant", content: r.text, status: r.status, connectionId: conn.id, kind: conn.kind, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens, errorCode: r.errorCode, errorMessage: r.errorMessage, toolUses: r.toolUses },
         });
+        await saveChatEdits(id, saved.id, projectRow?.id ?? null, writer.edits);
         const suggestion = r.status === "complete" ? parseSuggestion(r.text) : null;
         if (!suggestion?.goal) return saved;
         // Work requests become a plan right away; nothing runs until the owner presses Start.
