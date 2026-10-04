@@ -56,6 +56,7 @@ async function goalDTO(goal: FullGoal) {
       status: t.status,
       result: t.result,
       filesRead: t.filesRead,
+      toolUses: t.toolUses,
       error: t.error,
       errorCode: t.errorCode,
       verdict: t.verdict,

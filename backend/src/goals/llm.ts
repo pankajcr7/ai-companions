@@ -2,6 +2,7 @@ import type { z } from "zod";
 import { SecretError } from "../crypto.js";
 import { clientFor, type ConnectionLike } from "../providers/index.js";
 import { ProviderError, type ChatTurn, type StreamEvent } from "../providers/types.js";
+import { runLoop, type Tool } from "../harness/loop.js";
 import { extractJson } from "./plan.js";
 
 export type Actor = { id: string; name: string; kind: string; status: string; model: string | null; connection: (ConnectionLike & { status: string }) | null };
@@ -69,22 +70,32 @@ export async function complete(actor: Actor, instructions: string, turns: ChatTu
   return call;
 }
 
-/** Asks for JSON; one repair turn includes what was wrong; then gives up with "bad_output". */
-export async function completeJson<T>(actor: Actor, instructions: string, prompt: string, schema: z.ZodType<T>, signal: AbortSignal, log?: StepLog) {
-  const turns: ChatTurn[] = [{ role: "user", content: prompt }];
+/** Asks for JSON; one repair turn includes what was wrong; then gives up with "bad_output". With tools, the first attempt may use them. */
+export async function completeJson<T>(actor: Actor, instructions: string, prompt: string, schema: z.ZodType<T>, signal: AbortSignal, log?: StepLog, withTools?: { tools: Tool[]; limit: number }) {
+  let turns: ChatTurn[] = [{ role: "user", content: prompt }];
   const calls: Call[] = [];
   for (let attempt = 0; attempt < 2; attempt++) {
-    const call = await complete(actor, instructions, turns, signal, log);
-    calls.push(call);
+    let text: string;
+    if (attempt === 0 && withTools?.tools.length) {
+      const loop = await runLoop({ actor, instructions, turns, tools: withTools.tools, limit: withTools.limit, signal, log });
+      calls.push(...loop.calls);
+      turns = loop.turns;
+      text = loop.text;
+    } else {
+      const call = await complete(actor, instructions, turns, signal, log);
+      calls.push(call);
+      turns = [...turns, { role: "assistant", content: call.text }];
+      text = call.text;
+    }
     let problem: string;
     try {
-      const parsed = schema.safeParse(extractJson(call.text));
+      const parsed = schema.safeParse(extractJson(text));
       if (parsed.success) return { value: parsed.data, calls };
       problem = parsed.error.issues.map((i) => `${i.path.join(".") || "reply"}: ${i.message}`).join("; ");
     } catch (e) {
       problem = (e as Error).message;
     }
-    turns.push({ role: "assistant", content: call.text }, { role: "user", content: `That reply couldn't be used: ${problem.slice(0, 1000)}. Reply again with only the corrected JSON block.` });
+    turns = [...turns, { role: "user", content: `That reply couldn't be used: ${problem.slice(0, 1000)}. Reply again with only the corrected JSON block.` }];
   }
   throw new CallError("bad_output", "The reply wasn't in the expected format, even after one retry.");
 }

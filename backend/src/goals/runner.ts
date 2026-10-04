@@ -4,7 +4,10 @@ import { saveText } from "../files/service.js";
 import { HttpError } from "../http.js";
 import { cap, DEP_RESULT_CAP, FILE_BUDGET, pickFiles, RESULT_CAP, type Loaded } from "./context.js";
 import { checkEdit, splitEdits } from "./edits.js";
-import { CallError, complete, completeJson, type Call } from "./llm.js";
+import { CallError, completeJson, type Call } from "./llm.js";
+import { runLoop, ToolError } from "../harness/loop.js";
+import { projectTools, webTools, type Write } from "../harness/tools.js";
+import { loadSearchKey } from "../harness/web.js";
 import { goalContext, loadHead, loadText, stepLog } from "./load.js";
 import { selectInstructions, selectPrompt, summaryInstructions, summaryPrompt, taskInstructions, taskPrompt } from "./prompts.js";
 
@@ -81,6 +84,9 @@ async function runTask(goalId: string, taskId: string) {
     input += c.inputTokens ?? 0;
     output += c.outputTokens ?? 0;
   };
+  type Decided = { raw: { path: string; content: string; note: string }; check: { path: string; baseRevision: number; status: "pending" | "rejected" | "applied"; reason: string | null }; decidedById: string | null };
+  const decided: Decided[] = [];
+  const editRow = ({ raw, check, decidedById }: Decided) => ({ taskId, goalId, path: check.path, baseRevision: check.baseRevision, content: raw.content, note: raw.note, status: check.status, reason: check.reason, decidedById });
   try {
     // Loaded inside the try so a database error fails this task instead of escaping the runner.
     const task = await prisma.goalTask.findUniqueOrThrow({
@@ -108,48 +114,62 @@ async function runTask(goalId: string, taskId: string) {
       .filter((t) => task.dependsOn.includes(t.position))
       .sort((a, b) => a.position - b.position)
       .map((t) => ({ title: t.title, agentName: t.agent.name, result: cap(t.result ?? "", DEP_RESULT_CAP, "result") }));
-    const call = await complete(
-      agent,
-      taskInstructions(agent, goal.workspace.name, agent.department?.name ?? null, !!goal.project),
-      [{ role: "user", content: taskPrompt(task, goal.text, ctx, deps, files, notes.join(" ")) }],
-      signal,
-      stepLog(goal.workspaceId, goalId, taskId, "execute"),
-    );
-    add(call);
-    const split = goal.project ? splitEdits(call.text) : { visible: call.text.trim(), edits: [], error: null };
     const read = new Map(files.map((f) => [f.path.toLowerCase(), f]));
     const existing = new Map((ctx.entries ?? []).map((e) => [e.path.toLowerCase(), e]));
-    const checked = split.edits.map((raw) => ({ raw, check: checkEdit(raw, read, existing) }));
-    // A goal that created its project saves new files right away; changes to existing files still wait for Apply.
-    const decided: { raw: (typeof checked)[number]["raw"]; check: Omit<(typeof checked)[number]["check"], "status"> & { status: "pending" | "rejected" | "applied" }; decidedById: string | null }[] = [];
-    for (const { raw, check } of checked) {
-      if (signal.aborted) break; // Stopped: save nothing more, but still record what was saved.
-      if (!goal.newProject || !goal.project || check.status !== "pending" || check.baseRevision !== 0) {
-        decided.push({ raw, check, decidedById: null });
-        continue;
+    // A goal that created its project saves new files right away; anything else waits for Apply.
+    const saveOrSuggest = async (w: Write) => {
+      const raw = { path: w.path, content: w.content, note: w.note };
+      if (!goal.newProject || !goal.project || w.baseRevision !== 0) {
+        decided.push({ raw, check: { path: w.path, baseRevision: w.baseRevision, status: "pending", reason: null }, decidedById: null });
+        return "Saved as a suggestion for the owner to review.";
       }
+      if (signal.aborted) throw new CallError("aborted", "Stopped");
       try {
-        await saveText(goal.project, goal.createdById, check.path, raw.content, 0);
-        decided.push({ raw, check: { ...check, status: "applied" }, decidedById: goal.createdById });
+        await saveText(goal.project, goal.createdById, w.path, w.content, 0);
+        decided.push({ raw, check: { path: w.path, baseRevision: 0, status: "applied", reason: null }, decidedById: goal.createdById });
+        return `Saved ${w.path}.`;
       } catch (e) {
         // P2002: a task running alongside created the same file a moment earlier.
         const reason = e instanceof HttpError ? e.message : (e as { code?: string }).code === "P2002" ? "Another task already created this file." : null;
         if (!reason) throw e;
-        decided.push({ raw, check: { ...check, status: "rejected", reason }, decidedById: null });
+        decided.push({ raw, check: { path: w.path, baseRevision: 0, status: "rejected", reason }, decidedById: null });
+        throw new ToolError(`Not saved: ${reason}`);
       }
+    };
+    const tools = [...(goal.project ? projectTools(goal.project, { write: saveOrSuggest, read }) : []), ...webTools(await loadSearchKey(goal.workspaceId))];
+    const loop = await runLoop({
+      actor: agent,
+      instructions: taskInstructions(agent, goal.workspace.name, agent.department?.name ?? null, !!goal.project),
+      turns: [{ role: "user", content: taskPrompt(task, goal.text, ctx, deps, files, notes.join(" ")) }],
+      tools,
+      limit: 12,
+      signal,
+      log: stepLog(goal.workspaceId, goalId, taskId, "execute"),
+    });
+    loop.calls.forEach(add);
+    // Fallback for models that answer with an edits block instead of tools: today's rules apply.
+    const split = goal.project ? splitEdits(loop.text) : { visible: loop.text.trim(), edits: [], error: null };
+    for (const raw of split.edits) {
+      const check = checkEdit(raw, read, existing);
+      if (check.status === "pending" && check.baseRevision === 0 && goal.newProject && goal.project) {
+        await saveOrSuggest({ path: check.path, content: raw.content, note: raw.note ?? "", baseRevision: 0 }).catch((e) => {
+          if (!(e instanceof ToolError)) throw e;
+        });
+      } else decided.push({ raw: { path: check.path, content: raw.content, note: raw.note ?? "" }, check: { ...check, reason: check.reason ?? null }, decidedById: null });
     }
     const result = cap([split.visible, split.error].filter(Boolean).join("\n\n"), RESULT_CAP, "result");
+    const filesRead = [...read.values()].map((f) => ({ path: f.path, revision: f.revision }));
     await prisma.$transaction(async (tx) => {
       const r = await tx.goalTask.updateMany({
         // startedAt pins this run: after Stop and Resume, a newer run owns the task.
         where: { id: taskId, status: "running", startedAt: task.startedAt },
-        data: { status: "done", result, filesRead: files.map((f) => ({ path: f.path, revision: f.revision })), contextRevisions: ctx.sharedRevisions, inputTokens: input, outputTokens: output, finishedAt: new Date() },
+        data: { status: "done", result, filesRead, toolUses: loop.toolUses, contextRevisions: ctx.sharedRevisions, inputTokens: input, outputTokens: output, finishedAt: new Date() },
       });
       // Cancelled while working: only files already saved are recorded, so every saved file is listed.
       const rows = r.count ? decided : decided.filter((d) => d.check.status === "applied");
       if (rows.length) {
         await tx.proposedEdit.createMany({
-          data: rows.map(({ raw, check, decidedById }) => ({ taskId, goalId, path: check.path, baseRevision: check.baseRevision, content: raw.content, note: raw.note, status: check.status, reason: check.reason, decidedById })),
+          data: rows.map(editRow),
         });
       }
     });
@@ -157,6 +177,9 @@ async function runTask(goalId: string, taskId: string) {
     const err = e instanceof CallError ? e : new CallError("server_error", "Something went wrong while working on this task.");
     if (!(e instanceof CallError)) console.error("goal task", e);
     if (err.code === "reauth" && connectionId) await prisma.providerConnection.update({ where: { id: connectionId }, data: { status: "reauth", lastError: "Sign in to ChatGPT again" } });
+    // Files already saved before Stop or a failure stay listed, so nothing in the project is unaccounted for.
+    const saved = decided.filter((d) => d.check.status === "applied");
+    if (saved.length) await prisma.proposedEdit.createMany({ data: saved.map(editRow) }).catch((e2) => console.error("goal task edits", e2));
     await prisma.goalTask.updateMany({
       where: { id: taskId, status: "running" },
       data: { status: err.code === "aborted" ? "skipped" : "failed", error: err.code === "aborted" ? "Cancelled" : err.message, errorCode: err.code, inputTokens: input, outputTokens: output, finishedAt: new Date() },
