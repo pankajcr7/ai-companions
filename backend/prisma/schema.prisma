@@ -119,6 +119,7 @@ model Workspace {
   projects     Project[]
   goals        Goal[]
   goalSteps    GoalStep[]
+  searchKey    SearchKey?
 }
 
 model Membership {
@@ -292,6 +293,8 @@ model ChatMessage {
   conversation   Conversation?       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   goalId         String?
   planBlocked    String?
+  toolUses       Json                @default("[]")
+  edits          ChatEdit[]
 
   @@index([agentId, userId, createdAt])
   @@index([workspaceId])
@@ -339,6 +342,7 @@ model Project {
   summaryRevisionKey String?
   summarizedAt       DateTime?
   goals              Goal[]
+  chatEdits          ChatEdit[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -483,6 +487,7 @@ model GoalTask {
   ratingReason     String?
   inputTokens      Int            @default(0)
   outputTokens     Int            @default(0)
+  toolUses         Json           @default("[]")
   startedAt        DateTime?
   finishedAt       DateTime?
   createdAt        DateTime       @default(now())
@@ -561,4 +566,35 @@ model Conversation {
   messages    ChatMessage[]
 
   @@index([workspaceId, userId, updatedAt])
+}
+
+model ChatEdit {
+  id           String      @id @default(cuid())
+  workspaceId  String
+  messageId    String
+  projectId    String
+  path         String
+  baseRevision Int
+  content      String
+  note         String      @default("")
+  status       EditStatus  @default(pending)
+  reason       String?
+  decidedById  String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  message      ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  project      Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model SearchKey {
+  id          String    @id @default(cuid())
+  workspaceId String    @unique
+  provider    String    @default("tavily")
+  secret      String
+  hint        String
+  createdById String
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }

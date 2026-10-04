@@ -1,3 +1,5 @@
+import { decryptSecret } from "../crypto.js";
+import { prisma } from "../db.js";
 import { safeFetch, UnsafeUrlError } from "../safe-fetch.js";
 import { ToolError } from "./loop.js";
 
@@ -75,4 +77,9 @@ export async function tavilySearch(key: string, query: string, signal: AbortSign
   if (!res.ok) throw new ToolError(`Web search failed (${res.status}).`);
   const data = (await res.json()) as { results?: { title?: string; url?: string; content?: string }[] };
   return (data.results ?? []).slice(0, 5).map((r) => ({ title: r.title ?? "", url: r.url ?? "", content: (r.content ?? "").slice(0, 500) }));
+}
+
+export async function loadSearchKey(workspaceId: string): Promise<string | null> {
+  const row = await prisma.searchKey.findUnique({ where: { workspaceId } });
+  return row ? decryptSecret(row.secret) : null;
 }
