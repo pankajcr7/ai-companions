@@ -7,7 +7,7 @@ import { canEdit, CHATGPT_USAGE_URL, type Agent } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace";
 import { ChatThread } from "./chat/ChatThread";
 
-export function CompanionChat({ agent, onEdit, onThinking, command, onCommandSent, onOpenGoal, onHire }: { agent: Agent; onEdit: () => void; onThinking: (busy: boolean) => void; command?: string; onCommandSent?: () => void; onOpenGoal?: (id: string) => void; onHire?: (hire: HireSuggestion) => void }) {
+export function CompanionChat({ agent, onEdit, onThinking, command, onCommandSent, onOpenGoal, onHire, fill }: { fill?: boolean; agent: Agent; onEdit: () => void; onThinking: (busy: boolean) => void; command?: string; onCommandSent?: () => void; onOpenGoal?: (id: string) => void; onHire?: (hire: HireSuggestion) => void }) {
   const { snapshot, wsPath } = useWorkspace();
   const conn = snapshot.connections.find((c) => c.id === agent.connectionId);
 
@@ -30,6 +30,7 @@ export function CompanionChat({ agent, onEdit, onThinking, command, onCommandSen
       placeholder={`Message ${agent.name}...`}
       emptyText={`Say hello to ${agent.name}.`}
       canSend
+      fill={fill}
       usageLink={conn.kind === "chatgpt"}
       command={command}
       onCommandSent={onCommandSent}
