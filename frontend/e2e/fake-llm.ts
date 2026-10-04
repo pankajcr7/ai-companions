@@ -42,6 +42,10 @@ function scripted(system: string, user: string): string | null {
   if (system.includes("When the owner asks for work to be done") && /launch posts/i.test(user)) {
     return `I'll get the team on it.\n\n${fence({ suggest: { goal: "Write the launch posts for the bakery" } })}`;
   }
+  if (system.includes("When the owner asks for work to be done") && /what does my app do/i.test(user)) return fence({ tool: "read_file", args: { path: "sample-app/README.md" } });
+  if (system.includes("When the owner asks for work to be done") && user.startsWith("TOOL RESULT read_file sample-app/README.md")) return "Your app is a small sample with a math helper.";
+  if (system.includes("When the owner asks for work to be done") && /add a changelog/i.test(user)) return fence({ tool: "write_file", args: { path: "sample-app/CHANGELOG.md", content: "# Changelog\n\n- First release\n", note: "Start a changelog" } });
+  if (system.includes("When the owner asks for work to be done") && user.startsWith("TOOL RESULT write_file sample-app/CHANGELOG.md")) return "I suggested a changelog. Review it below.";
   return null;
 }
 

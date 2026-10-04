@@ -99,6 +99,53 @@ function AddForm({ kind, onClose, onSaved }: { kind: KeyKind; onClose: () => voi
   );
 }
 
+function WebSearchCard({ admin }: { admin: boolean }) {
+  const { wsPath } = useWorkspace();
+  const [key, setKey] = useState<{ hint: string } | null | undefined>(undefined);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const path = wsPath("/search-key");
+  useEffect(() => {
+    api<{ key: { hint: string } | null }>(path).then((r) => setKey(r.key), () => setKey(null));
+  }, [path]);
+  async function run(fn: () => Promise<unknown>) {
+    setBusy(true);
+    setError("");
+    try {
+      await fn();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section aria-label="Web search" className="rounded-[14px] border border-line bg-paper p-4">
+      <h2 className="font-semibold">Web search</h2>
+      <p className="mt-1 text-sm text-muted">Lets companions search the web while they work. Uses a Tavily key (free tier: about 1,000 searches a month).</p>
+      {key === undefined ? null : key ? (
+        <div className="mt-3 flex items-center gap-3 text-sm">
+          <span>Connected · <span className="font-mono">{key.hint}</span></span>
+          {admin && <button disabled={busy} onClick={() => run(async () => { await api(path, { method: "DELETE" }); setKey(null); })} className="rounded-[8px] px-3 py-1.5 font-semibold text-[#b42318] hover:bg-bg">Remove</button>}
+        </div>
+      ) : (
+        <>
+          <p className="mt-3 text-sm">Not set up</p>
+          {admin && (
+            <form className="mt-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); run(async () => { const r = await api<{ hint: string }>(path, { method: "PUT", body: { apiKey: draft } }); setKey(r); setDraft(""); }); }}>
+              <label className="sr-only" htmlFor="tavily-key">Tavily API key</label>
+              <input id="tavily-key" type="password" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="tvly-..." className="min-w-0 flex-1 rounded-[10px] border border-line bg-paper px-3 py-2 text-sm" />
+              <button disabled={busy || draft.trim().length < 8} className="btn-dark rounded-[10px] px-4 text-sm font-semibold">Save key</button>
+            </form>
+          )}
+        </>
+      )}
+      {error && <p role="alert" className="mt-2 text-sm text-[#b42318]">{error}</p>}
+    </section>
+  );
+}
+
 function ProvidersInner() {
   const { snapshot, wsPath, reload } = useWorkspace();
   const params = useSearchParams();
@@ -259,6 +306,8 @@ function ProvidersInner() {
           ))}
         </ul>
       </section>
+
+      <WebSearchCard admin={admin} />
 
       {adding && <AddForm kind={adding} onClose={() => setAdding(null)} onSaved={() => { setAdding(null); setNotice({ kind: "ok", text: "Connected." }); load(); reload(); }} />}
 

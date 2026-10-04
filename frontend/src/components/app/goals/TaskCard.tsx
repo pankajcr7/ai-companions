@@ -1,5 +1,6 @@
 "use client";
 
+import { ToolActivity } from "../chat/ToolActivity";
 import { useState } from "react";
 import { ThumbsDown, ThumbsUp } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
@@ -63,7 +64,8 @@ export function TaskCard({ task, edits, goalPath, editable, onChanged }: { task:
           </div>
         </div>
       )}
-      {open && task.filesRead.length > 0 && <p className="mt-1 text-xs text-muted">Read: {task.filesRead.map((f) => f.path).join(", ")}</p>}
+      {open && <ToolActivity uses={task.toolUses ?? []} />}
+      {open && !task.toolUses?.length && task.filesRead.length > 0 && <p className="mt-1 text-xs text-muted">Read: {task.filesRead.map((f) => f.path).join(", ")}</p>}
       {edits.length > 0 && (
         <ul className="mt-2 space-y-1.5" aria-label="Proposed changes">
           {edits.map((e) => (
