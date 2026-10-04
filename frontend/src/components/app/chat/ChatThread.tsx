@@ -2,15 +2,18 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
+import { liveLabel } from "@/lib/activity";
 import { replyArrived } from "@/lib/chat";
 import { readEvents } from "@/lib/sse";
 import { splitSuggestion, visibleWhileStreaming, type HireSuggestion } from "@/lib/suggest";
 import { CHATGPT_USAGE_URL, type ChatMessageDTO } from "@/lib/types";
 import { CopyButton } from "./CopyButton";
+import { ChatEditCard } from "./ChatEditCard";
 import { RichText } from "./RichText";
 import { SuggestionCard } from "./SuggestionCard";
+import { ToolActivity } from "./ToolActivity";
 
-type Pending = { sent: string; text: string; stopped?: boolean; error?: { code: string; message: string } };
+type Pending = { sent: string; text: string; stopped?: boolean; error?: { code: string; message: string }; activity?: { name: string; label: string }[] };
 
 /** A streaming chat against any endpoint that speaks the start/delta/error/done SSE protocol. */
 export function ChatThread({ path, name, inputLabel, logLabel, placeholder, emptyText, canSend, usageLink, footer, command, onCommandSent, onThinking, suggestions, postPath, extraBody, examples, renderExtra, goalStop, fill, hideMeta }: {
@@ -81,8 +84,10 @@ export function ChatThread({ path, name, inputLabel, logLabel, placeholder, empt
       const res = await fetch(postPath ?? path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message, ...(extraBody?.() ?? {}) }), signal: ac.signal });
       if (!res.ok) throw new Error(((await res.json().catch(() => null)) as { error?: { message?: string } } | null)?.error?.message ?? "Couldn't send the message.");
       for await (const ev of readEvents(res)) {
-        if (ev.event === "delta") setPending((p) => ({ sent: message, text: (p?.text ?? "") + (ev.data as { text: string }).text }));
-        if (ev.event === "error") setPending((p) => ({ sent: message, text: p?.text ?? "", error: ev.data as { code: string; message: string } }));
+        if (ev.event === "delta") setPending((p) => ({ ...p, sent: message, text: (p?.text ?? "") + (ev.data as { text: string }).text }));
+        // A tool event means the text so far was the tool call itself: clear it and show what's happening instead.
+        if (ev.event === "tool") setPending((p) => ({ ...p, sent: message, text: "", activity: [...(p?.activity ?? []), ev.data as { name: string; label: string }] }));
+        if (ev.event === "error") setPending((p) => ({ ...p, sent: message, text: p?.text ?? "", error: ev.data as { code: string; message: string } }));
       }
     } catch (e) {
       if ((e as Error).name !== "AbortError") setError((e as Error).message);
@@ -135,6 +140,8 @@ export function ChatThread({ path, name, inputLabel, logLabel, placeholder, empt
             <div key={m.id} className={bubble(m.role)}>
               {m.role === "user" ? m.content : text ? <RichText text={text} /> : m.status !== "complete" ? <span className="italic text-muted">No reply</span> : null}
               {suggestion && !m.goalId && <SuggestionCard suggestion={suggestion} onPlan={canSend && suggestions?.onPlan ? (goal, newProject) => suggestions.onPlan!(goal, newProject, m.id) : undefined} onHire={canSend ? suggestions?.onHire : undefined} />}
+              {m.role === "assistant" && <ToolActivity uses={m.toolUses ?? []} suggestions={m.edits?.length ?? 0} />}
+              {m.role === "assistant" && <ChatEditCard edits={m.edits ?? []} canDecide={canSend} onChanged={() => load().catch(() => {})} />}
               {renderExtra?.(m)}
             {m.role === "assistant" && (
               <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-[11px] text-muted">
@@ -156,7 +163,8 @@ export function ChatThread({ path, name, inputLabel, logLabel, placeholder, empt
         {pending && <div className={bubble("user")}>{pending.sent}</div>}
         {pending && (
           <div className={bubble("assistant")} aria-live="polite" aria-busy={!pending.error}>
-            {pending.text ? <RichText text={suggestions ? visibleWhileStreaming(pending.text) : pending.text} /> : <span className="text-muted">{pending.stopped ? "No reply" : `${name} is thinking...`}</span>}
+            {pending.activity?.length ? <p className="mb-1 text-[11px] text-muted">{liveLabel(pending.activity.at(-1)!)}</p> : null}
+            {pending.text ? <RichText text={visibleWhileStreaming(pending.text)} /> : pending.activity?.length ? null : <span className="text-muted">{pending.stopped ? "No reply" : `${name} is thinking...`}</span>}
             {pending.error && <p className="mt-1.5 text-[11px] text-[#b42318]">{pending.error.message}</p>}
             {pending.stopped && <p className="mt-1.5 text-[11px] text-muted">Stopped.</p>}
           </div>

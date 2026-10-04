@@ -29,5 +29,5 @@ export function visibleWhileStreaming(text: string): string {
   const lang = /^[a-z]*/.exec(tail)?.[0] ?? "";
   if (lang && lang !== "json") return text;
   const start = tail.slice(lang.length).replace(/\s+/g, "").slice(0, 10);
-  return '{"suggest"'.startsWith(start) ? text.slice(0, i).trimEnd() : text;
+  return ['{"suggest"', '{"tool"'].some((k) => k.startsWith(start) || start.startsWith(k)) ? text.slice(0, i).trimEnd() : text;
 }

@@ -1,3 +1,4 @@
+import type { ToolUseDTO } from "./activity";
 export type Role = "owner" | "admin" | "member" | "viewer";
 export type Appearance = {
   style: "robot" | "orb";
@@ -63,6 +64,9 @@ export type ChatMessageDTO = {
   createdAt: string;
   goalId?: string | null;
   planBlocked?: string | null;
+  toolUses?: ToolUseDTO[];
+  edits?: ChatEditDTO[];
 };
+export type ChatEditDTO = { id: string; path: string; baseRevision: number; note: string; status: "pending" | "applied" | "rejected" | "stale"; reason: string | null };
 export const PROVIDER_NAMES: Record<ProviderKind, string> = { chatgpt: "ChatGPT", openai: "OpenAI", anthropic: "Anthropic", gemini: "Google Gemini", custom: "Custom endpoint" };
 export const CHATGPT_USAGE_URL = "https://chatgpt.com/settings/usage";

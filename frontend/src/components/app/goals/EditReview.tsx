@@ -9,7 +9,7 @@ import type { EditDTO } from "@/lib/goals";
 import { CopyButton } from "../chat/CopyButton";
 
 /** Side-by-side, read-only: the current file on the left, the companion's proposal on the right. */
-export function EditReview({ goalPath, edit, onClose }: { goalPath: string; edit: EditDTO; onClose: () => void }) {
+export function EditReview({ url, edit, onClose }: { url: string; edit: Pick<EditDTO, "id" | "path" | "note">; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const host = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<{ content: string; current: string | null } | null>(null);
@@ -17,11 +17,11 @@ export function EditReview({ goalPath, edit, onClose }: { goalPath: string; edit
 
   useEffect(() => {
     dialog.current?.showModal();
-    api<{ edit: { content: string; current: string | null } }>(`${goalPath}/edits/${edit.id}`).then(
+    api<{ edit: { content: string; current: string | null } }>(url).then(
       (r) => setData(r.edit),
       (e) => setError((e as Error).message),
     );
-  }, [goalPath, edit.id]);
+  }, [url]);
 
   useEffect(() => {
     if (!data || !host.current) return;

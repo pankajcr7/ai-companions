@@ -96,7 +96,7 @@ export function TaskCard({ task, edits, goalPath, editable, onChanged }: { task:
         </div>
       )}
       {error && <p role="alert" className="mt-2 text-xs text-[#b42318]">{error}</p>}
-      {viewing && <EditReview goalPath={goalPath} edit={viewing} onClose={() => setViewing(null)} />}
+      {viewing && <EditReview url={`${goalPath}/edits/${viewing.id}`} edit={viewing} onClose={() => setViewing(null)} />}
     </article>
   );
 }

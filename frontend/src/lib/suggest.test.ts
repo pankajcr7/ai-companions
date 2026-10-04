@@ -34,3 +34,8 @@ test("a suggestion can ask to build in a new project", () => {
   const reply = `Sana can build it.\n\n${block({ suggest: { goal: "Build a landing page", newProject: true, projectName: "Bakery site" } })}`;
   assert.deepEqual(splitSuggestion(reply).suggestion, { goal: "Build a landing page", hire: [], newProject: true, projectName: "Bakery site" });
 });
+
+test("a tool block being typed is hidden while streaming", () => {
+  assert.equal(visibleWhileStreaming('Let me check.\n```json\n{"tool": "read_'), "Let me check.");
+  assert.equal(visibleWhileStreaming('```json\n{"suggest'), "");
+});
