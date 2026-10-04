@@ -26,7 +26,7 @@ export function readiness(a: Actor): string | null {
 }
 
 /** One streamed call collected into text, with the same single retry the chat route uses. */
-export async function complete(actor: Actor, instructions: string, turns: ChatTurn[], signal: AbortSignal, log?: StepLog): Promise<Call> {
+export async function complete(actor: Actor, instructions: string, turns: ChatTurn[], signal: AbortSignal, log?: StepLog, onDelta?: (text: string) => void): Promise<Call> {
   const problem = readiness(actor);
   if (problem) throw new CallError("unassigned", problem);
   const model = actor.model!;
@@ -38,7 +38,10 @@ export async function complete(actor: Actor, instructions: string, turns: ChatTu
     for (let attempt = 0; ; attempt++) {
       try {
         for await (const ev of provider.stream({ model, instructions, turns, signal })) {
-          if (ev.type === "delta") text += ev.text;
+          if (ev.type === "delta") {
+            text += ev.text;
+            onDelta?.(ev.text);
+          }
           else done = ev;
         }
         break;
