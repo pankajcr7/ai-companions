@@ -1,5 +1,10 @@
+import { Suspense } from "react";
 import { ChatHome } from "@/components/app/home/ChatHome";
 
 export default function HomePage() {
-  return <ChatHome />;
+  return (
+    <Suspense fallback={null}>
+      <ChatHome />
+    </Suspense>
+  );
 }

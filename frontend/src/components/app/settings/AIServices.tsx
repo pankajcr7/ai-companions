@@ -3,7 +3,9 @@
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
+import { setupSteps } from "@/lib/team";
 import { canAdmin, CHATGPT_USAGE_URL, PROVIDER_NAMES, type Connection, type ProviderKind } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace";
 
@@ -60,7 +62,7 @@ function AddForm({ kind, onClose, onSaved }: { kind: KeyKind; onClose: () => voi
         {kind === "custom" && (
           <>
             <label className="block text-sm font-medium">
-              Provider
+              AI service
               <select
                 value={preset}
                 onChange={(e) => {
@@ -75,7 +77,7 @@ function AddForm({ kind, onClose, onSaved }: { kind: KeyKind; onClose: () => voi
               </select>
             </label>
             <label className="block text-sm font-medium">
-              Base URL
+              Service address
               <input required value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/v1" className={field} />
             </label>
           </>
@@ -225,7 +227,7 @@ function AIServicesInner() {
     },
     { kind: "openai", title: "OpenAI API key", text: "Pay per use with your OpenAI platform account.", action: <button onClick={() => setAdding("openai")} className="btn-light rounded-[10px] px-4 py-2 text-sm font-semibold">Add key</button> },
     { kind: "gemini", title: "Google Gemini API key", text: "Use Gemini models with a Google AI Studio key.", action: <button onClick={() => setAdding("gemini")} className="btn-light rounded-[10px] px-4 py-2 text-sm font-semibold">Add key</button> },
-    { kind: "custom", title: "Custom endpoint", text: "OpenRouter, xAI, DeepSeek, Ollama, or any OpenAI-compatible URL.", action: <button onClick={() => setAdding("custom")} className="btn-light rounded-[10px] px-4 py-2 text-sm font-semibold">Add endpoint</button> },
+    { kind: "custom", title: "Other service", text: "OpenRouter, xAI, DeepSeek, Ollama, or any OpenAI-compatible URL.", action: <button onClick={() => setAdding("custom")} className="btn-light rounded-[10px] px-4 py-2 text-sm font-semibold">Add a service</button> },
   ];
 
   return (
@@ -237,6 +239,9 @@ function AIServicesInner() {
       {notice && (
         <p role={notice.kind === "error" ? "alert" : "status"} className={`rounded-[10px] px-4 py-3 text-sm ${notice.kind === "error" ? "bg-[#fde8e6] text-[#7a1b12]" : "bg-bg"}`}>
           {notice.text}
+          {notice.kind === "ok" && !setupSteps(snapshot.agents, snapshot.connections).model && (
+            <> Next: choose {snapshot.agents.find((a) => a.isHead)?.name ?? "Nova"}&apos;s AI model. <Link href={`/w/${snapshot.workspace.slug}`} className="underline">Back to home</Link></>
+          )}
         </p>
       )}
 

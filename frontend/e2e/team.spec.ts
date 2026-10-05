@@ -84,3 +84,34 @@ test("Settings has Company and AI services tabs; the old providers link keeps it
   await expect(page).toHaveURL(/\/settings\?/);
   await expect(page.getByText("Sign-in expired")).toBeVisible();
 });
+
+test("first-run setup card, then Give a task fills the home input", async ({ page }) => {
+  const co = await newCompany(page, { prefix: "Setup", company: "Setup Bakery", template: /Starter/ });
+  const setup = page.getByRole("region", { name: "Finish setting up" });
+  await expect(setup.getByText("Connect an AI service")).toBeVisible();
+  await setup.getByRole("link", { name: "Connect an AI service" }).click();
+  await expect(page).toHaveURL(/\/settings\?tab=ai/);
+  await page.getByRole("button", { name: "Add a service" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("AI service").selectOption("other");
+  await dialog.getByLabel("Service address").fill("http://127.0.0.1:4199/v1");
+  await dialog.getByLabel("Name").fill("Fake LLM");
+  await dialog.getByRole("button", { name: "Test and save" }).click();
+  await page.getByRole("link", { name: "Back to home" }).click();
+
+  await expect(setup.getByText("✓ Connect an AI service")).toBeVisible();
+  await setup.getByRole("button", { name: "Choose Nova's AI model" }).click();
+  const form = page.getByRole("dialog");
+  await form.getByLabel("AI service").selectOption({ label: "Fake LLM (127.0.0.1:4199)" });
+  await form.getByLabel("AI model").fill("fake-model");
+  await form.getByRole("button", { name: "Save" }).click();
+  await expect(setup).toHaveCount(0);
+
+  await page.getByRole("link", { name: "Team", exact: true }).click();
+  const snap = await (await page.request.get(`/api/workspaces/${co.id}`)).json();
+  const other = snap.agents.find((a: { isHead: boolean }) => !a.isHead);
+  await page.request.patch(`/api/workspaces/${co.id}/agents/${other.id}`, { headers: { origin: "http://localhost:3100" }, data: { name: "Mira & Co", connectionId: snap.agents.find((a: { isHead: boolean }) => a.isHead).connectionId, model: "fake-model" } });
+  await page.reload();
+  await page.getByRole("article", { name: "Mira & Co" }).getByRole("link", { name: "Give a task" }).click();
+  await expect(page.getByLabel("Message Nova")).toHaveValue("@Mira & Co ");
+});

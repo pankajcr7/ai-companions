@@ -156,7 +156,7 @@ export function CompanionForm({ agent, preset, onClose, onSaved }: { agent: Agen
           <fieldset className="grid gap-4 sm:grid-cols-2">
             <legend className="mb-1 text-sm font-semibold">AI model</legend>
             <label className="text-sm font-medium">
-              Provider
+              AI service
               <select value={form.connectionId} onChange={(e) => set("connectionId", e.target.value)} className={field}>
                 <option value="">Not connected</option>
                 {snapshot.connections.map((c) => (
@@ -165,7 +165,7 @@ export function CompanionForm({ agent, preset, onClose, onSaved }: { agent: Agen
               </select>
             </label>
             <label className="text-sm font-medium">
-              Model
+              AI model
               <input list={`models-${agent?.id ?? "new"}`} value={form.model} disabled={!form.connectionId} onChange={(e) => set("model", e.target.value)} placeholder={form.connectionId ? "Pick or type a model" : "Choose a provider first"} className={field} />
               <datalist id={`models-${agent?.id ?? "new"}`}>
                 {models.map((m) => (

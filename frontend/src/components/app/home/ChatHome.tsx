@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { isActive, type GoalDTO } from "@/lib/goals";
@@ -11,6 +12,7 @@ import { ChatThread } from "../chat/ChatThread";
 import { CompanionForm } from "../CompanionForm";
 import { GoalCard } from "../goals/GoalCard";
 import { ConversationList } from "./ConversationList";
+import { SetupCard } from "./SetupCard";
 import { TeamStrip } from "./TeamStrip";
 
 const EXAMPLES = ["Build a landing page for my bakery", "Write a week of Instagram posts", "Research three competitors and compare prices"];
@@ -29,6 +31,9 @@ export function ChatHome() {
   const [error, setError] = useState("");
   const [threadKey, setThreadKey] = useState(0);
   const [hire, setHire] = useState<HireSuggestion | null>(null);
+  const [editingHead, setEditingHead] = useState(false);
+  // "Give a task" on the Team page opens home with "@Name " ready in the input.
+  const ask = useSearchParams().get("ask") ?? "";
 
   const convPath = wsPath("/conversations");
   const newChat = useCallback(async () => {
@@ -92,10 +97,11 @@ export function ChatHome() {
         )}
         {error && <p role="alert" className="bg-[#fde8e6] px-4 py-2 text-sm text-[#7a1b12]">{error}</p>}
         <div className="flex min-h-0 flex-1 flex-col p-4">
-          {!headReady && <p className="mb-3 rounded-[10px] bg-bg px-3 py-2 text-sm">Nova needs an AI model before it can help. Open <b>See whole team</b>, choose Nova, and press Customize.</p>}
+          <SetupCard onChooseModel={() => head && setEditingHead(true)} />
           {activeId && (
             <ChatThread
               key={`${activeId}:${threadKey}`}
+              initialDraft={ask}
               fill
               hideMeta
               // When Nova finishes a reply, the chat list picks up the new title.
@@ -142,6 +148,17 @@ export function ChatHome() {
           )}
         </div>
       </section>
+      {editingHead && head && (
+        <CompanionForm
+          agent={head}
+          preset={null}
+          onClose={() => setEditingHead(false)}
+          onSaved={async () => {
+            setEditingHead(false);
+            await reload();
+          }}
+        />
+      )}
       {hire && (
         <CompanionForm
           agent={null}

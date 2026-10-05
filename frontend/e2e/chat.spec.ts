@@ -8,10 +8,10 @@ test("connect a custom endpoint, assign it to Nova, chat, and keep the history",
 
   await page.goto(`/w/${co.slug}/settings?tab=ai`);
   await expect(page.getByRole("heading", { name: "AI services" })).toBeVisible();
-  await page.getByRole("button", { name: "Add endpoint" }).click();
+  await page.getByRole("button", { name: "Add a service" }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Provider").selectOption("other");
-  await dialog.getByLabel("Base URL").fill("http://127.0.0.1:4199/v1");
+  await dialog.getByLabel("AI service").selectOption("other");
+  await dialog.getByLabel("Service address").fill("http://127.0.0.1:4199/v1");
   await dialog.getByLabel("Name").fill("Fake LLM");
   await dialog.getByRole("button", { name: "Test and save" }).click();
   await expect(page.getByText(/Connected/).first()).toBeVisible();
@@ -21,8 +21,8 @@ test("connect a custom endpoint, assign it to Nova, chat, and keep the history",
   const panel = page.getByRole("region", { name: "Chat with Nova" });
   await about.getByRole("button", { name: "Set up" }).click();
   const form = page.getByRole("dialog");
-  await form.getByLabel("Provider").selectOption({ label: "Fake LLM (127.0.0.1:4199)" });
-  await form.getByLabel("Model").fill("fake-model");
+  await form.getByLabel("AI service").selectOption({ label: "Fake LLM (127.0.0.1:4199)" });
+  await form.getByLabel("AI model").fill("fake-model");
   await form.getByRole("button", { name: "Save" }).click();
   await expect(form).toBeHidden();
 
@@ -49,8 +49,8 @@ test("connect a custom endpoint, assign it to Nova, chat, and keep the history",
   const hireForm = page.getByRole("dialog");
   await expect(hireForm.getByLabel("Role")).toHaveValue("Marketing lead");
   await hireForm.getByLabel("Name").fill("Mira");
-  await hireForm.getByLabel("Provider").selectOption({ label: "Fake LLM (127.0.0.1:4199)" });
-  await hireForm.getByLabel("Model").fill("fake-model");
+  await hireForm.getByLabel("AI service").selectOption({ label: "Fake LLM (127.0.0.1:4199)" });
+  await hireForm.getByLabel("AI model").fill("fake-model");
   await hireForm.getByRole("button", { name: "Save" }).click();
   await expect(hireForm).toBeHidden();
   const novaPanel = chat;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Agent, ConnectionSummary, Department } from "./types.ts";
-import { canGiveTask, groupTeam, isReady, roleLabel, statusText, teamStatus, workingTasks } from "./team.ts";
+import { canGiveTask, groupTeam, isReady, roleLabel, setupSteps, statusText, teamStatus, workingTasks } from "./team.ts";
 
 const look = { style: "robot", color: "#000000", head: "round", eyes: "dots", accessory: "none" } as Agent["appearance"];
 const agent = (o: Partial<Agent>): Agent => ({ id: "a", name: "A", role: "Writer", kind: "ai", workingStyle: "", status: "active", isHead: false, departmentId: null, managerId: null, appearance: look, connectionId: "c1", model: "m", ...o });
@@ -46,4 +46,12 @@ test("only members and admins can give tasks, and only to current teammates", ()
   assert.equal(canGiveTask("owner", agent({})), true);
   assert.equal(canGiveTask("viewer", agent({})), false);
   assert.equal(canGiveTask("member", agent({ status: "archived" })), false);
+});
+
+test("setup steps: a connected service, then the head's model on it", () => {
+  const head = agent({ isHead: true, model: null, connectionId: null });
+  assert.deepEqual(setupSteps([head], []), { service: false, model: false, done: false });
+  assert.deepEqual(setupSteps([head], conns), { service: true, model: false, done: false });
+  assert.deepEqual(setupSteps([{ ...head, model: "m", connectionId: "c1" }], conns), { service: true, model: true, done: true });
+  assert.deepEqual(setupSteps([{ ...head, model: "m", connectionId: "c1" }], [{ ...conns[0], status: "error" }]), { service: false, model: false, done: false });
 });

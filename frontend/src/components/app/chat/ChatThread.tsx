@@ -16,7 +16,7 @@ import { ToolActivity } from "./ToolActivity";
 type Pending = { sent: string; text: string; stopped?: boolean; error?: { code: string; message: string }; activity?: { name: string; label: string }[] };
 
 /** A streaming chat against any endpoint that speaks the start/delta/error/done SSE protocol. */
-export function ChatThread({ path, name, inputLabel, logLabel, placeholder, emptyText, canSend, usageLink, footer, command, onCommandSent, onThinking, suggestions, postPath, extraBody, examples, renderExtra, goalStop, fill, hideMeta }: {
+export function ChatThread({ initialDraft, path, name, inputLabel, logLabel, placeholder, emptyText, canSend, usageLink, footer, command, onCommandSent, onThinking, suggestions, postPath, extraBody, examples, renderExtra, goalStop, fill, hideMeta }: {
   path: string;
   name: string;
   inputLabel: string;
@@ -40,6 +40,8 @@ export function ChatThread({ path, name, inputLabel, logLabel, placeholder, empt
   renderExtra?: (m: ChatMessageDTO) => ReactNode;
   /** While the team works, Send becomes this Stop button. */
   goalStop?: { label: string; onClick: () => void } | null;
+  /** Text already in the input when the chat opens (e.g. "@Lina " from the Team page). */
+  initialDraft?: string;
   /** Fill the available height (full-page chat) instead of a fixed-height panel. */
   fill?: boolean;
   /** Hide the model name and token counts (the home chat is for non-technical owners). */
@@ -49,7 +51,7 @@ export function ChatThread({ path, name, inputLabel, logLabel, placeholder, empt
   const [messages, setMessages] = useState<ChatMessageDTO[] | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState("");
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(initialDraft ?? "");
   const abort = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
 

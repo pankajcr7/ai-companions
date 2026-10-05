@@ -34,3 +34,10 @@ export function groupTeam(agents: Agent[], departments: Department[]): { groups:
 }
 
 export const canGiveTask = (role: Role, a: Agent) => role !== "viewer" && a.status !== "archived";
+
+export function setupSteps(agents: Agent[], connections: ConnectionSummary[]) {
+  const service = connections.some((c) => c.status === "connected");
+  const head = agents.find((a) => a.isHead);
+  const model = !!head && head.kind === "ai" && isReady(head, connections);
+  return { service, model, done: service && model };
+}
