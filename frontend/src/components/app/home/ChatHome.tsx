@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { isActive, type GoalDTO } from "@/lib/goals";
@@ -33,10 +33,18 @@ export function ChatHome() {
   const [hire, setHire] = useState<HireSuggestion | null>(null);
   const [editingHead, setEditingHead] = useState(false);
   // "Give a task" on the Team page opens home with "@Name " ready in the input.
-  const ask = useSearchParams().get("ask") ?? "";
+  const params = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  // Filled in once: later chats start empty, and the name leaves the address so a reload doesn't repeat it.
+  const [ask, setAsk] = useState(() => params.get("ask") ?? "");
+  useEffect(() => {
+    if (params.has("ask")) router.replace(pathname);
+  }, [params, router, pathname]);
 
   const convPath = wsPath("/conversations");
-  const newChat = useCallback(async () => {
+  const newChat = useCallback(async (keepAsk = false) => {
+    if (!keepAsk) setAsk("");
     try {
       const { id } = await api<{ id: string }>(convPath, { method: "POST" });
       setActiveId(id);
@@ -53,7 +61,7 @@ export function ChatHome() {
     api<{ conversations: { id: string }[] }>(convPath).then(
       (r) => {
         if (r.conversations[0]) setActiveId(r.conversations[0].id);
-        else if (editable) newChat();
+        else if (editable) newChat(true);
       },
       (e) => setError((e as Error).message),
     );
@@ -74,7 +82,7 @@ export function ChatHome() {
   return (
     <div className="flex min-h-0 flex-1">
       <aside className={`${showList ? "block" : "hidden"} w-full shrink-0 border-r border-line bg-paper p-3 md:block md:w-64`}>
-        <ConversationList activeId={activeId} onOpen={(id) => { setActiveId(id); setGoals({}); setShowList(false); }} onNew={newChat} refreshKey={refreshKey} onDeleted={(id, rest) => {
+        <ConversationList activeId={activeId} onOpen={(id) => { setAsk(""); setActiveId(id); setGoals({}); setShowList(false); }} onNew={() => newChat()} refreshKey={refreshKey} onDeleted={(id, rest) => {
           if (id !== activeId) return;
           setGoals({});
           if (rest[0]) setActiveId(rest[0].id);
@@ -128,6 +136,7 @@ export function ChatHome() {
                 // Planned from its message, so the plan card appears right here in the chat.
                 onPlan: async (goal, _newProject, messageId) => {
                   await api(`${convPath}/${activeId}/messages/${messageId}/plan`, { method: "POST", body: { text: goal } });
+                  setAsk("");
                   setThreadKey((k) => k + 1);
                 },
                 onHire: setHire,

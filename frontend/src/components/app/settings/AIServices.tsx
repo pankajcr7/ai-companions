@@ -177,8 +177,9 @@ function AIServicesInner() {
           seen = localStorage.getItem(`chatgpt-welcome-${snapshot.workspace.id}`) === "1";
           localStorage.setItem(`chatgpt-welcome-${snapshot.workspace.id}`, "1");
         } catch {}
+        // The notice carries the next setup step, so it shows even under the first-time welcome.
+        setNotice({ kind: "ok", text: "ChatGPT is connected." });
         if (!seen) setWelcome(true);
-        else setNotice({ kind: "ok", text: "ChatGPT is connected." });
       }
       router.replace(`/w/${snapshot.workspace.slug}/settings?tab=ai`);
     }, 0);

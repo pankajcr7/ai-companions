@@ -114,4 +114,17 @@ test("first-run setup card, then Give a task fills the home input", async ({ pag
   await page.reload();
   await page.getByRole("article", { name: "Mira & Co" }).getByRole("link", { name: "Give a task" }).click();
   await expect(page.getByLabel("Message Nova")).toHaveValue("@Mira & Co ");
+  // The name is filled in once: a new chat (or a reload) starts empty.
+  await expect(page).not.toHaveURL(/ask=/);
+  await page.getByRole("navigation", { name: "Conversations" }).getByRole("button", { name: "New chat", exact: true }).first().click();
+  await expect(page.getByLabel("Message Nova")).toHaveValue("");
+});
+
+test("after a first ChatGPT sign-in the next setup step is still shown", async ({ page }) => {
+  const co = await newCompany(page, { prefix: "Gpt", company: "Gpt Bakery", template: /Starter/ });
+  await page.goto(`/w/${co.slug}/providers?connected=chatgpt`);
+  await page.getByRole("dialog").getByRole("button", { name: "Got it" }).click();
+  await expect(page.getByRole("status")).toContainText("ChatGPT is connected.");
+  await expect(page.getByRole("status")).toContainText("Next: choose Nova's AI model.");
+  await expect(page.getByRole("status").getByRole("link", { name: "Back to home" })).toBeVisible();
 });
