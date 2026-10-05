@@ -31,7 +31,8 @@ export async function planGoal(goalId: string): Promise<void> {
       ? await prisma.goal.findUnique({ where: { id: goal.parentGoalId }, include: { tasks: { orderBy: { position: "asc" }, include: { agent: { select: { name: true } } } } } })
       : null;
     const previous = parent ? previousGoal({ text: parent.text, summary: parent.summary, tasks: parent.tasks.map((t) => ({ title: t.title, agentName: t.agent.name, result: t.result })) }) : null;
-    const signal = AbortSignal.any([ctl.signal, AbortSignal.timeout(300_000)]);
+    // Planning may read a few files first, each a slow model call.
+    const signal = AbortSignal.any([ctl.signal, AbortSignal.timeout(15 * 60_000)]);
     const planTools = [...(goal.project ? projectTools(goal.project, { write: null, read: new Map() }) : []), ...webTools(await loadSearchKey(goal.workspaceId))];
     const { value, calls } = await completeJson(nova, planInstructions(goal.workspace.name, goal.newProject), planPrompt(goal.text, entries, ctx, previous), schema, signal, stepLog(goal.workspaceId, goalId, null, "plan"), { tools: planTools, limit: 4 });
     const inputTokens = calls.reduce((n, c) => n + (c.inputTokens ?? 0), 0);

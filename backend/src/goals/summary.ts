@@ -14,7 +14,7 @@ export async function summarizeProject(project: Project, nova: Actor & { workspa
   const entries: ProjectFile[] = rows.map((r) => ({ path: r.path, kind: r.kind, size: r.size, isText: r.isText, revision: r.revision, blobHash: r.blobHash }));
   const map = projectMap(entries);
   const log = stepLog(nova.workspaceId, null, null, "project_summary");
-  const signal = AbortSignal.timeout(300_000);
+  const signal = AbortSignal.timeout(15 * 60_000);
   const pick = await completeJson(nova, selectInstructions(30), projectSummarySelectPrompt(map), Select, signal, log);
   const { files } = await pickFiles(pick.value.read, entries, SUMMARY_BUDGET, loadText);
   const call = await complete(nova, projectSummaryInstructions(company), [{ role: "user", content: `PROJECT FILES:\n${map}\n\nKEY FILES:\n${filesBlock(files)}` }], signal, log);

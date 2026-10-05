@@ -74,9 +74,13 @@ async function tick(goalId: string) {
   if (![...status.values()].some((s) => s === "pending" || s === "running")) await finishGoal(goalId);
 }
 
+// A task may make many slow model calls (reading, writing whole files), so it gets far longer than one call.
+const taskLimitMs = () => Number(process.env.TASK_TIME_LIMIT_MS) || 30 * 60_000;
+
 async function runTask(goalId: string, taskId: string) {
   const ctl = controllerFor(goalId);
-  const signal = AbortSignal.any([ctl.signal, AbortSignal.timeout(300_000)]);
+  const limit = AbortSignal.timeout(taskLimitMs());
+  const signal = AbortSignal.any([ctl.signal, limit]);
   let input = 0;
   let output = 0;
   let connectionId: string | null = null;
@@ -175,7 +179,13 @@ async function runTask(goalId: string, taskId: string) {
       }
     });
   } catch (e) {
-    const err = e instanceof CallError ? e : new CallError("server_error", "Something went wrong while working on this task.");
+    // The time limit ran out (not the owner's Stop): say so plainly, so it can be retried.
+    const timedOut = limit.aborted && !ctl.signal.aborted;
+    const err = timedOut
+      ? new CallError("timeout", `Took longer than ${Math.round(taskLimitMs() / 60_000)} minutes, so it was stopped. Try again, or split it into smaller tasks.`)
+      : e instanceof CallError
+        ? e
+        : new CallError("server_error", "Something went wrong while working on this task.");
     if (!(e instanceof CallError)) console.error("goal task", e);
     if (err.code === "reauth" && connectionId) await prisma.providerConnection.update({ where: { id: connectionId }, data: { status: "reauth", lastError: "Sign in to ChatGPT again" } });
     // Files already saved before Stop or a failure stay listed, so nothing in the project is unaccounted for.
@@ -201,7 +211,7 @@ async function finishGoal(goalId: string) {
     if (!nova) throw new CallError("unassigned", "Your company has no head agent");
     const ctx = await goalContext(goal.project);
     const rows = goal.tasks.map((t) => ({ position: t.position, title: t.title, agentName: t.agent.name, status: t.status, criteria: t.criteria, result: t.result, error: t.error }));
-    const signal = AbortSignal.any([ctl.signal, AbortSignal.timeout(300_000)]);
+    const signal = AbortSignal.any([ctl.signal, AbortSignal.timeout(15 * 60_000)]);
     const { value, calls } = await completeJson(nova, summaryInstructions(goal.workspace.name), summaryPrompt(goal.text, ctx.shared, rows), Summary, signal, stepLog(goal.workspaceId, goalId, null, "summary"));
     const done = new Map(goal.tasks.filter((t) => t.status === "done").map((t) => [t.position, t.id]));
     await prisma.$transaction(async (tx) => {

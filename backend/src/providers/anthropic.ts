@@ -15,7 +15,7 @@ function mapError(e: unknown, signal: AbortSignal): unknown {
 
 /** Claude through the official SDK. baseURL is only set by tests. */
 export function anthropicClient(opts: { apiKey: string; baseURL?: string }): ProviderClient {
-  const client = new Anthropic({ apiKey: opts.apiKey, baseURL: opts.baseURL, maxRetries: 0, timeout: 300_000 });
+  const client = new Anthropic({ apiKey: opts.apiKey, baseURL: opts.baseURL, maxRetries: 0, timeout: 900_000 });
   return {
     async listModels(signal) {
       try {

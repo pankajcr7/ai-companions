@@ -46,7 +46,8 @@ export async function streamReply(
   const send = (event: string, data: unknown) => raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   send("start", opts.start);
 
-  const signal = AbortSignal.any([watch.signal, AbortSignal.timeout(300_000)]);
+  // A reply may use several tools, each a slow model call.
+  const signal = AbortSignal.any([watch.signal, AbortSignal.timeout(15 * 60_000)]);
   const started = Date.now();
   let text = "";
   // What the owner saw stream in the current round; kept if the reply stops or fails midway.
