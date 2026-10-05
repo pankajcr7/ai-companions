@@ -45,7 +45,7 @@ const without = (text: string, key: string) => {
 /** The part of a reply worth showing: everything before a tool call, complete or half-typed. */
 export function visibleAnswer(text: string): string {
   const last = [...text.matchAll(/\{\s*"tool"\s*:/g)].at(-1);
-  return last ? text.slice(0, last.index).replace(/```[a-zA-Z]*\s*$/, "").trim() : text.trim();
+  return last ? text.slice(0, last.index).replace(/```[a-zA-Z]*\s*$/, "").trim() : text;
 }
 
 const answerAfterTools = (text: string, uses: ToolUse[]) =>

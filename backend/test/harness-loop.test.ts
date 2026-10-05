@@ -134,6 +134,7 @@ test("every reply that held a tool block is followed by a reset event, and visib
   expect(events).toEqual(["reset", "tool", "reset"]);
   expect(visibleAnswer('Let me look.\n```json\n{"tool": "read_')).toBe("Let me look.");
   expect(visibleAnswer("Plain answer.")).toBe("Plain answer.");
+  expect(visibleAnswer("Partial ")).toBe("Partial ");
 });
 
 test("every model call is reported as it happens, so tokens count even if the loop stops", async () => {
