@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, Trash } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
 import { canAdmin, statusLabel, type Agent } from "@/lib/types";
+import { roleLabel } from "@/lib/team";
 import { useWorkspace } from "@/lib/workspace";
 import { CompanionAvatar } from "@/components/app/CompanionAvatar";
 
@@ -15,7 +16,7 @@ function Tree({ agents, managerId }: { agents: Agent[]; managerId: string }) {
       {reports.map((a) => (
         <li key={a.id} className="py-1.5">
           <span className="flex flex-wrap items-center gap-x-2 text-sm">
-            <CompanionAvatar look={a.appearance} size={28} /> <span className="font-medium">{a.name}</span> <span className="text-muted">{a.role}, {statusLabel(a)}</span>
+            <CompanionAvatar look={a.appearance} size={28} /> <span className="font-medium">{a.name}</span> <span className="text-muted">{roleLabel(a)}, {statusLabel(a)}</span>
           </span>
           <Tree agents={agents} managerId={a.id} />
         </li>
@@ -134,7 +135,7 @@ export function OrganizeDialog({ onClose }: { onClose: () => void }) {
             <ul className="ml-5 border-l border-line pl-4">
               <li className="py-1.5">
                 <span className="flex flex-wrap items-center gap-x-2 text-sm">
-                  <CompanionAvatar look={head.appearance} size={28} /> <span className="font-medium">{head.name}</span> <span className="text-muted">{head.role}</span>
+                  <CompanionAvatar look={head.appearance} size={28} /> <span className="font-medium">{head.name}</span> <span className="text-muted">{roleLabel(head)}</span>
                 </span>
                 <Tree agents={snapshot.agents} managerId={head.id} />
               </li>
@@ -146,7 +147,7 @@ export function OrganizeDialog({ onClose }: { onClose: () => void }) {
               <ul className="ml-5 border-l border-line pl-4">
                 {loose.map((a) => (
                   <li key={a.id} className="py-1.5 text-sm">
-                    <span className="font-medium">{a.name}</span> <span className="text-muted">{a.role}</span>
+                    <span className="font-medium">{a.name}</span> <span className="text-muted">{roleLabel(a)}</span>
                     <Tree agents={snapshot.agents} managerId={a.id} />
                   </li>
                 ))}

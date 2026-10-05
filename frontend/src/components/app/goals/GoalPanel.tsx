@@ -61,10 +61,10 @@ export function GoalPanel({ goalId, onClose, onWorking, onOpenGoal, onHire }: { 
   const tokens = goal ? goal.inputTokens + goal.outputTokens : 0;
 
   return (
-    <aside aria-label="Company goal" className="h-full overflow-auto border-l border-line bg-paper p-5">
+    <aside aria-label="Team task" className="h-full overflow-auto border-l border-line bg-paper p-5">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-xs uppercase tracking-wide text-muted">Company goal</p>
-        <button aria-label="Close goal" onClick={onClose} className="grid size-9 place-items-center rounded-[8px] hover:bg-bg"><X size={18} /></button>
+        <p className="text-xs uppercase tracking-wide text-muted">Team task</p>
+        <button aria-label="Close" onClick={onClose} className="grid size-9 place-items-center rounded-[8px] hover:bg-bg"><X size={18} /></button>
       </div>
       <h2 className="text-lg font-semibold">{goal?.text ?? "Loading..."}</h2>
       {goal?.parent && (

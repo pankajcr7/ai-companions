@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { roleLabel } from "@/lib/team";
 import { ArrowsOut, Minus, Plus } from "@phosphor-icons/react";
 import { statusLabel, UNASSIGNED, type Agent, type Snapshot } from "@/lib/types";
 import { CompanionFigure } from "../CompanionAvatar";
@@ -222,7 +223,7 @@ export function OfficeScene({
             const pos = drag?.id === a.id ? drag : layout.desks[a.id];
             const dimmed = deptFilter && deptFilter !== (a.departmentId ?? UNASSIGNED);
             const thinking = thinkingIds.includes(a.id);
-            const label = `${a.name}, ${a.role}, ${statusLabel(a, thinking)}`;
+            const label = `${a.name}, ${roleLabel(a)}, ${statusLabel(a, thinking)}`;
             return (
               <g
                 key={a.id}

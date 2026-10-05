@@ -19,7 +19,7 @@ test("give the company a goal, approve the plan, and apply a proposed edit", asy
   const projectId = new URL(page.url()).pathname.split("/").pop()!;
   await startGoal(page, co, { text: "Document the math helper", projectId });
 
-  const goal = page.getByRole("complementary", { name: "Company goal" });
+  const goal = page.getByRole("complementary", { name: "Team task" });
   await expect(goal.getByText("Plan ready for your approval")).toBeVisible();
   await goal.getByLabel("Title").fill("Document add()");
   await goal.getByRole("button", { name: "Start" }).click();
@@ -54,7 +54,7 @@ test("give the company a goal, approve the plan, and apply a proposed edit", asy
   await goal.getByRole("button", { name: "Continue with a new goal" }).click();
   await goal.getByLabel("What should happen next?").fill("Add a subtract helper too");
   await goal.getByRole("button", { name: "Plan it" }).click();
-  const followUp = page.getByRole("complementary", { name: "Company goal" });
+  const followUp = page.getByRole("complementary", { name: "Team task" });
   await expect(followUp.getByRole("button", { name: /Continues: Document the math helper/ })).toBeVisible();
   await expect(followUp.getByText("Plan ready for your approval")).toBeVisible();
 

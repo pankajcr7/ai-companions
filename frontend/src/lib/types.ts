@@ -39,7 +39,7 @@ export type Me = { user: { id: string; name: string; email: string }; workspaces
 export const UNASSIGNED = "unassigned";
 export const canEdit = (r: Role) => r !== "viewer";
 export const canAdmin = (r: Role) => r === "owner" || r === "admin";
-export const statusLabel = (a: Agent, thinking = false) => (thinking ? "Thinking" : { active: "Idle", paused: "Paused", archived: "Archived" }[a.status]);
+export const statusLabel = (a: Agent, thinking = false) => (thinking ? "Working" : { active: "Free", paused: "Paused", archived: "Former teammate" }[a.status]);
 
 export type ProviderKind = "chatgpt" | "openai" | "anthropic" | "gemini" | "custom";
 export type ConnectionStatus = "connected" | "error" | "reauth";
@@ -68,5 +68,5 @@ export type ChatMessageDTO = {
   edits?: ChatEditDTO[];
 };
 export type ChatEditDTO = { id: string; path: string; baseRevision: number; note: string; status: "pending" | "applied" | "rejected" | "stale"; reason: string | null };
-export const PROVIDER_NAMES: Record<ProviderKind, string> = { chatgpt: "ChatGPT", openai: "OpenAI", anthropic: "Anthropic", gemini: "Google Gemini", custom: "Custom endpoint" };
+export const PROVIDER_NAMES: Record<ProviderKind, string> = { chatgpt: "ChatGPT", openai: "OpenAI", anthropic: "Anthropic", gemini: "Google Gemini", custom: "Other service" };
 export const CHATGPT_USAGE_URL = "https://chatgpt.com/settings/usage";

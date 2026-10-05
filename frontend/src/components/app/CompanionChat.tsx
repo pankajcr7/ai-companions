@@ -16,7 +16,7 @@ export function CompanionChat({ agent, onEdit, onThinking, command, onCommandSen
     return (
       <div className="rounded-[12px] border border-dashed border-line p-5 text-center">
         <p className="font-medium">Choose an AI model for {agent.name} first</p>
-        <p className="mt-1 text-sm text-muted">Pick a provider and model in the Customize form.</p>
+        <p className="mt-1 text-sm text-muted">Pick an AI service and model with Edit.</p>
         <button onClick={onEdit} className="btn-dark mt-4 rounded-[10px] px-4 py-2 text-sm font-semibold">Choose a model</button>
       </div>
     );
@@ -30,6 +30,7 @@ export function CompanionChat({ agent, onEdit, onThinking, command, onCommandSen
       placeholder={`Message ${agent.name}...`}
       emptyText={`Say hello to ${agent.name}.`}
       canSend
+      hideMeta
       fill={fill}
       usageLink={conn.kind === "chatgpt"}
       command={command}

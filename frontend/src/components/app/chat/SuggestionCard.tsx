@@ -41,7 +41,7 @@ export function SuggestionCard({ suggestion, onPlan, onHire }: { suggestion: Sug
         <div>
           <p className="font-semibold">Plan this with the team</p>
           {editing ? (
-            <textarea aria-label="Goal for the team" value={text} onChange={(e) => setText(e.target.value)} rows={3} maxLength={4000} className="mt-1 w-full rounded-[8px] border border-line bg-paper px-2 py-1.5 text-xs" />
+            <textarea aria-label="Task for the team" value={text} onChange={(e) => setText(e.target.value)} rows={3} maxLength={4000} className="mt-1 w-full rounded-[8px] border border-line bg-paper px-2 py-1.5 text-xs" />
           ) : (
             <p className="mt-1 whitespace-pre-wrap">{text}</p>
           )}

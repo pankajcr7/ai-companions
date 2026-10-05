@@ -234,7 +234,7 @@ function AIServicesInner() {
     <div className="space-y-8">
       <div>
         <h2 className="text-xl font-semibold">AI services</h2>
-        <p className="mt-1 text-sm text-muted">Connect the AI services your companions use. Each companion picks one in its Customize form.</p>
+        <p className="mt-1 text-sm text-muted">Connect the AI services your companions use. Each companion picks one with Edit on their page.</p>
       </div>
       {notice && (
         <p role={notice.kind === "error" ? "alert" : "status"} className={`rounded-[10px] px-4 py-3 text-sm ${notice.kind === "error" ? "bg-[#fde8e6] text-[#7a1b12]" : "bg-bg"}`}>

@@ -118,7 +118,7 @@ export function CompanionForm({ agent, preset, onClose, onSaved }: { agent: Agen
           <p className="text-center text-sm text-muted">{form.role || "Role"}</p>
         </div>
         <div className="space-y-4">
-          <h2 id="companion-form-title" className="text-xl font-semibold">{agent ? `Customize ${agent.name}` : "New companion"}</h2>
+          <h2 id="companion-form-title" className="text-xl font-semibold">{agent ? `Edit ${agent.name}` : "New companion"}</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm font-medium">Name<input required maxLength={60} value={form.name} onChange={(e) => set("name", e.target.value)} className={field} /></label>
             <label className="text-sm font-medium">Role<input required maxLength={60} value={form.role} onChange={(e) => set("role", e.target.value)} className={field} /></label>
@@ -173,7 +173,7 @@ export function CompanionForm({ agent, preset, onClose, onSaved }: { agent: Agen
                 ))}
               </datalist>
             </label>
-            {snapshot.connections.length === 0 && <p className="text-xs text-muted sm:col-span-2">No providers yet. An owner can add one on the AI providers page.</p>}
+            {snapshot.connections.length === 0 && <p className="text-xs text-muted sm:col-span-2">No AI services yet. An owner can add one in Settings › AI services.</p>}
             {modelsNote && form.connectionId && <p className="text-xs text-muted sm:col-span-2">{modelsNote}</p>}
           </fieldset>
           <label className="block text-sm font-medium">

@@ -6,7 +6,7 @@ test("build a new project from a goal, preview it, and download it", async ({ pa
   await connectFakeLLM(page, co.id);
 
   await startGoal(page, co, { text: "Build a landing page for my bakery", newProject: true });
-  const goal = page.getByRole("complementary", { name: "Company goal" });
+  const goal = page.getByRole("complementary", { name: "Team task" });
   await expect(goal.getByLabel("New project name")).toHaveValue("Bakery landing page");
   await goal.getByRole("button", { name: "Start" }).click();
   await expect(goal.getByRole("status")).toContainText("Done", { timeout: 60_000 });

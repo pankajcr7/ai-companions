@@ -24,7 +24,7 @@ const PILL: Record<TeamStatus["kind"], string> = {
 };
 
 export function StatusPill({ status }: { status: TeamStatus }) {
-  return <span className={`inline-block max-w-full truncate rounded-full px-2.5 py-0.5 text-xs font-semibold ${PILL[status.kind]}`}>{statusText(status)}</span>;
+  return <span className={`inline-block max-w-full self-start truncate rounded-full px-2.5 py-0.5 text-xs font-semibold ${PILL[status.kind]}`}>{statusText(status)}</span>;
 }
 
 /** A teammate's own page: who they are, what they're doing, what they've done, and a chat with them. */
