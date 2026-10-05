@@ -1,4 +1,5 @@
 import { companionIntro } from "../companion.js";
+import { DESIGN_GUIDE } from "./quality.js";
 import { cap, filesBlock, type Loaded } from "./context.js";
 import type { GoalContext } from "./load.js";
 
@@ -68,7 +69,7 @@ export const selectInstructions = (max: number) =>
 export const selectPrompt = (task: Pick<TaskSpec, "title" | "instructions">, ctx: GoalContext) =>
   (section("SHARED BRIEF AND BRAND", ctx.shared) + section("TASK", `${task.title}\n${task.instructions}`) + section("PROJECT SUMMARY", ctx.summary) + section("PROJECT FILES", ctx.map)).trim();
 
-export const taskInstructions = (agent: { name: string; role: string; workingStyle: string }, company: string, department: string | null, hasProject: boolean) =>
+export const taskInstructions = (agent: { name: string; role: string; workingStyle: string }, company: string, department: string | null, hasProject: boolean, visual = false) =>
   lines(
     companionIntro(agent, company, department),
     `${TASK_MARK} as part of a company goal. Produce exactly the deliverable described and check it against every acceptance criterion before you finish.`,
@@ -77,6 +78,7 @@ export const taskInstructions = (agent: { name: string; role: string; workingSty
       ? 'Use the tools to explore, read, and write project files (write_file with the complete file). New files in a project this goal created are saved at once; other changes wait for the owner to review. If you can\'t use tools, you may instead end your reply with one JSON block: {"edits":[{"path":"...","content":"<the complete new file>","note":"why"}]}, giving whole files, at most 10, only for files you read or new files.'
       : "",
     "Write the result itself, ready to use, as short as the deliverable allows.",
+    visual ? DESIGN_GUIDE : "",
   );
 
 export function taskPrompt(task: TaskSpec, goal: string, ctx: GoalContext, deps: { title: string; agentName: string; result: string }[], files: Loaded[], note: string, brief: string | null = null) {
