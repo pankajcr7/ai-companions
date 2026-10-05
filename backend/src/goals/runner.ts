@@ -144,7 +144,7 @@ async function runTask(goalId: string, taskId: string) {
     const loop = await runLoop({
       actor: agent,
       instructions: taskInstructions(agent, goal.workspace.name, agent.department?.name ?? null, !!goal.project),
-      turns: [{ role: "user", content: taskPrompt(task, goal.text, ctx, deps, files, notes.join(" ")) }],
+      turns: [{ role: "user", content: taskPrompt(task, goal.text, ctx, deps, files, notes.join(" "), goal.brief && !ctx.shared.includes(goal.brief) ? goal.brief : null) }],
       tools,
       limit: 12,
       signal,

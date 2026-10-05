@@ -8,6 +8,7 @@ import { readiness } from "../goals/llm.js";
 import { loadHead } from "../goals/load.js";
 import { Plan, planProblems } from "../goals/plan.js";
 import { ACTIVE, createGoal } from "../goals/create.js";
+import { BRIEF_PATH } from "../goals/quality.js";
 import { planGoal } from "../goals/planner.js";
 import { abortGoal, kickGoal } from "../goals/runner.js";
 import { audit, HttpError, perUser, requireMember } from "../http.js";
@@ -42,6 +43,7 @@ async function goalDTO(goal: FullGoal) {
     working,
     newProject: goal.newProject,
     projectName: goal.projectName,
+    brief: goal.brief,
     parent: goal.parent,
     tasks: goal.tasks.map((t) => ({
       id: t.id,
@@ -83,6 +85,18 @@ async function rosterIds(workspaceId: string) {
   return new Set(roster.map((r) => r.id));
 }
 
+/** The goal's design brief becomes the project's shared brief: saved when there is none yet, otherwise suggested. */
+async function saveBrief(workspaceId: string, goalId: string, userId: string, projectId: string, brief: string) {
+  const project = await loadProject(workspaceId, projectId);
+  const existing = await prisma.projectEntry.findFirst({ where: { projectId, pathLower: BRIEF_PATH } });
+  if (!existing) {
+    await saveText(project, userId, BRIEF_PATH, brief, 0).catch((e) => console.error("brief", e));
+    return;
+  }
+  const first = await prisma.goalTask.findFirst({ where: { goalId }, orderBy: { position: "asc" } });
+  if (first) await prisma.proposedEdit.create({ data: { taskId: first.id, goalId, path: existing.path, baseRevision: existing.revision, content: brief, note: "Nova's design brief for this goal", status: "pending" } });
+}
+
 export async function goalRoutes(app: FastifyInstance) {
   app.post("/api/workspaces/:id/goals", { config: { rateLimit: { max: 10, timeWindow: "1 minute", keyGenerator: perUser } } }, async (req, reply) => {
     const { id } = WsParams.parse(req.params);
@@ -117,7 +131,7 @@ export async function goalRoutes(app: FastifyInstance) {
       // A conditional write locks the goal row, so a Start in progress finishes first and this then finds it running.
       const locked = await tx.goal.updateMany({ where: { id: gid, status: "awaiting_approval" }, data: { updatedAt: new Date() } });
       if (!locked.count) return false;
-      await tx.goal.update({ where: { id: gid }, data: { projectName: goal.newProject ? (plan.projectName ?? null) : null } });
+      await tx.goal.update({ where: { id: gid }, data: { projectName: goal.newProject ? (plan.projectName ?? null) : null, brief: plan.brief === undefined ? undefined : plan.brief || null } });
       await tx.goalTask.deleteMany({ where: { goalId: gid } });
       await tx.goalTask.createMany({ data: plan.tasks.map((t, position) => ({ goalId: gid, position, ...t })) });
       return true;
@@ -145,6 +159,7 @@ export async function goalRoutes(app: FastifyInstance) {
       return { projectId: project.id };
     });
     if (!started) throw new HttpError(409, "conflict", "This goal has already started.");
+    if (goal.brief && started.projectId) await saveBrief(id, gid, user.id, started.projectId, goal.brief);
     await audit(prisma, id, user.id, "goal.start", "goal", gid);
     kickGoal(gid);
     return { ok: true };
