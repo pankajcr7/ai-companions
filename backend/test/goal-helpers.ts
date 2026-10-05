@@ -27,10 +27,12 @@ export async function fakeLLM() {
 }
 
 /** A workspace with a custom connection to the fake and every AI companion assigned to it. */
-export async function company(app: FastifyInstance, llm: { url: string }, template = "starter") {
+export async function company(app: FastifyInstance, llm: { url: string }, template = "starter", opts: { qualityChecks?: boolean } = {}) {
   const { cookie } = await signUp(app);
   const req = client(app, cookie);
   const id = (await req("POST", "/api/workspaces", { name: "Goal Co", template })).json().id as string;
+  // Nova's quality check adds calls to every task; tests that are about it switch it on.
+  if (!opts.qualityChecks) await req("PATCH", `/api/workspaces/${id}`, { qualityChecks: false });
   const cid = (await req("POST", `/api/workspaces/${id}/connections`, { kind: "custom", label: "Fake", baseUrl: `${llm.url}/v1` })).json().id as string;
   const snap = (await req("GET", `/api/workspaces/${id}`)).json();
   const agents = snap.agents.filter((a: { kind: string }) => a.kind === "ai") as { id: string; name: string; isHead: boolean }[];

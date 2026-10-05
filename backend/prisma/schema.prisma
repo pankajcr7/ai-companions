@@ -103,6 +103,7 @@ enum Theme {
 }
 
 model Workspace {
+  qualityChecks Boolean @default(true)
   id           String               @id @default(cuid())
   name         String
   slug         String               @unique
@@ -435,6 +436,7 @@ enum StepPhase {
   summary
   project_summary
   chat
+  review
 }
 
 model Goal {
@@ -443,6 +445,7 @@ model Goal {
   projectId    String?
   text         String
   status       GoalStatus     @default(planning)
+  brief        String?
   summary      String?
   error        String?
   inputTokens  Int            @default(0)
@@ -487,6 +490,7 @@ model GoalTask {
   ratingReason     String?
   inputTokens      Int            @default(0)
   outputTokens     Int            @default(0)
+  review           Json?
   toolUses         Json           @default("[]")
   startedAt        DateTime?
   finishedAt       DateTime?

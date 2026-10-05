@@ -26,7 +26,7 @@ export type Zone = { departmentId: string; x: number; y: number; w: number; h: n
 export type Layout = { zones: Zone[]; desks: Record<string, { x: number; y: number }> };
 export type Preferences = { theme: "system" | "light" | "dark"; reducedMotion: boolean; calmMode: boolean };
 export type Snapshot = {
-  workspace: { id: string; name: string; slug: string };
+  workspace: { id: string; name: string; slug: string; qualityChecks: boolean };
   role: Role;
   departments: Department[];
   agents: Agent[];

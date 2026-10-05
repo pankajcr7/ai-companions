@@ -36,9 +36,10 @@ export async function workspaceRoutes(app: FastifyInstance) {
   app.patch("/api/workspaces/:id", async (req) => {
     const { id } = WsParams.parse(req.params);
     const { user } = await requireMember(req, id, "admin");
-    const { name } = z.object({ name: Name }).parse(req.body);
-    await prisma.workspace.update({ where: { id }, data: { name } });
-    await audit(prisma, id, user.id, "workspace.rename", "workspace", id, { name });
+    const { name, qualityChecks } = z.object({ name: Name.optional(), qualityChecks: z.boolean().optional() }).parse(req.body);
+    await prisma.workspace.update({ where: { id }, data: { name, qualityChecks } });
+    if (name !== undefined) await audit(prisma, id, user.id, "workspace.rename", "workspace", id, { name });
+    if (qualityChecks !== undefined) await audit(prisma, id, user.id, "workspace.quality_checks", "workspace", id, { qualityChecks });
     return { ok: true };
   });
 

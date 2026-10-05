@@ -25,7 +25,7 @@ export function toAgentDTO(a: Agent & { appearance: AgentAppearance | null }) {
 
 export async function snapshot(workspaceId: string, userId: string, role: Role) {
   const [workspace, departments, agents, layout, pref, connections] = await Promise.all([
-    prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId }, select: { id: true, name: true, slug: true } }),
+    prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId }, select: { id: true, name: true, slug: true, qualityChecks: true } }),
     prisma.department.findMany({ where: { workspaceId }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true, sortOrder: true } }),
     prisma.agent.findMany({ where: { workspaceId }, orderBy: [{ isHead: "desc" }, { createdAt: "asc" }, { name: "asc" }], include: { appearance: true } }),
     prisma.officeLayout.findUnique({ where: { workspaceId } }),
