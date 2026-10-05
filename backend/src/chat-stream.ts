@@ -3,7 +3,7 @@ import { SecretError } from "./crypto.js";
 import { prisma } from "./db.js";
 import type { ProviderConnection } from "./generated/prisma/client.js";
 import { CallError, type Actor } from "./goals/llm.js";
-import { runLoop, type Tool, type ToolUse } from "./harness/loop.js";
+import { runLoop, visibleAnswer, type Tool, type ToolUse } from "./harness/loop.js";
 import type { ChatTurn } from "./providers/types.js";
 
 export type ClientWatch = { signal: AbortSignal; gone: () => boolean };
@@ -71,20 +71,21 @@ export async function streamReply(
           send("delta", { text: e.text });
         } else {
           streamed = "";
-          send("tool", { name: e.name, label: e.label });
+          if (e.type === "tool") send("tool", { name: e.name, label: e.label });
+          else send("reset", {});
         }
+      },
+      onCall: (c) => {
+        model = c.model;
+        inTokens += c.inputTokens ?? 0;
+        outTokens += c.outputTokens ?? 0;
+        counted ||= c.inputTokens != null || c.outputTokens != null;
       },
     });
     text = loop.text;
     toolUses = loop.toolUses;
-    for (const c of loop.calls) {
-      model = c.model;
-      inTokens += c.inputTokens ?? 0;
-      outTokens += c.outputTokens ?? 0;
-      counted ||= c.inputTokens != null || c.outputTokens != null;
-    }
   } catch (e) {
-    text = streamed;
+    text = visibleAnswer(streamed);
     if (watch.gone()) failure = undefined;
     else if (e instanceof CallError && e.code === "aborted") failure = { code: "timeout", message: "The reply took too long and was stopped." };
     else if (e instanceof CallError) failure = { code: e.code, message: e.message };

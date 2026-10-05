@@ -5,8 +5,10 @@ import type { ChatTurn } from "../providers/types.js";
 
 export type ToolUse = { name: string; label: string; ok: boolean; ms: number; chars: number };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type Tool<A = any> = { name: string; purpose: string; argsHelp: string; args: z.ZodType<A>; label: (a: A) => string; run: (a: A, signal: AbortSignal) => Promise<string> };
-export type LoopEvent = { type: "delta"; text: string } | { type: "tool"; name: string; label: string };
+/** finishOnStop: a tool that saves something runs to completion on Stop, so whatever it saved is still recorded. */
+export type Tool<A = any> = { name: string; purpose: string; argsHelp: string; args: z.ZodType<A>; label: (a: A) => string; run: (a: A, signal: AbortSignal) => Promise<string>; finishOnStop?: boolean };
+/** reset: the text streamed so far was a tool call, not part of the answer. */
+export type LoopEvent = { type: "delta"; text: string } | { type: "tool"; name: string; label: string } | { type: "reset" };
 export type CallModel = (instructions: string, turns: ChatTurn[], onDelta?: (t: string) => void) => Promise<Call>;
 
 /** A problem the model can fix (missing file, bad address): its message goes back to the model as the tool result. */
@@ -40,6 +42,15 @@ const without = (text: string, key: string) => {
   return (b ? text.slice(0, b.start) + text.slice(b.end) : text).trim();
 };
 
+/** The part of a reply worth showing: everything before a tool call, complete or half-typed. */
+export function visibleAnswer(text: string): string {
+  const last = [...text.matchAll(/\{\s*"tool"\s*:/g)].at(-1);
+  return last ? text.slice(0, last.index).replace(/```[a-zA-Z]*\s*$/, "").trim() : text.trim();
+}
+
+const answerAfterTools = (text: string, uses: ToolUse[]) =>
+  visibleAnswer(without(text, "tool")) || `I ran out of steps before finishing. What I did: ${uses.map((u) => `${u.name} ${u.label}`).join(", ") || "nothing yet"}.`;
+
 /** Shortens all but the latest two tool results, oldest first, until the conversation fits the budget. */
 export function trimToolResults(turns: ChatTurn[], budget = CONTEXT_BUDGET): ChatTurn[] {
   let size = turns.reduce((n, t) => n + t.content.length, 0);
@@ -58,10 +69,12 @@ export function trimToolResults(turns: ChatTurn[], budget = CONTEXT_BUDGET): Cha
 
 async function runTool(tool: Tool, args: unknown, signal: AbortSignal): Promise<{ ok: boolean; text: string }> {
   const timeout = AbortSignal.timeout(TOOL_TIMEOUT_MS);
-  const both = AbortSignal.any([signal, timeout]);
-  const stopped = new Promise<never>((_r, reject) => both.addEventListener("abort", () => reject(both.reason), { once: true }));
+  const stopper = tool.finishOnStop ? timeout : AbortSignal.any([signal, timeout]);
+  const stopped = new Promise<never>((_r, reject) => stopper.addEventListener("abort", () => reject(stopper.reason), { once: true }));
   try {
-    return { ok: true, text: await Promise.race([tool.run(args, both), stopped]) };
+    const text = await Promise.race([tool.run(args, stopper), stopped]);
+    if (signal.aborted) throw new CallError("aborted", "Stopped");
+    return { ok: true, text };
   } catch (e) {
     if (signal.aborted) throw new CallError("aborted", "Stopped");
     if (timeout.aborted) return { ok: false, text: "That took too long and was stopped." };
@@ -72,7 +85,7 @@ async function runTool(tool: Tool, args: unknown, signal: AbortSignal): Promise<
 }
 
 /** Calls the model until it answers without a tool block, running one tool per round within the limits. */
-export async function runLoop(o: { actor: Actor; instructions: string; turns: ChatTurn[]; tools: Tool[]; limit: number; signal: AbortSignal; log?: StepLog; onEvent?: (e: LoopEvent) => void; callModel?: CallModel }) {
+export async function runLoop(o: { actor: Actor; instructions: string; turns: ChatTurn[]; tools: Tool[]; limit: number; signal: AbortSignal; log?: StepLog; onEvent?: (e: LoopEvent) => void; onCall?: (c: Call) => void; callModel?: CallModel }) {
   const callModel: CallModel = o.callModel ?? ((instructions, turns, onDelta) => complete(o.actor, instructions, turns, o.signal, o.log, onDelta));
   const instructions = o.tools.length ? `${o.instructions}\n\n${protocol(o.tools, o.limit)}` : o.instructions;
   const byName = new Map(o.tools.map((t) => [t.name, t]));
@@ -84,10 +97,11 @@ export async function runLoop(o: { actor: Actor; instructions: string; turns: Ch
   for (;;) {
     const c = await callModel(instructions, trimToolResults(turns), (text) => o.onEvent?.({ type: "delta", text }));
     calls.push(c);
+    o.onCall?.(c);
     turns.push({ role: "assistant", content: c.text });
     const parsed = o.tools.length ? parseToolCall(c.text) : null;
     if (!parsed) return { text: without(c.text, "done"), calls, toolUses, turns };
-    if (toolUses.length >= o.limit) return { text: without(c.text, "tool"), calls, toolUses, turns };
+    if (toolUses.length >= o.limit) return { text: answerAfterTools(c.text, toolUses), calls, toolUses, turns };
 
     let head = "error";
     let result: string;
@@ -112,7 +126,8 @@ export async function runLoop(o: { actor: Actor; instructions: string; turns: Ch
       }
     }
     if (result.startsWith("You already did") || head === "error") bad++;
-    if (bad >= MAX_BAD) return { text: without(c.text, "tool"), calls, toolUses, turns };
+    if (bad >= MAX_BAD) return { text: answerAfterTools(c.text, toolUses), calls, toolUses, turns };
+    o.onEvent?.({ type: "reset" });
     const last = toolUses.length >= o.limit ? "\n\nNo more tools. Give your final answer now." : "";
     turns.push({ role: "user", content: `${TOOL_RESULT}${head}:\n${result}${last}` });
   }

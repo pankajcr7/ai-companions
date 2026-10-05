@@ -101,6 +101,7 @@ export function projectTools(project: Project, o: { write: ((w: Write) => Promis
       argsHelp: '{"path": file, "content": the complete file, "note"?: why}',
       args: z.object({ path: z.string().min(1).max(500), content: z.string().max(1_000_000), note: z.string().max(500).optional() }),
       label: (a) => a.path,
+      finishOnStop: true,
       run: async (a) => {
         const { path, e } = await fileAt(a.path);
         if (e && (e.kind !== "file" || !e.isText)) throw new ToolError(`${path} is a folder or a binary file and can't be written.`);

@@ -86,6 +86,7 @@ export function ChatThread({ path, name, inputLabel, logLabel, placeholder, empt
       for await (const ev of readEvents(res)) {
         if (ev.event === "delta") setPending((p) => ({ ...p, sent: message, text: (p?.text ?? "") + (ev.data as { text: string }).text }));
         // A tool event means the text so far was the tool call itself: clear it and show what's happening instead.
+        if (ev.event === "reset") setPending((p) => ({ ...p, sent: message, text: "" }));
         if (ev.event === "tool") setPending((p) => ({ ...p, sent: message, text: "", activity: [...(p?.activity ?? []), ev.data as { name: string; label: string }] }));
         if (ev.event === "error") setPending((p) => ({ ...p, sent: message, text: p?.text ?? "", error: ev.data as { code: string; message: string } }));
       }

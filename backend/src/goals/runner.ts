@@ -145,8 +145,9 @@ async function runTask(goalId: string, taskId: string) {
       limit: 12,
       signal,
       log: stepLog(goal.workspaceId, goalId, taskId, "execute"),
+      // Counted per call, so a stopped task still reports what it used.
+      onCall: add,
     });
-    loop.calls.forEach(add);
     // Fallback for models that answer with an edits block instead of tools: today's rules apply.
     const split = goal.project ? splitEdits(loop.text) : { visible: loop.text.trim(), edits: [], error: null };
     for (const raw of split.edits) {

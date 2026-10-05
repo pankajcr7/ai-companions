@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { z } from "zod";
 import type { Call } from "../src/goals/llm.js";
-import { parseToolCall, runLoop, ToolError, trimToolResults, TOOL_RESULT, type CallModel, type Tool } from "../src/harness/loop.js";
+import { parseToolCall, runLoop, ToolError, trimToolResults, TOOL_RESULT, visibleAnswer, type CallModel, type Tool } from "../src/harness/loop.js";
 
 const actor = { id: "a", name: "A", kind: "ai", status: "active", model: "m", connection: null };
 const fence = (v: unknown) => `\`\`\`json\n${JSON.stringify(v)}\n\`\`\``;
@@ -107,4 +107,42 @@ test("old tool results are shortened once the conversation is over budget, keepi
   expect(out[6].content).toBe(turns[6].content);
   expect(out[8].content).toBe(turns[8].content);
   expect(trimToolResults(turns.slice(0, 3), 60_000)).toEqual(turns.slice(0, 3));
+});
+
+test("a save already running when Stop arrives finishes before the loop ends (finishOnStop)", async () => {
+  const ac = new AbortController();
+  const done: string[] = [];
+  const save: Tool<{ word: string }> = { ...echo, finishOnStop: true, run: async (a) => (await new Promise((r) => setTimeout(r, 150)), done.push(a.word), "saved") };
+  const { done: loop } = run([save], [fence({ tool: "echo", args: { word: "file" } }), "never"], 3, ac.signal);
+  setTimeout(() => ac.abort(), 30);
+  await expect(loop).rejects.toMatchObject({ code: "aborted" });
+  expect(done).toEqual(["file"]);
+});
+
+test("a forced or broken last reply never becomes an empty or raw-JSON answer", async () => {
+  const t = (w: string) => fence({ tool: "echo", args: { word: w } });
+  const forced = await run([echo], [t("a"), t("b")], 1).done;
+  expect(forced.text).toBe("I ran out of steps before finishing. What I did: echo a.");
+  const broken = await run([echo], [fence({ tool: "nope", args: {} }), fence({ tool: "nope2", args: {} }), 'Here it is: {"tool": "echo", "args": {'], 3).done;
+  expect(broken.text).toBe("Here it is:");
+});
+
+test("every reply that held a tool block is followed by a reset event, and visibleAnswer cuts a half-typed call", async () => {
+  const events: string[] = [];
+  const s = scripted([fence({ tool: "nope", args: {} }), fence({ tool: "echo", args: { word: "x" } }), "Done."]);
+  await runLoop({ actor, instructions: "BASE", turns: [{ role: "user", content: "hi" }], tools: [echo], limit: 3, signal: new AbortController().signal, callModel: s.model, onEvent: (e) => events.push(e.type) });
+  expect(events).toEqual(["reset", "tool", "reset"]);
+  expect(visibleAnswer('Let me look.\n```json\n{"tool": "read_')).toBe("Let me look.");
+  expect(visibleAnswer("Plain answer.")).toBe("Plain answer.");
+});
+
+test("every model call is reported as it happens, so tokens count even if the loop stops", async () => {
+  const ac = new AbortController();
+  const seen: number[] = [];
+  const slow: Tool<{ word: string }> = { ...echo, run: (_a, signal) => new Promise((_r, reject) => signal.addEventListener("abort", () => reject(new Error("x")))) };
+  const s = scripted([fence({ tool: "echo", args: { word: "x" } })]);
+  const loop = runLoop({ actor, instructions: "B", turns: [{ role: "user", content: "hi" }], tools: [slow], limit: 3, signal: ac.signal, callModel: s.model, onCall: (c) => seen.push(c.outputTokens ?? 0) });
+  setTimeout(() => ac.abort(), 30);
+  await expect(loop).rejects.toMatchObject({ code: "aborted" });
+  expect(seen).toEqual([1]);
 });
