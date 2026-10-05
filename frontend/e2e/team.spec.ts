@@ -70,3 +70,17 @@ test("the Team page: cards by department, the office view, organizing, and old l
   await page.goto(`/w/${co.slug}/organization`);
   await expect(page).toHaveURL(new RegExp(`/w/${co.slug}/team$`));
 });
+
+test("Settings has Company and AI services tabs; the old providers link keeps its message", async ({ page }) => {
+  const co = await newCompany(page, { prefix: "Tabs", company: "Tabs Bakery", template: /Just the head agent/ });
+  const nav = page.getByRole("navigation", { name: "App" });
+  await expect(nav.getByRole("link")).toHaveText(["Home", "Team", "Projects", "Settings"]);
+  await nav.getByRole("link", { name: "Settings" }).click();
+  await expect(page.getByRole("tab", { name: "Company", selected: true })).toBeVisible();
+  await page.getByRole("tab", { name: "AI services" }).click();
+  await expect(page).toHaveURL(/tab=ai/);
+  await expect(page.getByRole("heading", { name: "AI services" })).toBeVisible();
+  await page.goto(`/w/${co.slug}/providers?chatgpt_error=${encodeURIComponent("Sign-in expired")}`);
+  await expect(page).toHaveURL(/\/settings\?/);
+  await expect(page.getByText("Sign-in expired")).toBeVisible();
+});

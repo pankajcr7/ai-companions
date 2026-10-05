@@ -6,8 +6,8 @@ test("connect a custom endpoint, assign it to Nova, chat, and keep the history",
   const novaId = (await (await page.request.get(`/api/workspaces/${co.id}`)).json()).agents.find((a: { isHead: boolean }) => a.isHead).id as string;
   const novaPage = `/w/${co.slug}/team/${novaId}`;
 
-  await page.getByRole("link", { name: "AI providers", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "AI providers" })).toBeVisible();
+  await page.goto(`/w/${co.slug}/settings?tab=ai`);
+  await expect(page.getByRole("heading", { name: "AI services" })).toBeVisible();
   await page.getByRole("button", { name: "Add endpoint" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Provider").selectOption("other");

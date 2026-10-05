@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ChatCircle, FolderSimple, GearSix, Plugs, SignOut, UsersThree } from "@phosphor-icons/react";
+import { ChatCircle, FolderSimple, GearSix, SignOut, UsersThree } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/lib/workspace";
 import { Logo } from "@/components/landing/ui";
@@ -16,7 +16,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { href: base, label: "Home", icon: ChatCircle },
     { href: `${base}/team`, label: "Team", icon: UsersThree },
     { href: `${base}/projects`, label: "Projects", icon: FolderSimple },
-    { href: `${base}/providers`, label: "AI providers", icon: Plugs },
     { href: `${base}/settings`, label: "Settings", icon: GearSix },
   ];
   const { theme, reducedMotion, calmMode } = snapshot.preferences;
@@ -31,7 +30,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="flex items-center justify-between gap-2 border-b border-line bg-paper px-4 py-3 lg:w-60 lg:flex-col lg:items-stretch lg:justify-start lg:border-b-0 lg:border-r lg:p-5">
         <Link href={base} aria-label="Agent Company home"><Logo compact className="text-base sm:text-lg" /></Link>
         <p className="hidden truncate text-sm font-medium text-muted lg:mt-6 lg:block">{snapshot.workspace.name}</p>
-        <nav aria-label="App" className="flex gap-1 lg:mt-4 lg:flex-col">
+        <nav aria-label="App" className="fixed inset-x-0 bottom-0 z-30 flex justify-around border-t border-line bg-paper px-2 py-1.5 sm:static sm:justify-start sm:gap-1 sm:border-0 sm:bg-transparent sm:p-0 lg:mt-4 lg:flex-col">
           {nav.map(({ href, label, icon: Icon }) => {
             const active = href === base ? pathname === href : pathname.startsWith(href);
             return (
@@ -41,9 +40,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 aria-current={active ? "page" : undefined}
                 aria-label={label}
                 title={label}
-                className={`flex items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm font-medium sm:px-3 ${active ? "bg-ink text-paper" : "text-ink hover:bg-bg"}`}
+                className={`flex flex-col items-center gap-0.5 rounded-[10px] px-2.5 py-1.5 text-[11px] font-medium sm:flex-row sm:gap-2 sm:px-3 sm:py-2 sm:text-sm ${active ? "bg-ink text-paper" : "text-ink hover:bg-bg"}`}
               >
-                <Icon size={18} /> <span className="hidden sm:inline">{label}</span>
+                <Icon size={18} /> <span>{label}</span>
               </Link>
             );
           })}
@@ -53,7 +52,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </button>
       </aside>
       {/* On desktop the window is the frame: each page scrolls inside it, so side panels scroll on their own. */}
-      <div className="flex min-h-0 flex-1 flex-col lg:overflow-y-auto">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col pb-16 sm:pb-0 lg:overflow-y-auto">{children}</div>
     </div>
   );
 }
