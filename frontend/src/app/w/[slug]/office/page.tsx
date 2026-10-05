@@ -1,5 +1,6 @@
-import { Office } from "@/components/app/office/Office";
+import { redirect } from "next/navigation";
 
-export default function OfficePage() {
-  return <Office />;
+export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  redirect(`/w/${slug}/team`);
 }

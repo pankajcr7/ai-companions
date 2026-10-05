@@ -17,14 +17,16 @@ export function TeamStrip({ workingIds }: { workingIds: string[] }) {
       {team.map((a) => {
         const state = workingIds.includes(a.id) ? ["working", "bg-[#e0a400]"] : ready(a.id) ? ["free", "bg-[#3c9a3c]"] : ["needs setup", "bg-[#b5b8b1]"];
         return (
-          <span key={a.id} role="listitem" title={`${a.name}: ${state[0]}`} className="flex items-center gap-1.5 rounded-full border border-line bg-paper py-0.5 pl-0.5 pr-2.5 text-xs">
-            <CompanionAvatar look={a.appearance} size={22} />
-            {a.name}
-            <span className={`size-2 rounded-full ${state[1]}`} aria-label={state[0]} />
+          <span key={a.id} role="listitem">
+            <Link href={`/w/${snapshot.workspace.slug}/team/${a.id}`} title={`${a.name}: ${state[0]}`} className="flex items-center gap-1.5 rounded-full border border-line bg-paper py-0.5 pl-0.5 pr-2.5 text-xs hover:border-ink">
+              <CompanionAvatar look={a.appearance} size={22} />
+              {a.name}
+              <span className={`size-2 rounded-full ${state[1]}`} aria-label={state[0]} />
+            </Link>
           </span>
         );
       })}
-      <Link href={`/w/${snapshot.workspace.slug}/office`} className="text-xs text-muted underline">See whole team</Link>
+      <Link href={`/w/${snapshot.workspace.slug}/team`} className="text-xs text-muted underline">See whole team</Link>
     </div>
   );
 }
