@@ -21,6 +21,7 @@ export type TaskDTO = {
   errorCode: string | null;
   verdict: "meets" | "needs_eyes" | null;
   verdictNote: string | null;
+  review?: { rounds: number; approved: boolean; fixes: string[][] } | null;
   rating: 1 | -1 | null;
   ratingReason: string | null;
   inputTokens: number;
@@ -35,6 +36,7 @@ export type GoalDTO = {
   parent: { id: string; text: string } | null;
   newProject: boolean;
   projectName: string | null;
+  brief?: string | null;
   summary: string | null;
   error: string | null;
   inputTokens: number;
@@ -83,4 +85,10 @@ export function planSentence(agentName: string, title: string): string {
 export function pendingChanges(goal: Pick<GoalDTO, "edits">): { count: number; firstTaskId: string | null } {
   const pending = goal.edits.filter((e) => e.status === "pending");
   return { count: pending.length, firstTaskId: pending[0]?.taskId ?? null };
+}
+
+export function reviewLabel(r: { rounds: number; approved: boolean } | null | undefined): string | null {
+  if (!r) return null;
+  if (!r.approved) return "Nova asked for more changes";
+  return r.rounds ? `✓ Checked by Nova · ${r.rounds} ${r.rounds === 1 ? "fix" : "fixes"} made` : "✓ Checked by Nova";
 }

@@ -8,10 +8,11 @@ const field = "mt-1 w-full rounded-[8px] border border-line bg-paper px-2.5 py-1
 const clean = (tasks: DraftTask[]) =>
   tasks.map((t) => ({ ...t, title: t.title.trim(), instructions: t.instructions.trim(), deliverable: t.deliverable.trim(), criteria: t.criteria.map((c) => c.trim()).filter(Boolean).slice(0, 5) }));
 
-export function PlanEditor({ goal, editable, busy, onStart, onCancel }: { goal: GoalDTO; editable: boolean; busy: boolean; onStart: (tasks: DraftTask[], projectName?: string) => void; onCancel: () => void }) {
+export function PlanEditor({ goal, editable, busy, onStart, onCancel }: { goal: GoalDTO; editable: boolean; busy: boolean; onStart: (tasks: DraftTask[], projectName?: string, brief?: string | null) => void; onCancel: () => void }) {
   const { snapshot } = useWorkspace();
   const [tasks, setTasks] = useState<DraftTask[]>(() => goal.tasks.map(({ agentId, title, instructions, deliverable, criteria, dependsOn }) => ({ agentId, title, instructions, deliverable, criteria, dependsOn })));
   const [projectName, setProjectName] = useState(goal.projectName ?? "");
+  const [brief, setBrief] = useState(goal.brief ?? "");
   const companions = snapshot.agents.filter((a) => a.kind === "ai" && a.status === "active");
   const ready = (id: string) => {
     const a = snapshot.agents.find((x) => x.id === id);
@@ -29,6 +30,10 @@ export function PlanEditor({ goal, editable, busy, onStart, onCancel }: { goal: 
           <input value={projectName} maxLength={60} onChange={(e) => setProjectName(e.target.value)} className={field} />
         </label>
       )}
+      <label className="block text-xs font-medium">
+        Design direction
+        <textarea value={brief} maxLength={4000} rows={4} onChange={(e) => setBrief(e.target.value)} placeholder="Optional: audience, feeling, colours, fonts, things to avoid" className={field} />
+      </label>
       {tasks.map((t, i) => (
         <fieldset key={i} disabled={!editable} className="rounded-[12px] border border-line p-3">
           <legend className="px-1 text-xs text-muted">Task {i + 1}</legend>
@@ -65,7 +70,7 @@ export function PlanEditor({ goal, editable, busy, onStart, onCancel }: { goal: 
       {notReady.length > 0 && <p role="alert" className="text-sm text-[#b42318]">Choose an AI model for {notReady.join(", ")} before starting, or give their tasks to someone else.</p>}
       {editable && (
         <div className="flex gap-2">
-          <button disabled={busy || notReady.length > 0 || incomplete || (goal.newProject && !projectName.trim())} onClick={() => onStart(clean(tasks), goal.newProject ? projectName.trim() : undefined)} className="btn-dark rounded-[10px] px-4 py-2 text-sm font-semibold disabled:opacity-60">Start</button>
+          <button disabled={busy || notReady.length > 0 || incomplete || (goal.newProject && !projectName.trim())} onClick={() => onStart(clean(tasks), goal.newProject ? projectName.trim() : undefined, brief.trim() || null)} className="btn-dark rounded-[10px] px-4 py-2 text-sm font-semibold disabled:opacity-60">Start</button>
           <button disabled={busy} onClick={onCancel} className="btn-light rounded-[10px] px-4 py-2 text-sm font-semibold">Cancel</button>
         </div>
       )}

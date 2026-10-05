@@ -12,6 +12,7 @@ import { CopyButton } from "../chat/CopyButton";
 import { RichText } from "../chat/RichText";
 import { FilesCreated } from "./FilesCreated";
 import { PlanEditor } from "./PlanEditor";
+import { ReviewLine } from "./ReviewLine";
 import { TaskCard } from "./TaskCard";
 
 const STATE: Record<TaskDTO["status"], [string, string]> = {
@@ -65,9 +66,9 @@ export function GoalCard({ goalId, onStatus }: { goalId: string; onStatus?: (goa
       setBusy(false);
     }
   }
-  const start = (tasks?: DraftTask[], projectName?: string) =>
+  const start = (tasks?: DraftTask[], projectName?: string, brief?: string | null) =>
     act(async () => {
-      if (tasks) await api(`${path}/plan`, { method: "PUT", body: { tasks, projectName } });
+      if (tasks) await api(`${path}/plan`, { method: "PUT", body: { tasks, projectName, brief } });
       await api(`${path}/start`, { method: "POST" });
       setChanging(false);
     });
@@ -93,6 +94,7 @@ export function GoalCard({ goalId, onStatus }: { goalId: string; onStatus?: (goa
               </li>
             ))}
           </ul>
+          {goal.brief && <DesignDirection text={goal.brief} />}
           {editable && (
             <div className="mt-3 flex flex-wrap gap-2">
               <button disabled={busy} onClick={() => start()} className="btn-dark rounded-[10px] px-4 py-2 text-sm font-semibold">Start</button>
@@ -120,6 +122,7 @@ export function GoalCard({ goalId, onStatus }: { goalId: string; onStatus?: (goa
                     {t.status === "running" && minutes(t.startedAt) ? ` (${minutes(t.startedAt)} min)` : ""}
                   </span>
                 </button>
+                <div className="pl-9"><ReviewLine review={t.review} /></div>
                 {open === t.id && <TaskCard task={t} edits={goal.edits.filter((e) => e.taskId === t.id)} goalPath={path} editable={editable} onChanged={load} />}
               </li>
             ))}
@@ -153,6 +156,20 @@ export function GoalCard({ goalId, onStatus }: { goalId: string; onStatus?: (goa
       <FilesCreated goal={goal} />
       <Link href={`/w/${snapshot.workspace.slug}/goals/${goal.id}`} className="mt-2 inline-block text-xs text-muted underline">Details</Link>
       {error && <p role="alert" className="mt-2 text-xs text-[#b42318]">{error}</p>}
+    </div>
+  );
+}
+
+/** The design brief Nova wrote for visual work, shown on the plan before Start. */
+function DesignDirection({ text }: { text: string }) {
+  const [all, setAll] = useState(false);
+  return (
+    <div className="mt-3 rounded-[10px] bg-bg p-3">
+      <p className="text-xs font-semibold">Design direction</p>
+      <p className={`mt-1 whitespace-pre-wrap text-xs ${all ? "" : "line-clamp-4"}`}>{text}</p>
+      {text.split("\n").length > 4 || text.length > 300 ? (
+        <button onClick={() => setAll((a) => !a)} className="mt-1 text-xs underline">{all ? "Show less" : "Show all"}</button>
+      ) : null}
     </div>
   );
 }

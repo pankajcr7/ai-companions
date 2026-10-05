@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 export const FAKE_LLM_PORT = 4199;
 // The first run of the launch-posts task is slow so the home test can press Stop mid-task.
 let slowNext = true;
+let reviewedPosts = false;
 export const FAKE_REPLY = ["Hello ", "from the ", "fake model."];
 
 const fence = (v: unknown) => `\`\`\`json\n${JSON.stringify(v)}\n\`\`\``;
@@ -10,6 +11,15 @@ export const MATH_EDIT = "// Adds two numbers.\nexport const add = (a: number, b
 
 /** Scripted replies for goals, keyed on phrases in the system prompt; plain chat gets FAKE_REPLY. */
 function scripted(system: string, user: string): string | null {
+  if (system.includes("Review a teammate's finished task")) {
+    // The launch posts get one round of fixes so the home test sees a revision; everything else is approved.
+    if (user.includes("Write the launch posts") && !reviewedPosts) {
+      reviewedPosts = true;
+      return fence({ approved: false, fixes: ["Add a call to action to each post."] });
+    }
+    return fence({ approved: true, fixes: [] });
+  }
+  if (system.includes("Nova assigned you a task") && user.startsWith("NOVA'S REVIEW")) return "1. Fresh bread daily — order now\n2. Croissants at 7 — visit today\n3. Order online — tap the link";
   if (system.includes("This goal builds a NEW project")) {
     const id = /id: (\S+)/.exec(user)?.[1] ?? "unknown";
     return fence({ projectName: "Bakery landing page", tasks: [{ agentId: id, title: "Build the landing page", instructions: "Create index.html and style.css.", deliverable: "The page files", criteria: ["Has a heading"], dependsOn: [] }] });
@@ -21,7 +31,7 @@ function scripted(system: string, user: string): string | null {
   }
   if (system.includes("Turn the owner's goal into a plan") && user.includes("Write the launch posts")) {
     const id = /id: (\S+)/.exec(user)?.[1] ?? "unknown";
-    return fence({ tasks: [{ agentId: id, title: "Write the launch posts", instructions: "Three posts.", deliverable: "Posts", criteria: ["Three posts"], dependsOn: [] }] });
+    return fence({ brief: "Warm, handmade feel; cream and brown; no emoji.", tasks: [{ agentId: id, title: "Write the launch posts", instructions: "Three posts.", deliverable: "Posts", criteria: ["Three posts"], dependsOn: [] }] });
   }
   if (system.includes("Nova assigned you a task") && user.includes("YOUR TASK:\nWrite the launch posts")) return "1. Fresh bread daily\n2. Croissants at 7\n3. Order online";
   if (system.includes("Turn the owner's goal into a plan")) {

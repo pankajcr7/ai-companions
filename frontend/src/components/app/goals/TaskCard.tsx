@@ -1,5 +1,6 @@
 "use client";
 
+import { ReviewLine } from "./ReviewLine";
 import { ToolActivity } from "../chat/ToolActivity";
 import { useState } from "react";
 import { ThumbsDown, ThumbsUp } from "@phosphor-icons/react";
@@ -47,6 +48,7 @@ export function TaskCard({ task, edits, goalPath, editable, onChanged }: { task:
             {task.agentName} · {LABEL[task.status]}
             {task.verdict ? (task.verdict === "meets" ? " · Meets criteria" : " · Needs your eyes") : ""}
           </p>
+          <ReviewLine review={task.review} />
         </div>
         {task.result && (
           <button aria-expanded={open} onClick={() => setOpen((o) => !o)} className="shrink-0 text-xs underline">

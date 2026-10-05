@@ -46,6 +46,14 @@ export function CompanySettings() {
         </form>
       </section>
 
+      <section aria-labelledby="quality-title">
+        <h2 id="quality-title" className="text-lg font-semibold">Quality</h2>
+        <label className="mt-3 flex items-center gap-3 text-sm">
+          <input type="checkbox" checked={snapshot.workspace.qualityChecks} disabled={!canAdmin(snapshot.role)} onChange={(e) => save(() => api(wsPath(), { method: "PATCH", body: { qualityChecks: e.target.checked } }), "Saved.")} />
+          Check work before it&apos;s done (Nova reviews each task and asks for fixes; slower but better results)
+        </label>
+      </section>
+
       <section aria-labelledby="view-title">
         <h2 id="view-title" className="text-lg font-semibold">Your view</h2>
         <fieldset className="mt-3">

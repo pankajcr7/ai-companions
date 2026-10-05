@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseCommand, pendingChanges, planSentence, removeTask, type DraftTask, type EditDTO } from "./goals.ts";
+import { parseCommand, pendingChanges, planSentence, reviewLabel, removeTask, type DraftTask, type EditDTO } from "./goals.ts";
 
 test("chat: sends to Nova's chat; everything else is a goal", () => {
   assert.deepEqual(parseCommand("  chat: hello Nova "), { kind: "chat", text: "hello Nova" });
@@ -24,4 +24,12 @@ test("pending changes are counted so the card can say they're waiting", () => {
   const e = (status: EditDTO["status"], taskId = "t1"): EditDTO => ({ id: Math.random().toString(), taskId, path: "a", baseRevision: 1, note: "", status, reason: null });
   assert.deepEqual(pendingChanges({ edits: [e("pending"), e("applied"), e("pending", "t2"), e("stale")] }), { count: 2, firstTaskId: "t1" });
   assert.deepEqual(pendingChanges({ edits: [e("applied")] }), { count: 0, firstTaskId: null });
+});
+
+test("the review line says how Nova's check went", () => {
+  assert.equal(reviewLabel(null), null);
+  assert.equal(reviewLabel({ rounds: 0, approved: true }), "✓ Checked by Nova");
+  assert.equal(reviewLabel({ rounds: 1, approved: true }), "✓ Checked by Nova · 1 fix made");
+  assert.equal(reviewLabel({ rounds: 2, approved: true }), "✓ Checked by Nova · 2 fixes made");
+  assert.equal(reviewLabel({ rounds: 2, approved: false }), "Nova asked for more changes");
 });
