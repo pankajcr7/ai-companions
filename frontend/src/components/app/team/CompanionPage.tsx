@@ -134,11 +134,11 @@ export function CompanionPage({ agentId }: { agentId: string }) {
           agent={editing === "self" ? agent : null}
           preset={editing === "new" ? hire : null}
           onClose={() => { setEditing(null); setHire(null); }}
-          onSaved={async (id) => {
+          // Hiring from the chat keeps you in the conversation; the new teammate shows on the Team page.
+          onSaved={async () => {
             setEditing(null);
             setHire(null);
             await reload();
-            if (id !== agent.id) router.push(`${base}/team/${id}`);
           }}
         />
       )}
