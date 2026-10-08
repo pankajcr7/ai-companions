@@ -34,14 +34,14 @@ export function reviewPrompt(o: { goal: string; task: { title: string; instructi
   ].filter(Boolean).join("\n\n");
 }
 
-/** One review by Nova. A reply that can't be read counts as approved, so a broken review never blocks the task. */
-export async function reviewTask(nova: Actor, company: string, o: Parameters<typeof reviewPrompt>[0], signal: AbortSignal, log: StepLog, onCall: (c: Call) => void) {
+/** One review by Nova. A reply that can't be read counts as approved; a failed call (rate limit, outage) skips the review (null). Only Stop or the time limit end the task. */
+export async function reviewTask(nova: Actor, company: string, o: Parameters<typeof reviewPrompt>[0], signal: AbortSignal, log: StepLog, onCall: (c: Call) => void): Promise<{ approved: boolean; fixes: string[] } | null> {
   try {
     const { value, calls } = await completeJson(nova, reviewInstructions(company), reviewPrompt(o), Review, signal, log);
     calls.forEach(onCall);
     return { approved: value.approved || value.fixes.length === 0, fixes: value.fixes };
   } catch (e) {
-    if (e instanceof CallError && e.code === "bad_output") return { approved: true, fixes: [] };
-    throw e;
+    if (!(e instanceof CallError) || e.code === "aborted") throw e;
+    return e.code === "bad_output" ? { approved: true, fixes: [] } : null;
   }
 }

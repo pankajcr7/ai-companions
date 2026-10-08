@@ -38,7 +38,7 @@ export async function planGoal(goalId: string): Promise<void> {
     const inputTokens = calls.reduce((n, c) => n + (c.inputTokens ?? 0), 0);
     const outputTokens = calls.reduce((n, c) => n + (c.outputTokens ?? 0), 0);
     await prisma.$transaction(async (tx) => {
-      const r = await tx.goal.updateMany({ where: { id: goalId, status: "planning" }, data: { status: "awaiting_approval", error: null, projectName: goal.newProject ? (value.projectName ?? null) : null, brief: value.brief || null, inputTokens: { increment: inputTokens }, outputTokens: { increment: outputTokens } } });
+      const r = await tx.goal.updateMany({ where: { id: goalId, status: "planning" }, data: { status: "awaiting_approval", error: null, projectName: goal.newProject ? (value.projectName ?? null) : null, brief: value.brief && value.brief.trim().length >= 20 ? value.brief : null, inputTokens: { increment: inputTokens }, outputTokens: { increment: outputTokens } } });
       if (!r.count) return;
       await tx.goalTask.createMany({ data: value.tasks.map((t, position) => ({ goalId, position, ...t })) });
     });

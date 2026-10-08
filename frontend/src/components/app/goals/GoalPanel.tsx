@@ -52,9 +52,9 @@ export function GoalPanel({ goalId, onClose, onWorking, onOpenGoal, onHire }: { 
       setBusy(false);
     }
   }
-  const start = (tasks: DraftTask[], projectName?: string) =>
+  const start = (tasks: DraftTask[], projectName?: string, brief?: string | null) =>
     act(async () => {
-      await api(`${path}/plan`, { method: "PUT", body: { tasks, projectName } });
+      await api(`${path}/plan`, { method: "PUT", body: { tasks, projectName, brief } });
       await api(`${path}/start`, { method: "POST" });
     });
   const cancel = () => act(() => api(`${path}/cancel`, { method: "POST" }));

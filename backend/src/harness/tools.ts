@@ -105,9 +105,11 @@ export function projectTools(project: Project, o: { write: ((w: Write) => Promis
       run: async (a) => {
         const { path, e } = await fileAt(a.path);
         if (e && (e.kind !== "file" || !e.isText)) throw new ToolError(`${path} is a folder or a binary file and can't be written.`);
-        const message = await write({ path: e?.path ?? path, content: a.content, note: a.note ?? "", baseRevision: e?.revision ?? 0 });
-        cache = null;
-        return message;
+        try {
+          return await write({ path: e?.path ?? path, content: a.content, note: a.note ?? "", baseRevision: e?.revision ?? 0 });
+        } finally {
+          cache = null;
+        }
       },
     });
   }

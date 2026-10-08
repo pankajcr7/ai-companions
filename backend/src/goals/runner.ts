@@ -128,6 +128,9 @@ async function runTask(goalId: string, taskId: string) {
       const raw = { path: w.path, content: w.content, note: w.note };
       const ownFile = w.baseRevision !== 0 && goalCreated.has(w.path.toLowerCase());
       if (!goal.newProject || !goal.project || (w.baseRevision !== 0 && !ownFile)) {
+        // A rewrite replaces this task's earlier suggestion for the same file: one suggestion per file.
+        const earlier = decided.findIndex((d) => d.check.status === "pending" && d.raw.path.toLowerCase() === w.path.toLowerCase());
+        if (earlier >= 0) decided.splice(earlier, 1);
         decided.push({ raw, check: { path: w.path, baseRevision: w.baseRevision, status: "pending", reason: null }, decidedById: null });
         return "Saved as a suggestion for the owner to review.";
       }
@@ -146,7 +149,7 @@ async function runTask(goalId: string, taskId: string) {
       }
     };
     const tools = [...(goal.project ? projectTools(goal.project, { write: saveOrSuggest, read }) : []), ...webTools(await loadSearchKey(goal.workspaceId))];
-    const visual = isVisualTask(task);
+    const visual = !!goal.project || isVisualTask(task);
     const instructions = taskInstructions(agent, goal.workspace.name, agent.department?.name ?? null, !!goal.project, visual);
     const loop = await runLoop({
       actor: agent,
@@ -181,8 +184,14 @@ async function runTask(goalId: string, taskId: string) {
     if (nova && !readiness(nova)) {
       review = { rounds: 0, approved: true, fixes: [] };
       for (;;) {
-        const written = decided.filter((d) => d.check.status !== "rejected").map((d) => ({ path: d.raw.path, content: d.raw.content }));
+        // The latest version of each file this task wrote.
+        const written = [...new Map(decided.filter((d) => d.check.status === "pending" || d.check.status === "applied").map((d) => [d.raw.path.toLowerCase(), { path: d.raw.path, content: d.raw.content }])).values()];
         const r = await reviewTask(nova, goal.workspace.name, { goal: goal.text, task, brief: goal.brief, guide: visual, result, files: written }, signal, stepLog(goal.workspaceId, goalId, taskId, "review"), add);
+        if (!r) {
+          // The review call itself failed: the task keeps its result rather than failing.
+          if (review.rounds === 0) review = null;
+          break;
+        }
         if (r.approved) break;
         review.fixes.push(r.fixes);
         if (review.rounds === 2) {
@@ -190,7 +199,7 @@ async function runTask(goalId: string, taskId: string) {
           break;
         }
         review.rounds++;
-        const again = await runLoop({ actor: agent, instructions, turns: [...turns, { role: "user", content: `NOVA'S REVIEW — please fix:\n${r.fixes.map((f) => `- ${f}`).join("\n")}` }], tools, limit: 6, signal, log: stepLog(goal.workspaceId, goalId, taskId, "execute"), onCall: add });
+        const again = await runLoop({ actor: agent, instructions, turns: [...turns, { role: "user", content: `NOVA'S REVIEW — please fix:\n${r.fixes.map((f) => `- ${f}`).join("\n")}\n\nThen reply with your complete final answer; it replaces your previous one.` }], tools, limit: 6, signal, log: stepLog(goal.workspaceId, goalId, taskId, "execute"), onCall: add });
         turns = again.turns;
         toolUses.push(...again.toolUses);
         result = await finish(again.text);
@@ -248,9 +257,10 @@ async function finishGoal(goalId: string) {
     const { value, calls } = await completeJson(nova, summaryInstructions(goal.workspace.name), summaryPrompt(goal.text, ctx.shared, rows), Summary, signal, stepLog(goal.workspaceId, goalId, null, "summary"));
     const done = new Map(goal.tasks.filter((t) => t.status === "done").map((t) => [t.position, t.id]));
     await prisma.$transaction(async (tx) => {
+      const flagged = new Set(goal.tasks.filter((t) => (t.review as { approved?: boolean } | null)?.approved === false).map((t) => t.id));
       for (const v of value.verdicts) {
         const id = done.get(v.position);
-        if (id) await tx.goalTask.update({ where: { id }, data: { verdict: v.verdict, verdictNote: v.note || null } });
+        if (id && !flagged.has(id)) await tx.goalTask.update({ where: { id }, data: { verdict: v.verdict, verdictNote: v.note || null } });
       }
       await tx.goal.updateMany({
         where: { id: goalId, status: "reviewing" },

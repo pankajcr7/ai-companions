@@ -160,7 +160,7 @@ export async function goalRoutes(app: FastifyInstance) {
       return { projectId: project.id };
     });
     if (!started) throw new HttpError(409, "conflict", "This goal has already started.");
-    if (goal.brief && started.projectId) await saveBrief(id, gid, user.id, started.projectId, goal.brief);
+    if (goal.brief && started.projectId) await saveBrief(id, gid, user.id, started.projectId, goal.brief).catch((e) => req.log.error(e));
     await audit(prisma, id, user.id, "goal.start", "goal", gid);
     kickGoal(gid);
     return { ok: true };
