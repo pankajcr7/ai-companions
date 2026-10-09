@@ -1,12 +1,12 @@
 import type { z } from "zod";
 import { SecretError } from "../crypto.js";
 import { clientFor, type ConnectionLike } from "../providers/index.js";
-import { ProviderError, type ChatTurn, type StreamEvent } from "../providers/types.js";
+import { hasMedia, ProviderError, withoutMedia, type ChatTurn, type StreamEvent } from "../providers/types.js";
 import { runLoop, type Tool } from "../harness/loop.js";
 import { extractJson } from "./plan.js";
 
 export type Actor = { id: string; name: string; kind: string; status: string; model: string | null; connection: (ConnectionLike & { status: string }) | null };
-export type Call = { text: string; model: string; inputTokens: number | null; outputTokens: number | null };
+export type Call = { text: string; model: string; inputTokens: number | null; outputTokens: number | null; visionFallback?: boolean };
 export type StepLog = (s: { agentId: string; model: string; inputTokens: number | null; outputTokens: number | null; ms: number; errorCode: string | null }) => Promise<void>;
 
 export class CallError extends Error {
@@ -34,11 +34,14 @@ export async function complete(actor: Actor, instructions: string, turns: ChatTu
   const started = Date.now();
   let text = "";
   let done: Extract<StreamEvent, { type: "done" }> | undefined;
+  // A model that can't take pictures or PDFs gets the same message once more with notes in their place.
+  let sent = turns;
+  let visionFallback = false;
   try {
     const provider = clientFor(actor.connection!);
     for (let attempt = 0; ; attempt++) {
       try {
-        for await (const ev of provider.stream({ model, instructions, turns, signal })) {
+        for await (const ev of provider.stream({ model, instructions, turns: sent, signal })) {
           if (ev.type === "delta") {
             text += ev.text;
             onDelta?.(ev.text);
@@ -47,6 +50,11 @@ export async function complete(actor: Actor, instructions: string, turns: ChatTu
         }
         break;
       } catch (e) {
+        if (!text && !visionFallback && !signal.aborted && e instanceof ProviderError && ["bad_request", "unsupported", "refused"].includes(e.code) && hasMedia(sent)) {
+          sent = withoutMedia(sent);
+          visionFallback = true;
+          continue;
+        }
         if (attempt === 0 && !text && e instanceof ProviderError && e.retryable && !signal.aborted) {
           await new Promise((r) => setTimeout(r, 500 + Math.random() * 1000));
           continue;
@@ -65,7 +73,7 @@ export async function complete(actor: Actor, instructions: string, turns: ChatTu
     await log?.({ agentId: actor.id, model, inputTokens: null, outputTokens: null, ms: Date.now() - started, errorCode: err.code });
     throw err;
   }
-  const call: Call = { text, model: done?.model ?? model, inputTokens: done?.usage.inputTokens ?? null, outputTokens: done?.usage.outputTokens ?? null };
+  const call: Call = { text, model: done?.model ?? model, inputTokens: done?.usage.inputTokens ?? null, outputTokens: done?.usage.outputTokens ?? null, ...(visionFallback ? { visionFallback } : {}) };
   await log?.({ agentId: actor.id, model: call.model, inputTokens: call.inputTokens, outputTokens: call.outputTokens, ms: Date.now() - started, errorCode: null });
   return call;
 }

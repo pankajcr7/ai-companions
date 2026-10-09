@@ -8,7 +8,7 @@ const fence = (v: unknown) => `\`\`\`json\n${JSON.stringify(v)}\n\`\`\``;
 const call = (text: string): Call => ({ text, model: "m", inputTokens: 1, outputTokens: 1 });
 /** A model that replies from a list, recording what it was sent. */
 function scripted(replies: string[]) {
-  const seen: { instructions: string; turns: { role: string; content: string }[] }[] = [];
+  const seen: { instructions: string; turns: { role: string; content: unknown }[] }[] = [];
   const model: CallModel = async (instructions, turns) => {
     seen.push({ instructions, turns: turns.map((t) => ({ ...t })) });
     return call(replies.shift() ?? "final");
@@ -146,4 +146,10 @@ test("every model call is reported as it happens, so tokens count even if the lo
   setTimeout(() => ac.abort(), 30);
   await expect(loop).rejects.toMatchObject({ code: "aborted" });
   expect(seen).toEqual([1]);
+});
+test("a tool can return pictures; they reach the model as parts in the result turn", async () => {
+  const look: Tool<{ word: string }> = { ...echo, run: async () => ({ text: "the logo", images: [{ mime: "image/png", data: "AAAA" }] }) };
+  const { s, done } = run([look], [fence({ tool: "echo", args: { word: "logo" } }), "Seen."]);
+  await done;
+  expect(s.seen[1].turns.at(-1)!.content).toEqual([{ type: "text", text: `${TOOL_RESULT}echo logo:\nthe logo` }, { type: "image", mime: "image/png", data: "AAAA" }]);
 });

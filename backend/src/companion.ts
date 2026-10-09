@@ -1,4 +1,4 @@
-import type { ChatTurn } from "./providers/types.js";
+import { sizeOf, type ChatTurn } from "./providers/types.js";
 
 export function companionIntro(agent: { name: string; role: string; workingStyle: string }, company: string, department: string | null) {
   return [`You are ${agent.name}, the ${agent.role}${department ? ` in the ${department} department` : ""} at ${company}.`, agent.workingStyle ? `Your working style: ${agent.workingStyle}` : ""]
@@ -19,7 +19,7 @@ export function trimTurns(turns: ChatTurn[], maxChars: number): ChatTurn[] {
   const out: ChatTurn[] = [];
   let total = 0;
   for (let i = turns.length - 1; i >= 0; i--) {
-    total += turns[i].content.length;
+    total += sizeOf(turns[i].content);
     if (total > maxChars && out.length) break;
     out.unshift(turns[i]);
   }

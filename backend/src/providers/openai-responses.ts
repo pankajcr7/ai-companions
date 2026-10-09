@@ -1,5 +1,5 @@
 import { readSse } from "./sse.js";
-import { call, errorFromStatus, ProviderError, toProviderError, type ProviderClient, type Usage } from "./types.js";
+import { call, errorFromStatus, ProviderError, toProviderError, toResponsesParts, type ProviderClient, type Usage } from "./types.js";
 
 /**
  * OpenAI Responses API. Used for OpenAI API keys and for ChatGPT plan usage (same endpoint).
@@ -24,7 +24,7 @@ export function openAiResponsesClient(opts: { baseUrl: string; token: () => Prom
         method: "POST",
         headers: await headers(),
         signal,
-        body: JSON.stringify({ model, instructions, input: turns.map((t) => ({ role: t.role, content: t.content })), store: false, stream: true }),
+        body: JSON.stringify({ model, instructions, input: turns.map((t) => ({ role: t.role, content: toResponsesParts(t.content) })), store: false, stream: true }),
       });
       let usage: Usage = { inputTokens: null, outputTokens: null };
       let served = model;

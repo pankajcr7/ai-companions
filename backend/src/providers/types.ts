@@ -1,6 +1,21 @@
 import { safeFetch, UnsafeUrlError, type SafeInit } from "../safe-fetch.js";
 
-export type ChatTurn = { role: "user" | "assistant"; content: string };
+export type Part = { type: "text"; text: string } | { type: "image"; mime: string; data: string } | { type: "pdf"; name: string; data: string };
+export type ChatTurn = { role: "user" | "assistant"; content: string | Part[] };
+export const textOf = (c: ChatTurn["content"]) => (typeof c === "string" ? c : c.map((p) => (p.type === "text" ? p.text : "")).filter(Boolean).join("\n"));
+/** History budgets count a picture as 1,500 characters and a PDF as 3,000. */
+export const sizeOf = (c: ChatTurn["content"]) => (typeof c === "string" ? c.length : c.reduce((n, p) => n + (p.type === "text" ? p.text.length : p.type === "image" ? 1500 : 3000), 0));
+export const hasMedia = (turns: ChatTurn[]) => turns.some((t) => typeof t.content !== "string" && t.content.some((p) => p.type !== "text"));
+export const withoutMedia = (turns: ChatTurn[]): ChatTurn[] =>
+  turns.map((t) => (typeof t.content === "string" ? t : { ...t, content: t.content.flatMap((p): Part[] => (p.type === "text" ? [p] : p.type === "image" ? [{ type: "text", text: "[image attached — this AI model can't see images]" }] : [])) }));
+const dataUrl = (mime: string, data: string) => `data:${mime};base64,${data}`;
+type ChatPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+export const toChatParts = (c: ChatTurn["content"]): string | ChatPart[] =>
+  typeof c === "string" ? c : c.flatMap((p): ChatPart[] => (p.type === "text" ? [{ type: "text", text: p.text }] : p.type === "image" ? [{ type: "image_url", image_url: { url: dataUrl(p.mime, p.data) } }] : []));
+export const toResponsesParts = (c: ChatTurn["content"]) =>
+  typeof c === "string" ? c : c.map((p) => (p.type === "text" ? { type: "input_text", text: p.text } : p.type === "image" ? { type: "input_image", image_url: dataUrl(p.mime, p.data) } : { type: "input_file", filename: p.name, file_data: dataUrl("application/pdf", p.data) }));
+export const toAnthropicParts = (c: ChatTurn["content"]) =>
+  typeof c === "string" ? c : c.map((p) => (p.type === "text" ? { type: "text" as const, text: p.text } : p.type === "image" ? { type: "image" as const, source: { type: "base64" as const, media_type: p.mime as "image/png", data: p.data } } : { type: "document" as const, source: { type: "base64" as const, media_type: "application/pdf" as const, data: p.data } }));
 export type Usage = { inputTokens: number | null; outputTokens: number | null };
 export type StreamEvent = { type: "delta"; text: string } | { type: "done"; usage: Usage; model: string };
 export type ModelInfo = { id: string; label: string };

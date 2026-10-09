@@ -59,3 +59,12 @@ test("completeJson gives up after one repair", async () => {
   llm.setScript(() => "I refuse to write JSON");
   await expect(completeJson(actor(), "Pick", "FILES", z.object({ read: z.array(z.string()) }), signal())).rejects.toMatchObject({ code: "bad_output" });
 });
+
+test("a model that refuses pictures gets the message again without them, and the call says so", async () => {
+  llm.setScript((_s, _u, body) => (JSON.stringify(body).includes("image_url") ? { status: 400, message: "image input is not supported for this model" } : "Read it as text."));
+  const call = await complete(actor(), "x", [{ role: "user", content: [{ type: "text", text: "What is this?" }, { type: "image", mime: "image/png", data: "AAAA" }] }], signal());
+  expect(call).toMatchObject({ text: "Read it as text.", visionFallback: true });
+  const sent = JSON.stringify(llm.requests.at(-1)!.body);
+  expect(sent).toContain("this AI model can't see images");
+  expect(sent).not.toContain("image_url");
+});

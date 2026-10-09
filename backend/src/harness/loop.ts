@@ -1,12 +1,14 @@
 import type { z } from "zod";
 import { findJsonBlock } from "../goals/json-block.js";
 import { CallError, complete, type Actor, type Call, type StepLog } from "../goals/llm.js";
-import type { ChatTurn } from "../providers/types.js";
+import { sizeOf, textOf, type ChatTurn, type Part } from "../providers/types.js";
 
 export type ToolUse = { name: string; label: string; ok: boolean; ms: number; chars: number };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 /** finishOnStop: a tool that saves something runs to completion on Stop, so whatever it saved is still recorded. */
-export type Tool<A = any> = { name: string; purpose: string; argsHelp: string; args: z.ZodType<A>; label: (a: A) => string; run: (a: A, signal: AbortSignal) => Promise<string>; finishOnStop?: boolean };
+/** What a tool returns: text, or text plus pictures (e.g. an image file) for models that can see. */
+export type ToolOutput = { text: string; images: { mime: string; data: string }[] };
+export type Tool<A = any> = { name: string; purpose: string; argsHelp: string; args: z.ZodType<A>; label: (a: A) => string; run: (a: A, signal: AbortSignal) => Promise<string | ToolOutput>; finishOnStop?: boolean };
 /** reset: the text streamed so far was a tool call, not part of the answer. */
 export type LoopEvent = { type: "delta"; text: string } | { type: "tool"; name: string; label: string } | { type: "reset" };
 export type CallModel = (instructions: string, turns: ChatTurn[], onDelta?: (t: string) => void) => Promise<Call>;
@@ -53,34 +55,35 @@ const answerAfterTools = (text: string, uses: ToolUse[]) =>
 
 /** Shortens all but the latest two tool results, oldest first, until the conversation fits the budget. */
 export function trimToolResults(turns: ChatTurn[], budget = CONTEXT_BUDGET): ChatTurn[] {
-  let size = turns.reduce((n, t) => n + t.content.length, 0);
+  let size = turns.reduce((n, t) => n + sizeOf(t.content), 0);
   if (size <= budget) return turns;
-  const results = turns.flatMap((t, i) => (t.role === "user" && t.content.startsWith(TOOL_RESULT) ? [i] : []));
+  const results = turns.flatMap((t, i) => (t.role === "user" && textOf(t.content).startsWith(TOOL_RESULT) ? [i] : []));
   const out = [...turns];
   for (const i of results.slice(0, -2)) {
     if (size <= budget) break;
-    const head = out[i].content.slice(TOOL_RESULT.length).split("\n", 1)[0].replace(/:$/, "");
-    const short = `[${head}: ${out[i].content.length} characters, shown earlier]`;
-    size -= out[i].content.length - short.length;
+    const text = textOf(out[i].content);
+    const head = text.slice(TOOL_RESULT.length).split("\n", 1)[0].replace(/:$/, "");
+    const short = `[${head}: ${text.length} characters, shown earlier]`;
+    size -= sizeOf(out[i].content) - short.length;
     out[i] = { role: "user", content: short };
   }
   return out;
 }
 
-async function runTool(tool: Tool, args: unknown, signal: AbortSignal): Promise<{ ok: boolean; text: string }> {
+async function runTool(tool: Tool, args: unknown, signal: AbortSignal): Promise<{ ok: boolean; text: string; images: ToolOutput["images"] }> {
   const timeout = AbortSignal.timeout(TOOL_TIMEOUT_MS);
   const stopper = tool.finishOnStop ? timeout : AbortSignal.any([signal, timeout]);
   const stopped = new Promise<never>((_r, reject) => stopper.addEventListener("abort", () => reject(stopper.reason), { once: true }));
   try {
-    const text = await Promise.race([tool.run(args, stopper), stopped]);
+    const out = await Promise.race([tool.run(args, stopper), stopped]);
     if (signal.aborted) throw new CallError("aborted", "Stopped");
-    return { ok: true, text };
+    return typeof out === "string" ? { ok: true, text: out, images: [] } : { ok: true, ...out };
   } catch (e) {
     if (signal.aborted) throw new CallError("aborted", "Stopped");
-    if (timeout.aborted) return { ok: false, text: "That took too long and was stopped." };
-    if (e instanceof ToolError) return { ok: false, text: e.message };
+    if (timeout.aborted) return { ok: false, text: "That took too long and was stopped.", images: [] };
+    if (e instanceof ToolError) return { ok: false, text: e.message, images: [] };
     console.error("tool", tool.name, e);
-    return { ok: false, text: "The tool failed." };
+    return { ok: false, text: "The tool failed.", images: [] };
   }
 }
 
@@ -105,6 +108,7 @@ export async function runLoop(o: { actor: Actor; instructions: string; turns: Ch
 
     let head = "error";
     let result: string;
+    let images: ToolOutput["images"] = [];
     const tool = "bad" in parsed ? undefined : byName.get(parsed.name);
     const args = tool && !("bad" in parsed) ? tool.args.safeParse(parsed.args) : undefined;
     if ("bad" in parsed) result = `${parsed.bad} Valid tools: ${[...byName.keys()].join(", ")}.`;
@@ -122,6 +126,7 @@ export async function runLoop(o: { actor: Actor; instructions: string; turns: Ch
         const r = await runTool(tool, args.data, o.signal);
         toolUses.push({ name: tool.name, label, ok: r.ok, ms: Date.now() - started, chars: r.text.length });
         result = r.text;
+        images = r.images;
         bad = 0;
       }
     }
@@ -129,6 +134,7 @@ export async function runLoop(o: { actor: Actor; instructions: string; turns: Ch
     if (bad >= MAX_BAD) return { text: answerAfterTools(c.text, toolUses), calls, toolUses, turns };
     o.onEvent?.({ type: "reset" });
     const last = toolUses.length >= o.limit ? "\n\nNo more tools. Give your final answer now." : "";
-    turns.push({ role: "user", content: `${TOOL_RESULT}${head}:\n${result}${last}` });
+    const resultText = `${TOOL_RESULT}${head}:\n${result}${last}`;
+    turns.push({ role: "user", content: images.length ? [{ type: "text", text: resultText }, ...images.map((i): Part => ({ type: "image", ...i }))] : resultText });
   }
 }

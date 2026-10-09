@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from "vitest";
 import { prisma } from "../src/db.js";
 import type { Loaded } from "../src/goals/context.js";
-import { ToolError } from "../src/harness/loop.js";
+import { ToolError, type Tool } from "../src/harness/loop.js";
 import { projectTools, webTools, type Write } from "../src/harness/tools.js";
 import { htmlToText } from "../src/harness/web.js";
 import { fakeServer } from "./fake-provider.js";
@@ -24,7 +24,7 @@ afterAll(async () => {
 });
 
 const signal = new AbortController().signal;
-const run = (tools: { name: string; run: (a: never, s: AbortSignal) => Promise<string> }[], name: string, args: unknown) => tools.find((t) => t.name === name)!.run(args as never, signal);
+const run = (tools: Tool[], name: string, args: unknown) => tools.find((t) => t.name === name)!.run(args as never, signal) as Promise<string>;
 
 async function project() {
   const { cookie } = await signUp(app);

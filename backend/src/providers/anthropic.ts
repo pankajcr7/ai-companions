@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { errorFromStatus, ProviderError, type ProviderClient } from "./types.js";
+import { errorFromStatus, ProviderError, toAnthropicParts, type ProviderClient } from "./types.js";
 
 function mapError(e: unknown, signal: AbortSignal): unknown {
   if (e instanceof ProviderError) return e;
@@ -28,7 +28,7 @@ export function anthropicClient(opts: { apiKey: string; baseURL?: string }): Pro
     },
     async *stream({ model, instructions, turns, signal }) {
       try {
-        const stream = client.messages.stream({ model, max_tokens: 16000, system: instructions, messages: turns }, { signal });
+        const stream = client.messages.stream({ model, max_tokens: 16000, system: instructions, messages: turns.map((t) => ({ role: t.role, content: toAnthropicParts(t.content) })) }, { signal });
         for await (const ev of stream) {
           if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") yield { type: "delta", text: ev.delta.text };
         }

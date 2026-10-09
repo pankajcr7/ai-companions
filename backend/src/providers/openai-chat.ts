@@ -1,5 +1,5 @@
 import { readSse } from "./sse.js";
-import { call, ProviderError, toProviderError, type ProviderClient, type Usage } from "./types.js";
+import { call, ProviderError, toChatParts, toProviderError, type ProviderClient, type Usage } from "./types.js";
 
 /** OpenAI-compatible /chat/completions (Gemini's OpenAI endpoint, OpenRouter, xAI, DeepSeek, Ollama, custom). */
 export function openAiChatClient(opts: { baseUrl: string; apiKey: string | null }): ProviderClient {
@@ -15,7 +15,7 @@ export function openAiChatClient(opts: { baseUrl: string; apiKey: string | null 
         method: "POST",
         headers,
         signal,
-        body: JSON.stringify({ model, stream: true, stream_options: { include_usage: true }, messages: [{ role: "system", content: instructions }, ...turns] }),
+        body: JSON.stringify({ model, stream: true, stream_options: { include_usage: true }, messages: [{ role: "system", content: instructions }, ...turns.map((t) => ({ role: t.role, content: toChatParts(t.content) }))] }),
       });
       let usage: Usage = { inputTokens: null, outputTokens: null };
       let served = model;
