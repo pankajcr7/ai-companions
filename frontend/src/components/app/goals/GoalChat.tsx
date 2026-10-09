@@ -39,6 +39,7 @@ export function GoalChat({ goalId, goalPath, canSend, projectId, onOpenGoal, onH
     <section aria-label={`Chat with ${name} about this goal`} className="mt-5 border-t border-line pt-4">
       <h3 className="mb-2 text-sm font-semibold">Ask {name} about this goal</h3>
       <ChatThread
+        attachmentsPath={wsPath("/attachments")}
         path={`${goalPath}/chat`}
         name={name}
         inputLabel={`Ask ${name} about this goal`}

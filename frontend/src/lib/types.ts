@@ -66,7 +66,10 @@ export type ChatMessageDTO = {
   planBlocked?: string | null;
   toolUses?: ToolUseDTO[];
   edits?: ChatEditDTO[];
+  attachments?: AttachmentDTO[];
+  visionFallback?: boolean;
 };
+export type AttachmentDTO = { id: string; name: string; kind: "image" | "pdf" | "office" | "text"; mime: string; size: number; pages: number | null; scanned: boolean; url: string; viewUrl: string };
 export type ChatEditDTO = { id: string; path: string; baseRevision: number; note: string; status: "pending" | "applied" | "rejected" | "stale"; reason: string | null };
 export const PROVIDER_NAMES: Record<ProviderKind, string> = { chatgpt: "ChatGPT", openai: "OpenAI", anthropic: "Anthropic", gemini: "Google Gemini", custom: "Other service" };
 export const CHATGPT_USAGE_URL = "https://chatgpt.com/settings/usage";

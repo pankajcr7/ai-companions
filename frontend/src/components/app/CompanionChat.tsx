@@ -23,6 +23,7 @@ export function CompanionChat({ agent, onEdit, onThinking, command, onCommandSen
   }
   return (
     <ChatThread
+      attachmentsPath={wsPath("/attachments")}
       path={wsPath(`/agents/${agent.id}/chat`)}
       name={agent.name}
       inputLabel={`Message ${agent.name}`}

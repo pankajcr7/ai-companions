@@ -245,7 +245,12 @@ export default function ProjectWorkspace() {
                   <div className="grid h-full place-items-center p-6 text-center text-sm">
                     <div>
                       <p>This file can&apos;t be opened in the editor ({formatBytes(open.size)}).</p>
-                      <a href={`${base}/download?${q(open.path)}`} className="btn-dark mt-3 inline-block rounded-[10px] px-4 py-2 font-semibold">Download</a>
+                      <div className="mt-3 flex justify-center gap-2">
+                        {open.path.toLowerCase().endsWith(".pdf") && (
+                          <a href={`${base}/download?${q(open.path)}`} target="_blank" rel="noreferrer" className="btn-dark inline-block rounded-[10px] px-4 py-2 font-semibold">Open PDF</a>
+                        )}
+                        <a href={`${base}/download?${q(open.path)}`} download className="btn-light inline-block rounded-[10px] px-4 py-2 font-semibold">Download</a>
+                      </div>
                     </div>
                   </div>
                 )}

@@ -11,6 +11,8 @@ export const MATH_EDIT = "// Adds two numbers.\nexport const add = (a: number, b
 
 /** Scripted replies for goals, keyed on phrases in the system prompt; plain chat gets FAKE_REPLY. */
 function scripted(system: string, user: string): string | null {
+  if (system.includes("When the owner asks for work to be done") && /what's on my menu/i.test(user) && user.includes("croissants")) return "Your menu has croissants.";
+  if (system.includes("When the owner asks for work to be done") && /bakery site with these files/i.test(user)) return `On it.\n\n${fence({ suggest: { goal: "Build the bakery site using logo.png and menu.pdf", newProject: true } })}`;
   if (system.includes("Review a teammate's finished task")) {
     // The launch posts get one round of fixes so the home test sees a revision; everything else is approved.
     if (user.includes("Write the launch posts") && !reviewedPosts) {
@@ -68,9 +70,11 @@ export function startFakeLlm(): Promise<Server> {
     if (req.method === "POST" && req.url === "/v1/chat/completions") {
       const chunks: Buffer[] = [];
       for await (const c of req) chunks.push(c as Buffer);
-      const body = JSON.parse(Buffer.concat(chunks).toString() || "{}") as { messages?: { role: string; content: string }[] };
-      const system = body.messages?.find((m) => m.role === "system")?.content ?? "";
-      const user = body.messages?.filter((m) => m.role === "user").at(-1)?.content ?? "";
+      const body = JSON.parse(Buffer.concat(chunks).toString() || "{}") as { messages?: { role: string; content: string | { type: string; text?: string }[] }[] };
+      const system = String(body.messages?.find((m) => m.role === "system")?.content ?? "");
+      const last = body.messages?.filter((m) => m.role === "user").at(-1)?.content ?? "";
+      // Messages with attachments arrive as parts; the script reads their text.
+      const user = typeof last === "string" ? last : (last as { type: string; text?: string }[]).map((p) => p.text ?? "").join("\n");
       const slow = system.includes("Nova assigned you a task") && user.includes("YOUR TASK:\nWrite the launch posts") && slowNext;
       if (slow) {
         slowNext = false;
