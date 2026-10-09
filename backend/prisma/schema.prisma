@@ -294,6 +294,8 @@ model ChatMessage {
   conversation   Conversation?       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   goalId         String?
   planBlocked    String?
+  visionFallback Boolean             @default(false)
+  attachments    Attachment[]
   toolUses       Json                @default("[]")
   edits          ChatEdit[]
 
@@ -601,4 +603,31 @@ model SearchKey {
   createdById String
   createdAt   DateTime  @default(now())
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+/// A file the owner attached in a chat. Stored in the blob store; text pulled out once on upload.
+model Attachment {
+  id            String       @id @default(cuid())
+  workspaceId   String
+  userId        String
+  messageId     String?
+  goalMessageId String?
+  goalId        String?
+  name          String
+  mime          String
+  kind          String
+  size          Int
+  blobHash      String
+  viewHash      String?
+  viewMime      String?
+  text          String?
+  pages         Int?
+  scanned       Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  message       ChatMessage? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([goalMessageId])
+  @@index([goalId])
+  @@index([userId, createdAt])
 }

@@ -14,6 +14,7 @@ import { fileRoutes } from "./routes/files.js";
 import { goalChatRoutes } from "./routes/goal-chat.js";
 import { previewRoutes } from "./routes/preview.js";
 import { searchKeyRoutes } from "./routes/search-key.js";
+import { attachmentRoutes } from "./routes/attachments.js";
 import { chatEditRoutes } from "./routes/chat-edits.js";
 import { conversationRoutes } from "./routes/conversations.js";
 import { goalRoutes } from "./routes/goals.js";
@@ -40,6 +41,7 @@ export async function buildApp() {
   await app.register(conversationRoutes);
   await app.register(searchKeyRoutes);
   await app.register(chatEditRoutes);
+  await app.register(attachmentRoutes);
   await app.register(waitlistRoutes);
   return app;
 }

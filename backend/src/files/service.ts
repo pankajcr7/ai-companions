@@ -36,20 +36,21 @@ export async function recount(db: Db, projectId: string) {
 export const entryDTO = (e: ProjectEntry) => ({ path: e.path, kind: e.kind, size: e.size, isText: e.isText, revision: e.revision, updatedAt: e.updatedAt });
 export const projectDTO = (p: Project) => ({ id: p.id, name: p.name, fileCount: p.fileCount, totalBytes: p.totalBytes, updatedAt: p.updatedAt });
 
-const INLINE: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" };
+const INLINE: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", pdf: "application/pdf" };
 
 /** Never lets the browser render uploaded content as a page: images inline, everything else an attachment. */
 export function sendFile(reply: FastifyReply, name: string, data: Buffer, forceAttachment = false) {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
   const inline = !forceAttachment ? INLINE[ext] : undefined;
   const ascii = name.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
-  return reply
+  reply
     .header("content-type", inline ?? "application/octet-stream")
     .header("content-disposition", `${inline ? "inline" : "attachment"}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`)
     .header("x-content-type-options", "nosniff")
-    .header("content-security-policy", "sandbox")
-    .header("cache-control", "private, no-store")
-    .send(data);
+    .header("cache-control", "private, no-store");
+  // A sandbox stops the browser's PDF viewer from running, so inline PDFs go without one; the viewer isolates them itself.
+  if (inline !== "application/pdf") reply.header("content-security-policy", "sandbox");
+  return reply.send(data);
 }
 
 export type Incoming = { path: string; data: Buffer };
