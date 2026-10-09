@@ -7,14 +7,16 @@ import type { GoalMessage } from "../generated/prisma/client.js";
 import { readiness } from "../goals/llm.js";
 import { goalContext, loadHead, loadRoster } from "../goals/load.js";
 import { goalChatContext, goalChatInstructions } from "../goals/prompts.js";
-import { projectTools, webTools } from "../harness/tools.js";
+import { attachmentTools, projectTools, webTools } from "../harness/tools.js";
+import { historyTurns } from "../attachments/parts.js";
+import { attachmentDTO, ownAttachments } from "../attachments/service.js";
 import { loadSearchKey } from "../harness/web.js";
 import { HttpError, perUser, requireMember } from "../http.js";
 import type { ChatTurn } from "../providers/types.js";
 import { WsParams } from "./workspaces.js";
 
 const GoalParams = WsParams.extend({ gid: z.string().min(1).max(64) });
-const Send = z.object({ message: z.string().trim().min(1).max(8000) });
+const Send = z.object({ message: z.string().trim().min(1).max(8000), attachmentIds: z.array(z.string().max(64)).max(10).default([]) });
 const OPEN = new Set(["running", "reviewing", "done", "failed", "cancelled"]);
 const HISTORY = 50;
 
@@ -46,7 +48,9 @@ export async function goalChatRoutes(app: FastifyInstance) {
     const { user } = await requireMember(req, id);
     await loadGoal(id, gid);
     const rows = await prisma.goalMessage.findMany({ where: { goalId: gid, userId: user.id }, orderBy: { createdAt: "desc" }, take: HISTORY });
-    return { messages: rows.reverse().map(dto) };
+    // Goal chat messages keep their attachments by goalMessageId (they aren't chat messages).
+    const files = await prisma.attachment.findMany({ where: { goalMessageId: { in: rows.map((r) => r.id) } }, orderBy: { createdAt: "asc" } });
+    return { messages: rows.reverse().map((m) => ({ ...dto(m), attachments: files.filter((f) => f.goalMessageId === m.id).map(attachmentDTO), visionFallback: false })) };
   });
 
   app.delete("/api/workspaces/:id/goals/:gid/chat", async (req, reply) => {
@@ -61,7 +65,7 @@ export async function goalChatRoutes(app: FastifyInstance) {
     const watch = watchClient(reply);
     const { id, gid } = GoalParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
-    const { message } = Send.parse(req.body);
+    const { message, attachmentIds } = Send.parse(req.body);
     const goal = await loadGoal(id, gid);
     if (!OPEN.has(goal.status)) throw new HttpError(409, "not_open", "Chat opens once the plan is approved.");
     const nova = await loadHead(id);
@@ -70,9 +74,13 @@ export async function goalChatRoutes(app: FastifyInstance) {
     const conn = nova.connection;
     const model = nova.model;
 
+    const atts = await ownAttachments(id, user.id, attachmentIds);
     const history = await prisma.goalMessage.findMany({ where: { goalId: gid, userId: user.id, status: "complete" }, orderBy: { createdAt: "desc" }, take: 20 });
     const userMsg = await prisma.goalMessage.create({ data: { goalId: gid, workspaceId: id, userId: user.id, role: "user", content: message } });
-    const turns = trimTurns([...history.reverse().map((m): ChatTurn => ({ role: m.role, content: m.content })), { role: "user", content: message }], 24_000);
+    if (atts.length) await prisma.attachment.updateMany({ where: { id: { in: atts.map((a) => a.id) } }, data: { goalMessageId: userMsg.id } });
+    const chatFiles = await prisma.attachment.findMany({ where: { workspaceId: id, userId: user.id, goalMessageId: { in: [...history.map((m) => m.id), userMsg.id] } }, orderBy: { createdAt: "asc" } });
+    const rows = [...history.reverse().map((m) => ({ role: m.role, content: m.content, attachments: chatFiles.filter((f) => f.goalMessageId === m.id) })), { role: "user" as const, content: message, attachments: atts }];
+    const turns = trimTurns(await historyTurns(rows, conn.kind), 24_000);
     const ctx = await goalContext(goal.project);
     const tasks = goal.tasks.map((t) => ({ position: t.position, title: t.title, agentName: t.agent.name, status: t.status, verdict: t.verdict, result: t.result, error: t.error }));
     const instructions = `${goalChatInstructions(goal.workspace.name, await loadRoster(id))}\n\n${goalChatContext(goal, tasks, goal.edits, ctx)}`;
@@ -80,7 +88,7 @@ export async function goalChatRoutes(app: FastifyInstance) {
     await streamReply(req, reply, watch, {
       actor: { ...nova, model, connection: conn },
       // Read-only here: goal chat messages have nowhere to keep suggested changes; "Continue with a new goal" makes changes.
-      tools: [...(goal.project ? projectTools(goal.project, { write: null, read: new Map() }) : []), ...webTools(await loadSearchKey(id))],
+      tools: [...(goal.project ? projectTools(goal.project, { write: null, read: new Map() }) : []), ...webTools(await loadSearchKey(id)), ...(chatFiles.length ? attachmentTools(chatFiles) : [])],
       limit: 6,
       instructions,
       turns,

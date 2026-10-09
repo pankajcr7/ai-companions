@@ -31,6 +31,8 @@ export type SavedReply = {
   errorMessage: string | null;
   ms: number;
   toolUses: ToolUse[];
+  /** The model refused pictures, so it got notes instead. */
+  visionFallback: boolean;
 };
 
 /** Streams a model reply as SSE (start, delta, tool, error|done), letting it use tools, and always ends the response, even if saving fails. */
@@ -57,6 +59,7 @@ export async function streamReply(
   let inTokens = 0;
   let outTokens = 0;
   let counted = false;
+  let visionFallback = false;
   let failure: { code: string; message: string } | undefined;
   try {
     const loop = await runLoop({
@@ -81,6 +84,7 @@ export async function streamReply(
         inTokens += c.inputTokens ?? 0;
         outTokens += c.outputTokens ?? 0;
         counted ||= c.inputTokens != null || c.outputTokens != null;
+        visionFallback ||= !!c.visionFallback;
       },
     });
     text = loop.text;
@@ -102,7 +106,7 @@ export async function streamReply(
   const outputTokens = counted ? outTokens : null;
   // The response is already hijacked: whatever happens below, the stream must end.
   try {
-    const saved = await opts.save({ text, status, model, inputTokens, outputTokens, errorCode: failure?.code ?? null, errorMessage: failure?.message ?? null, ms: Date.now() - started, toolUses });
+    const saved = await opts.save({ text, status, model, inputTokens, outputTokens, errorCode: failure?.code ?? null, errorMessage: failure?.message ?? null, ms: Date.now() - started, toolUses, visionFallback });
     if (opts.actor.connection.kind === "chatgpt" && failure && (failure.code === "auth" || failure.code === "reauth")) {
       await prisma.providerConnection.update({ where: { id: opts.actor.connection.id }, data: { status: "reauth", lastError: "Sign in to ChatGPT again" } });
       failure = { code: "reauth", message: "Sign in to ChatGPT again to keep using it." };

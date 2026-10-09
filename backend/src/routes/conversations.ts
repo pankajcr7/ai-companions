@@ -3,9 +3,11 @@ import { z } from "zod";
 import { streamReply, watchClient } from "../chat-stream.js";
 import { trimTurns } from "../companion.js";
 import { prisma } from "../db.js";
-import type { ChatEdit, ChatMessage } from "../generated/prisma/client.js";
+import type { Attachment, ChatEdit, ChatMessage } from "../generated/prisma/client.js";
+import { historyTurns } from "../attachments/parts.js";
+import { attachmentDTO, ownAttachments } from "../attachments/service.js";
 import { loadProject } from "../files/service.js";
-import { projectTools, webTools } from "../harness/tools.js";
+import { attachmentTools, projectTools, webTools } from "../harness/tools.js";
 import { loadSearchKey } from "../harness/web.js";
 import { chatEditDTO, chatWriter, saveChatEdits } from "./chat-edits.js";
 import { createGoal } from "../goals/create.js";
@@ -19,9 +21,9 @@ import { WsParams } from "./workspaces.js";
 
 const ConvParams = WsParams.extend({ cid: z.string().min(1).max(64) });
 const Project = z.discriminatedUnion("kind", [z.object({ kind: z.literal("none") }), z.object({ kind: z.literal("existing"), id: z.string().min(1).max(64) }), z.object({ kind: z.literal("new") })]);
-const Send = z.object({ message: z.string().trim().min(1).max(8000), project: Project.default({ kind: "none" }) });
+const Send = z.object({ message: z.string().trim().min(1).max(8000), project: Project.default({ kind: "none" }), attachmentIds: z.array(z.string().max(64)).max(10).default([]) });
 
-const dto = (m: ChatMessage & { edits?: ChatEdit[] }) => ({
+const dto = (m: ChatMessage & { edits?: ChatEdit[]; attachments?: Attachment[] }) => ({
   id: m.id,
   role: m.role,
   content: m.content,
@@ -34,6 +36,8 @@ const dto = (m: ChatMessage & { edits?: ChatEdit[] }) => ({
   createdAt: m.createdAt,
   toolUses: m.toolUses,
   edits: (m.edits ?? []).map(chatEditDTO),
+  attachments: (m.attachments ?? []).map(attachmentDTO),
+  visionFallback: m.visionFallback,
   goalId: m.goalId,
   planBlocked: m.planBlocked,
 });
@@ -82,7 +86,7 @@ export async function conversationRoutes(app: FastifyInstance) {
     const { id, cid } = ConvParams.parse(req.params);
     const { user } = await requireMember(req, id);
     const c = await loadConversation(id, user.id, cid);
-    const rows = await prisma.chatMessage.findMany({ where: { conversationId: cid }, orderBy: { createdAt: "desc" }, take: 200, include: { edits: { orderBy: { createdAt: "asc" } } } });
+    const rows = await prisma.chatMessage.findMany({ where: { conversationId: cid }, orderBy: { createdAt: "desc" }, take: 200, include: { edits: { orderBy: { createdAt: "asc" } }, attachments: { orderBy: { createdAt: "asc" } } } });
     return { conversation: { id: c.id, title: c.title }, messages: rows.reverse().map(dto) };
   });
 
@@ -109,7 +113,7 @@ export async function conversationRoutes(app: FastifyInstance) {
     const watch = watchClient(reply);
     const { id, cid } = ConvParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
-    const { message, project } = Send.parse(req.body);
+    const { message, project, attachmentIds } = Send.parse(req.body);
     const conv = await loadConversation(id, user.id, cid);
     const nova = await loadHead(id);
     const problem = nova ? readiness(nova) : "Your company has no head agent";
@@ -120,11 +124,15 @@ export async function conversationRoutes(app: FastifyInstance) {
     const projectRow = project.kind === "existing" ? await loadProject(id, project.id) : null;
     const writer = chatWriter();
     const tools = [...(projectRow ? projectTools(projectRow, { write: writer.write, read: new Map() }) : []), ...webTools(await loadSearchKey(id))];
+    const withFiles = () => (chatFiles.length ? [...tools, ...attachmentTools(chatFiles)] : tools);
 
-    const history = await prisma.chatMessage.findMany({ where: { conversationId: cid, status: "complete" }, orderBy: { createdAt: "desc" }, take: 20 });
+    const atts = await ownAttachments(id, user.id, attachmentIds);
+    const history = await prisma.chatMessage.findMany({ where: { conversationId: cid, status: "complete" }, orderBy: { createdAt: "desc" }, take: 20, include: { attachments: { orderBy: { createdAt: "asc" } } } });
     const userMsg = await prisma.chatMessage.create({ data: { workspaceId: id, agentId: nova.id, userId: user.id, conversationId: cid, role: "user", content: message } });
+    if (atts.length) await prisma.attachment.updateMany({ where: { id: { in: atts.map((a) => a.id) } }, data: { messageId: userMsg.id } });
     await prisma.conversation.update({ where: { id: cid }, data: conv.title === "New chat" ? { title: titleFrom(message) } : { updatedAt: new Date() } });
-    const turns = trimTurns([...history.reverse().map((m): ChatTurn => ({ role: m.role, content: m.content })), { role: "user", content: message }], 24_000);
+    const turns = trimTurns(await historyTurns([...history.reverse(), { role: "user" as const, content: message, attachments: atts }], conn.kind), 24_000);
+    const chatFiles = await prisma.attachment.findMany({ where: { workspaceId: id, userId: user.id, message: { conversationId: cid } }, orderBy: { createdAt: "asc" } });
 
     const linked = await prisma.chatMessage.findMany({ where: { conversationId: cid, goalId: { not: null } }, orderBy: { createdAt: "desc" }, take: 3, select: { goalId: true } });
     const goals = await prisma.goal.findMany({ where: { id: { in: linked.map((l) => l.goalId!) }, workspaceId: id }, include: { tasks: { orderBy: { position: "asc" }, include: { agent: { select: { name: true } } } } }, orderBy: { createdAt: "asc" } });
@@ -139,14 +147,14 @@ export async function conversationRoutes(app: FastifyInstance) {
 
     await streamReply(req, reply, watch, {
       actor: { ...nova, model, connection: conn },
-      tools,
+      tools: withFiles(),
       limit: 6,
       instructions,
       turns,
       start: { userMessageId: userMsg.id },
       save: async (r) => {
         const saved = await prisma.chatMessage.create({
-          data: { workspaceId: id, agentId: nova.id, userId: user.id, conversationId: cid, role: "assistant", content: r.text, status: r.status, connectionId: conn.id, kind: conn.kind, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens, errorCode: r.errorCode, errorMessage: r.errorMessage, toolUses: r.toolUses },
+          data: { workspaceId: id, agentId: nova.id, userId: user.id, conversationId: cid, role: "assistant", content: r.text, status: r.status, connectionId: conn.id, kind: conn.kind, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens, errorCode: r.errorCode, errorMessage: r.errorMessage, toolUses: r.toolUses, visionFallback: r.visionFallback },
         });
         await saveChatEdits(id, saved.id, projectRow?.id ?? null, writer.edits);
         const suggestion = r.status === "complete" ? parseSuggestion(r.text) : null;

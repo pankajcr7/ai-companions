@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { prisma } from "../db.js";
-import type { Project, ProjectEntry } from "../generated/prisma/client.js";
+import type { Attachment, Project, ProjectEntry } from "../generated/prisma/client.js";
+import { getBlob } from "../files/store.js";
 import { requirePath } from "../files/service.js";
 import { exclusionReason } from "../files/rules.js";
 import type { Loaded } from "../goals/context.js";
@@ -147,4 +148,39 @@ export function webTools(searchKey: string | null): Tool[] {
     });
   }
   return tools;
+}
+
+/** The chat's attached files: list them, and read any one again (text in pages, images as pictures). */
+export function attachmentTools(atts: Attachment[]): Tool[] {
+  const find = (name: string) => {
+    const a = atts.find((x) => x.name.toLowerCase() === name.trim().toLowerCase());
+    if (!a) throw new ToolError(`There is no attachment called ${name}. Use list_attachments to see them.`);
+    return a;
+  };
+  return [
+    {
+      name: "list_attachments",
+      purpose: "Lists the files the owner attached in this chat.",
+      argsHelp: "{}",
+      args: z.object({}).passthrough(),
+      label: () => "attachments",
+      run: async () => atts.map((a) => `${a.name} (${a.kind}, ${Math.max(1, Math.round(a.size / 1024))} KB${a.pages ? `, ${a.pages} pages` : ""}${a.scanned ? ", scanned, no text" : ""})`).join("\n") || "No files are attached in this chat.",
+    },
+    {
+      name: "read_attachment",
+      purpose: `Reads an attached file, ${READ_CHARS} characters at a time; an image comes back as a picture.`,
+      argsHelp: '{"name": file name, "offset"?: number}',
+      args: z.object({ name: z.string().min(1).max(300), offset: z.number().int().min(0).optional() }),
+      label: (a) => a.name,
+      run: async (a) => {
+        const att = find(a.name);
+        if (att.kind === "image") return { text: `${att.name} (image)`, images: [{ mime: att.viewMime ?? att.mime, data: (await getBlob(att.viewHash ?? att.blobHash)).toString("base64") }] };
+        const text = att.text ?? "";
+        if (!text) return `${att.name} has no readable text${att.scanned ? " (it looks like a scanned document)" : ""}.`;
+        const from = a.offset ?? 0;
+        const piece = text.slice(from, from + READ_CHARS);
+        return from + READ_CHARS < text.length ? `${piece}\n[truncated — continue with offset ${from + READ_CHARS}]` : piece;
+      },
+    },
+  ];
 }

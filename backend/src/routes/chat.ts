@@ -5,8 +5,10 @@ import { companionInstructions, trimTurns } from "../companion.js";
 import { loadRoster } from "../goals/load.js";
 import { headInstructions } from "../goals/prompts.js";
 import { prisma } from "../db.js";
-import type { ChatEdit, ChatMessage } from "../generated/prisma/client.js";
-import { webTools } from "../harness/tools.js";
+import type { Attachment, ChatEdit, ChatMessage } from "../generated/prisma/client.js";
+import { historyTurns } from "../attachments/parts.js";
+import { attachmentDTO, ownAttachments } from "../attachments/service.js";
+import { attachmentTools, webTools } from "../harness/tools.js";
 import { loadSearchKey } from "../harness/web.js";
 import { chatEditDTO } from "./chat-edits.js";
 import { HttpError, perUser, requireMember } from "../http.js";
@@ -14,12 +16,12 @@ import type { ChatTurn } from "../providers/types.js";
 import { WsParams } from "./workspaces.js";
 
 const AgentParams = WsParams.extend({ agentId: z.string().min(1).max(64) });
-const Send = z.object({ message: z.string().trim().min(1).max(8000) });
+const Send = z.object({ message: z.string().trim().min(1).max(8000), attachmentIds: z.array(z.string().max(64)).max(10).default([]) });
 const HISTORY = 50;
 const CONTEXT_MESSAGES = 20;
 const CONTEXT_CHARS = 24_000;
 
-const dto = (m: ChatMessage & { edits?: ChatEdit[] }) => ({
+const dto = (m: ChatMessage & { edits?: ChatEdit[]; attachments?: Attachment[] }) => ({
   id: m.id,
   role: m.role,
   content: m.content,
@@ -32,6 +34,8 @@ const dto = (m: ChatMessage & { edits?: ChatEdit[] }) => ({
   createdAt: m.createdAt,
   toolUses: m.toolUses,
   edits: (m.edits ?? []).map(chatEditDTO),
+  attachments: (m.attachments ?? []).map(attachmentDTO),
+  visionFallback: m.visionFallback,
 });
 
 async function loadAgent(workspaceId: string, agentId: string) {
@@ -45,7 +49,7 @@ export async function chatRoutes(app: FastifyInstance) {
     const { id, agentId } = AgentParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
     await loadAgent(id, agentId);
-    const rows = await prisma.chatMessage.findMany({ where: { agentId, userId: user.id, conversationId: null }, orderBy: { createdAt: "desc" }, take: HISTORY });
+    const rows = await prisma.chatMessage.findMany({ where: { agentId, userId: user.id, conversationId: null }, orderBy: { createdAt: "desc" }, take: HISTORY, include: { attachments: { orderBy: { createdAt: "asc" } } } });
     return { messages: rows.reverse().map(dto) };
   });
 
@@ -64,7 +68,7 @@ export async function chatRoutes(app: FastifyInstance) {
       const watch = watchClient(reply);
       const { id, agentId } = AgentParams.parse(req.params);
       const { user } = await requireMember(req, id, "member");
-      const { message } = Send.parse(req.body);
+      const { message, attachmentIds } = Send.parse(req.body);
       const agent = await loadAgent(id, agentId);
       if (agent.status === "archived") throw new HttpError(409, "inactive", `Restore ${agent.name} before chatting`);
       if (agent.status === "paused") throw new HttpError(409, "inactive", `Resume ${agent.name} before chatting`);
@@ -72,23 +76,26 @@ export async function chatRoutes(app: FastifyInstance) {
       if (!conn || !agent.model) throw new HttpError(409, "unassigned", `Choose an AI model for ${agent.name} first`);
       if (conn.status === "reauth") throw new HttpError(409, "reauth", "Sign in to ChatGPT again in Settings › AI services");
 
-      const history = await prisma.chatMessage.findMany({ where: { agentId, userId: user.id, status: "complete", conversationId: null }, orderBy: { createdAt: "desc" }, take: CONTEXT_MESSAGES });
+      const atts = await ownAttachments(id, user.id, attachmentIds);
+      const history = await prisma.chatMessage.findMany({ where: { agentId, userId: user.id, status: "complete", conversationId: null }, orderBy: { createdAt: "desc" }, take: CONTEXT_MESSAGES, include: { attachments: { orderBy: { createdAt: "asc" } } } });
       const userMsg = await prisma.chatMessage.create({ data: { workspaceId: id, agentId, userId: user.id, role: "user", content: message } });
-      const turns = trimTurns([...history.reverse().map((m): ChatTurn => ({ role: m.role, content: m.content })), { role: "user", content: message }], CONTEXT_CHARS);
+      if (atts.length) await prisma.attachment.updateMany({ where: { id: { in: atts.map((a) => a.id) } }, data: { messageId: userMsg.id } });
+      const turns = trimTurns(await historyTurns([...history.reverse(), { role: "user" as const, content: message, attachments: atts }], conn.kind), CONTEXT_CHARS);
+      const chatFiles = await prisma.attachment.findMany({ where: { workspaceId: id, userId: user.id, message: { agentId, conversationId: null } }, orderBy: { createdAt: "asc" } });
       // Nova leads the team, so its chat knows the roster and can hand work to it; other companions just chat.
       const instructions = agent.isHead
         ? headInstructions(agent, agent.workspace.name, agent.department?.name ?? null, await loadRoster(id))
         : companionInstructions(agent, agent.workspace.name, agent.department?.name ?? null);
       await streamReply(req, reply, watch, {
         actor: { ...agent, model: agent.model, connection: conn },
-        tools: webTools(await loadSearchKey(id)),
+        tools: [...webTools(await loadSearchKey(id)), ...(chatFiles.length ? attachmentTools(chatFiles) : [])],
         limit: 6,
         instructions,
         turns,
         start: { userMessageId: userMsg.id },
         save: (r) =>
           prisma.chatMessage.create({
-            data: { workspaceId: id, agentId, userId: user.id, role: "assistant", content: r.text, status: r.status, connectionId: conn.id, kind: conn.kind, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens, errorCode: r.errorCode, errorMessage: r.errorMessage, toolUses: r.toolUses },
+            data: { workspaceId: id, agentId, userId: user.id, role: "assistant", content: r.text, status: r.status, connectionId: conn.id, kind: conn.kind, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens, errorCode: r.errorCode, errorMessage: r.errorMessage, toolUses: r.toolUses, visionFallback: r.visionFallback },
           }),
       });
     },

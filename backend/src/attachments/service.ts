@@ -19,11 +19,11 @@ export const attachmentDTO = (a: Attachment) => ({
   viewUrl: `/api/workspaces/${a.workspaceId}/attachments/${a.id}/view`,
 });
 
-/** The caller's own attachments, in the order asked; anyone else's id is "not found". */
+/** The caller's own not-yet-sent attachments, in the order asked; anyone else's (or an already sent) id is "not found". */
 export async function ownAttachments(workspaceId: string, userId: string, ids: string[]): Promise<Attachment[]> {
   if (!ids.length) return [];
   if (ids.length > MAX_ATTACHMENTS) throw new HttpError(400, "invalid", `Up to ${MAX_ATTACHMENTS} files per message`);
-  const rows = await prisma.attachment.findMany({ where: { id: { in: ids }, workspaceId, userId } });
+  const rows = await prisma.attachment.findMany({ where: { id: { in: ids }, workspaceId, userId, messageId: null, goalMessageId: null } });
   if (rows.length !== new Set(ids).size) throw new HttpError(404, "not_found", "Attachment not found");
   return ids.map((id) => rows.find((r) => r.id === id)!);
 }

@@ -2,14 +2,16 @@ import type { FastifyInstance } from "fastify";
 import { client, signUp } from "./helpers.js";
 import { fakeServer, json, sse, type FakeRequest } from "./fake-provider.js";
 
-type Body = { messages: { role: string; content: string }[] };
+type Body = { messages: { role: string; content: string | { type: string; text?: string }[] }[] };
 export type Reply = string | { status: number; message: string };
 export type Script = (system: string, user: string, body: Body) => Reply | Promise<Reply>;
 
 // Requests without a chat body (such as GET /v1/models) read as empty.
 const messagesOf = (q: FakeRequest) => (q.body as Body | undefined)?.messages ?? [];
-export const systemOf = (q: FakeRequest) => messagesOf(q).find((m) => m.role === "system")?.content ?? "";
-export const userOf = (q: FakeRequest) => messagesOf(q).filter((m) => m.role === "user").at(-1)?.content ?? "";
+// Messages with attachments arrive as parts; scripts read their text.
+const textOf = (c: string | { type: string; text?: string }[] | undefined) => (typeof c === "string" ? c : (c ?? []).map((p) => p.text ?? "").filter(Boolean).join("\n"));
+export const systemOf = (q: FakeRequest) => textOf(messagesOf(q).find((m) => m.role === "system")?.content);
+export const userOf = (q: FakeRequest) => textOf(messagesOf(q).filter((m) => m.role === "user").at(-1)?.content);
 export const fence = (value: unknown) => `\`\`\`json\n${JSON.stringify(value)}\n\`\`\``;
 
 /** An OpenAI-compatible fake whose replies come from a script that sees the system and last user message. */
