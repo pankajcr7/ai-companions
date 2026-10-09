@@ -52,3 +52,29 @@ export async function cleanupAttachments(now = Date.now()): Promise<number> {
   const r = await prisma.attachment.deleteMany({ where: { messageId: null, goalMessageId: null, goalId: null, createdAt: { lt: new Date(now - DAY_MS) } } });
   return r.count;
 }
+
+/** A work request's files go to the goal: the request message's own files, plus earlier ones in the chat that the goal names. */
+export async function linkGoalAttachments(goalId: string, userMessageId: string, conversationId: string, goalText: string) {
+  await prisma.attachment.updateMany({ where: { messageId: userMessageId }, data: { goalId } });
+  const earlier = await prisma.attachment.findMany({ where: { goalId: null, message: { conversationId } }, select: { id: true, name: true } });
+  const named = earlier.filter((a) => goalText.toLowerCase().includes(a.name.toLowerCase())).map((a) => a.id);
+  if (named.length) await prisma.attachment.updateMany({ where: { id: { in: named } }, data: { goalId } });
+}
+
+/** On Start: the goal's files are copied into the project's attachments/ folder and listed with the first task. */
+export async function copyGoalAttachments(workspaceId: string, goalId: string, userId: string, projectId: string) {
+  const atts = await prisma.attachment.findMany({ where: { goalId }, orderBy: { createdAt: "asc" } });
+  if (!atts.length) return;
+  const project = await prisma.project.findFirstOrThrow({ where: { id: projectId, workspaceId } });
+  const first = await prisma.goalTask.findFirst({ where: { goalId }, orderBy: { position: "asc" } });
+  const problems: string[] = [];
+  for (const att of atts) {
+    try {
+      const path = await copyIntoProject(att, project, userId);
+      if (first) await prisma.proposedEdit.create({ data: { taskId: first.id, goalId, path, baseRevision: 0, content: "", note: "Your attachment", status: "applied", decidedById: userId } });
+    } catch (e) {
+      problems.push(e instanceof HttpError ? e.message : `${att.name} couldn't be added`);
+    }
+  }
+  if (problems.length) await prisma.goal.update({ where: { id: goalId }, data: { error: problems.join(" ") } });
+}

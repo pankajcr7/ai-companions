@@ -5,7 +5,7 @@ import { trimTurns } from "../companion.js";
 import { prisma } from "../db.js";
 import type { Attachment, ChatEdit, ChatMessage } from "../generated/prisma/client.js";
 import { historyTurns } from "../attachments/parts.js";
-import { attachmentDTO, ownAttachments } from "../attachments/service.js";
+import { attachmentDTO, linkGoalAttachments, ownAttachments } from "../attachments/service.js";
 import { loadProject } from "../files/service.js";
 import { attachmentTools, projectTools, webTools } from "../harness/tools.js";
 import { loadSearchKey } from "../harness/web.js";
@@ -106,6 +106,9 @@ export async function conversationRoutes(app: FastifyInstance) {
     // Conditional, so two clicks can't link two goals to one message.
     const linked = await prisma.chatMessage.updateMany({ where: { id: mid, goalId: null }, data: { goalId: goal.id, planBlocked: null } });
     if (!linked.count) throw new HttpError(409, "planned", "This request already has a plan.");
+    // The owner's message just before Nova's reply carries the files for this request.
+    const request = await prisma.chatMessage.findFirst({ where: { conversationId: cid, role: "user", createdAt: { lte: msg.createdAt } }, orderBy: { createdAt: "desc" }, select: { id: true } });
+    if (request) await linkGoalAttachments(goal.id, request.id, cid, text ?? suggestion.goal);
     return { goalId: goal.id };
   });
 
@@ -171,6 +174,7 @@ export async function conversationRoutes(app: FastifyInstance) {
             log: (e) => req.log.error(e),
           });
           await prisma.chatMessage.update({ where: { id: saved.id }, data: { goalId: goal.id } });
+          await linkGoalAttachments(goal.id, userMsg.id, cid, suggestion.goal);
         } catch (e) {
           if (!(e instanceof HttpError)) throw e;
           await prisma.chatMessage.update({ where: { id: saved.id }, data: { planBlocked: e.code === "busy" ? "busy" : e.message } });

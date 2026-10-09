@@ -9,6 +9,7 @@ import { loadHead } from "../goals/load.js";
 import { Plan, planProblems } from "../goals/plan.js";
 import { ACTIVE, createGoal } from "../goals/create.js";
 import { BRIEF_PATH } from "../goals/quality.js";
+import { copyGoalAttachments } from "../attachments/service.js";
 import { planGoal } from "../goals/planner.js";
 import { abortGoal, kickGoal } from "../goals/runner.js";
 import { audit, HttpError, perUser, requireMember } from "../http.js";
@@ -161,6 +162,8 @@ export async function goalRoutes(app: FastifyInstance) {
     });
     if (!started) throw new HttpError(409, "conflict", "This goal has already started.");
     if (goal.brief && started.projectId) await saveBrief(id, gid, user.id, started.projectId, goal.brief).catch((e) => req.log.error(e));
+    // The owner's chat attachments join the project before anyone starts working.
+    if (started.projectId) await copyGoalAttachments(id, gid, user.id, started.projectId).catch((e) => req.log.error(e));
     await audit(prisma, id, user.id, "goal.start", "goal", gid);
     kickGoal(gid);
     return { ok: true };

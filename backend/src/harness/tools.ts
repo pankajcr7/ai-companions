@@ -2,6 +2,9 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import type { Attachment, Project, ProjectEntry } from "../generated/prisma/client.js";
 import { getBlob } from "../files/store.js";
+import { detect, type Kind } from "../attachments/detect.js";
+import { extractText } from "../attachments/extract.js";
+import { LIMITS } from "../files/rules.js";
 import { requirePath } from "../files/service.js";
 import { exclusionReason } from "../files/rules.js";
 import type { Loaded } from "../goals/context.js";
@@ -9,6 +12,19 @@ import { loadText } from "../goals/load.js";
 import { HttpError } from "../http.js";
 import { ToolError, type Tool } from "./loop.js";
 import { openUrl, tavilySearch, untrusted } from "./web.js";
+
+const MAX_SHOWN_IMAGE = 4.5 * 1024 * 1024;
+const DOC_EXT = /\.(pdf|docx|xlsx|pptx)$/i;
+// ponytail: per-process cache of document text by blob, oldest out past 50; move to a column if documents get large or many.
+const docCache = new Map<string, string>();
+async function documentText(hash: string, kind: Kind, mime: string, data: Buffer): Promise<string> {
+  const hit = docCache.get(hash);
+  if (hit !== undefined) return hit;
+  const text = (await extractText(kind, mime, data)).text ?? "";
+  docCache.set(hash, text);
+  if (docCache.size > 50) docCache.delete(docCache.keys().next().value!);
+  return text;
+}
 
 export type Write = { path: string; content: string; note: string; baseRevision: number };
 export const READ_CHARS = 20_000;
@@ -65,8 +81,21 @@ export function projectTools(project: Project, o: { write: ((w: Write) => Promis
       run: async (a) => {
         const { path, e } = await fileAt(a.path);
         if (!e || e.kind !== "file" || !e.blobHash) throw new ToolError(`There is no file at ${path}. Use list_files to see what exists.`);
-        if (!e.isText) return `${e.path} is a binary file (${Math.ceil(e.size / 1024)} KB) and can't be read as text.`;
-        const text = await loadText(e.blobHash);
+        let text: string;
+        if (e.isText) text = await loadText(e.blobHash);
+        else {
+          // Images come back as pictures; PDF and Office files as their text; anything else stays unreadable.
+          const data = await getBlob(e.blobHash);
+          const type = detect(e.path, data);
+          if (type?.kind === "image") {
+            if (e.size > MAX_SHOWN_IMAGE) return `${e.path} is an image too large to show (${(e.size / 1024 / 1024).toFixed(1)} MB).`;
+            return { text: `${e.path} (image, ${Math.ceil(e.size / 1024)} KB)`, images: [{ mime: type.mime, data: data.toString("base64") }] };
+          }
+          const doc = type && (type.kind === "pdf" || type.kind === "office") ? await documentText(e.blobHash, type.kind, type.mime, data) : null;
+          if (doc === null) return `${e.path} is a binary file (${Math.ceil(e.size / 1024)} KB) and can't be read as text.`;
+          if (!doc) return `${e.path} has no readable text (it may be a scanned document).`;
+          text = doc;
+        }
         o.read.set(e.pathLower, { path: e.path, revision: e.revision, content: text });
         const from = a.offset ?? 0;
         const piece = text.slice(from, from + READ_CHARS);
@@ -84,10 +113,18 @@ export function projectTools(project: Project, o: { write: ((w: Write) => Promis
         const needle = a.query.toLowerCase();
         const hits: string[] = [];
         let scanned = 0;
-        for (const e of (await entries()).filter((x) => x.kind === "file" && x.isText && x.blobHash && x.size <= SEARCH_FILE_MAX && under(x, dir))) {
+        const searchable = (x: ProjectEntry) => x.kind === "file" && !!x.blobHash && under(x, dir) && (x.isText ? x.size <= SEARCH_FILE_MAX : DOC_EXT.test(x.path) && x.size <= LIMITS.maxFileBytes);
+        for (const e of (await entries()).filter(searchable)) {
           if (hits.length >= SEARCH_HITS || scanned > SEARCH_SCAN_MAX || signal.aborted) break;
-          scanned += e.size;
-          const lines = (await loadText(e.blobHash!)).split("\n");
+          let body: string;
+          if (e.isText) body = await loadText(e.blobHash!);
+          else {
+            const data = await getBlob(e.blobHash!);
+            const type = detect(e.path, data);
+            body = type && (type.kind === "pdf" || type.kind === "office") ? ((await documentText(e.blobHash!, type.kind, type.mime, data)) ?? "") : "";
+          }
+          scanned += body.length;
+          const lines = body.split("\n");
           for (let i = 0; i < lines.length && hits.length < SEARCH_HITS; i++) if (lines[i].toLowerCase().includes(needle)) hits.push(`${e.path}:${i + 1}: ${lines[i].trim().slice(0, 200)}`);
         }
         return hits.length ? hits.join("\n") : "No matches.";

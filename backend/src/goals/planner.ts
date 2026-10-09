@@ -34,7 +34,9 @@ export async function planGoal(goalId: string): Promise<void> {
     // Planning may read a few files first, each a slow model call.
     const signal = AbortSignal.any([ctl.signal, AbortSignal.timeout(15 * 60_000)]);
     const planTools = [...(goal.project ? projectTools(goal.project, { write: null, read: new Map() }) : []), ...webTools(await loadSearchKey(goal.workspaceId))];
-    const { value, calls } = await completeJson(nova, planInstructions(goal.workspace.name, goal.newProject), planPrompt(goal.text, entries, ctx, previous), schema, signal, stepLog(goal.workspaceId, goalId, null, "plan"), { tools: planTools, limit: 4 });
+    const files = await prisma.attachment.findMany({ where: { goalId }, orderBy: { createdAt: "asc" } });
+    const attached = files.map((a) => `attachments/${a.name} (${a.kind}, ${Math.max(1, Math.round(a.size / 1024))} KB${a.pages ? `, ${a.pages} pages` : ""}${a.kind === "image" ? "" : a.scanned ? ", scanned" : ", text inside"})`).join("\n") || null;
+    const { value, calls } = await completeJson(nova, planInstructions(goal.workspace.name, goal.newProject), planPrompt(goal.text, entries, ctx, previous, attached), schema, signal, stepLog(goal.workspaceId, goalId, null, "plan"), { tools: planTools, limit: 4 });
     const inputTokens = calls.reduce((n, c) => n + (c.inputTokens ?? 0), 0);
     const outputTokens = calls.reduce((n, c) => n + (c.outputTokens ?? 0), 0);
     await prisma.$transaction(async (tx) => {
