@@ -102,13 +102,12 @@ export async function conversationRoutes(app: FastifyInstance) {
     // The owner may have edited the request on the card before planning it.
     const { text } = z.object({ text: z.string().trim().min(1).max(4000).optional() }).parse(req.body ?? {});
     const latest = await prisma.chatMessage.findFirst({ where: { conversationId: cid, goalId: { not: null } }, orderBy: { createdAt: "desc" }, select: { goalId: true } });
-    const goal = await createGoal({ workspaceId: id, userId: user.id, text: text ?? suggestion.goal, newProject: suggestion.newProject, parentGoalId: latest?.goalId ?? null, projectId: latest ? undefined : null, log: (e) => req.log.error(e) });
+    // The owner's message just before Nova's reply carries the files for this request.
+    const request = await prisma.chatMessage.findFirst({ where: { conversationId: cid, role: "user", createdAt: { lte: msg.createdAt } }, orderBy: { createdAt: "desc" }, select: { id: true } });
+    const goal = await createGoal({ workspaceId: id, userId: user.id, text: text ?? suggestion.goal, newProject: suggestion.newProject, parentGoalId: latest?.goalId ?? null, projectId: latest ? undefined : null, log: (e) => req.log.error(e), beforePlan: request ? (goalId) => linkGoalAttachments(goalId, request.id, cid, text ?? suggestion.goal!) : undefined });
     // Conditional, so two clicks can't link two goals to one message.
     const linked = await prisma.chatMessage.updateMany({ where: { id: mid, goalId: null }, data: { goalId: goal.id, planBlocked: null } });
     if (!linked.count) throw new HttpError(409, "planned", "This request already has a plan.");
-    // The owner's message just before Nova's reply carries the files for this request.
-    const request = await prisma.chatMessage.findFirst({ where: { conversationId: cid, role: "user", createdAt: { lte: msg.createdAt } }, orderBy: { createdAt: "desc" }, select: { id: true } });
-    if (request) await linkGoalAttachments(goal.id, request.id, cid, text ?? suggestion.goal);
     return { goalId: goal.id };
   });
 
@@ -172,9 +171,9 @@ export async function conversationRoutes(app: FastifyInstance) {
             projectId: project.kind === "existing" ? project.id : latestGoalId ? undefined : null,
             parentGoalId: latestGoalId,
             log: (e) => req.log.error(e),
+            beforePlan: (goalId) => linkGoalAttachments(goalId, userMsg.id, cid, suggestion.goal!),
           });
           await prisma.chatMessage.update({ where: { id: saved.id }, data: { goalId: goal.id } });
-          await linkGoalAttachments(goal.id, userMsg.id, cid, suggestion.goal);
         } catch (e) {
           if (!(e instanceof HttpError)) throw e;
           await prisma.chatMessage.update({ where: { id: saved.id }, data: { planBlocked: e.code === "busy" ? "busy" : e.message } });

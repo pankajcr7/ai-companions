@@ -8,7 +8,7 @@ import { planGoal } from "./planner.js";
 export const ACTIVE = ["planning", "running", "reviewing"] as const;
 
 /** Creates a goal and starts planning. Shared by POST /goals and the chat home's automatic plans. */
-export async function createGoal(o: { workspaceId: string; userId: string; text: string; projectId?: string | null; parentGoalId?: string | null; newProject?: boolean; log?: (e: unknown) => void }) {
+export async function createGoal(o: { workspaceId: string; userId: string; text: string; projectId?: string | null; parentGoalId?: string | null; newProject?: boolean; log?: (e: unknown) => void; beforePlan?: (goalId: string) => Promise<void> }) {
   const id = o.workspaceId;
   let projectId = o.projectId ?? null;
   if (o.parentGoalId) {
@@ -30,6 +30,8 @@ export async function createGoal(o: { workspaceId: string; userId: string; text:
     return tx.goal.create({ data: { workspaceId: id, projectId, parentGoalId: o.parentGoalId ?? null, newProject: o.newProject ?? false, text: o.text, createdById: o.userId } });
   });
   await audit(prisma, id, o.userId, "goal.create", "goal", goal.id);
+  // Anything the plan must see (the owner's attached files) is in place before Nova starts planning.
+  if (o.beforePlan) await o.beforePlan(goal.id).catch((e) => (o.log ?? console.error)(e));
   planGoal(goal.id).catch((e) => (o.log ?? console.error)(e));
   return { id: goal.id };
 }

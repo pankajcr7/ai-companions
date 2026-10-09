@@ -17,8 +17,15 @@ export function detect(_name: string, d: Buffer): { kind: Kind; mime: string } |
   if (d.subarray(0, 5).toString("latin1") === "%PDF-") return { kind: "pdf", mime: "application/pdf" };
   if (starts(d, "504b0304")) {
     try {
-      const names = Object.keys(unzipSync(d, { filter: (f) => f.name in OFFICE }));
-      return names[0] ? { kind: "office", mime: OFFICE[names[0]] } : null;
+      // Only the entry names are read; nothing is inflated, so a zip bomb costs nothing here.
+      let found: string | undefined;
+      unzipSync(d, {
+        filter: (f) => {
+          if (!found && f.name in OFFICE) found = f.name;
+          return false;
+        },
+      });
+      return found ? { kind: "office", mime: OFFICE[found] } : null;
     } catch {
       return null;
     }
@@ -26,7 +33,8 @@ export function detect(_name: string, d: Buffer): { kind: Kind; mime: string } |
   const head = d.subarray(0, 8192);
   if (head.includes(0)) return null;
   try {
-    new TextDecoder("utf-8", { fatal: true }).decode(head.subarray(0, head.length - (head.length === 8192 ? 4 : 0)));
+    // stream: true lets the sample end in the middle of a character (any non-English text).
+    new TextDecoder("utf-8", { fatal: true }).decode(head, { stream: true });
     return { kind: "text", mime: "text/plain" };
   } catch {
     return null;

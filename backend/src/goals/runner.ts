@@ -123,7 +123,8 @@ async function runTask(goalId: string, taskId: string) {
     const existing = new Map((ctx.entries ?? []).map((e) => [e.path.toLowerCase(), e]));
     // A goal that created its project saves new files right away; anything else waits for Apply.
     // Files this goal created in its own project can be revised directly (Nova's review asks for fixes).
-    const goalCreated = new Set((await prisma.proposedEdit.findMany({ where: { goalId, status: "applied" }, select: { path: true } })).map((e) => e.path.toLowerCase()));
+    // The owner's attachments are theirs, not files this goal made: changing them always needs the owner's OK.
+    const goalCreated = new Set((await prisma.proposedEdit.findMany({ where: { goalId, status: "applied", note: { not: "Your attachment" } }, select: { path: true } })).map((e) => e.path.toLowerCase()));
     const saveOrSuggest = async (w: Write) => {
       const raw = { path: w.path, content: w.content, note: w.note };
       const ownFile = w.baseRevision !== 0 && goalCreated.has(w.path.toLowerCase());

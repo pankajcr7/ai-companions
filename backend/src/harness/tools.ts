@@ -4,6 +4,7 @@ import type { Attachment, Project, ProjectEntry } from "../generated/prisma/clie
 import { getBlob } from "../files/store.js";
 import { detect, type Kind } from "../attachments/detect.js";
 import { extractText } from "../attachments/extract.js";
+import { imageFits } from "../attachments/parts.js";
 import { LIMITS } from "../files/rules.js";
 import { requirePath } from "../files/service.js";
 import { exclusionReason } from "../files/rules.js";
@@ -13,7 +14,6 @@ import { HttpError } from "../http.js";
 import { ToolError, type Tool } from "./loop.js";
 import { openUrl, tavilySearch, untrusted } from "./web.js";
 
-const MAX_SHOWN_IMAGE = 4.5 * 1024 * 1024;
 const DOC_EXT = /\.(pdf|docx|xlsx|pptx)$/i;
 // ponytail: per-process cache of document text by blob, oldest out past 50; move to a column if documents get large or many.
 const docCache = new Map<string, string>();
@@ -88,7 +88,7 @@ export function projectTools(project: Project, o: { write: ((w: Write) => Promis
           const data = await getBlob(e.blobHash);
           const type = detect(e.path, data);
           if (type?.kind === "image") {
-            if (e.size > MAX_SHOWN_IMAGE) return `${e.path} is an image too large to show (${(e.size / 1024 / 1024).toFixed(1)} MB).`;
+            if (!imageFits(e.size)) return `${e.path} is an image too large to show (${(e.size / 1024 / 1024).toFixed(1)} MB).`;
             return { text: `${e.path} (image, ${Math.ceil(e.size / 1024)} KB)`, images: [{ mime: type.mime, data: data.toString("base64") }] };
           }
           const doc = type && (type.kind === "pdf" || type.kind === "office") ? await documentText(e.blobHash, type.kind, type.mime, data) : null;
@@ -211,7 +211,11 @@ export function attachmentTools(atts: Attachment[]): Tool[] {
       label: (a) => a.name,
       run: async (a) => {
         const att = find(a.name);
-        if (att.kind === "image") return { text: `${att.name} (image)`, images: [{ mime: att.viewMime ?? att.mime, data: (await getBlob(att.viewHash ?? att.blobHash)).toString("base64") }] };
+        if (att.kind === "image") {
+          const data = await getBlob(att.viewHash ?? att.blobHash);
+          if (!imageFits(data.length)) return `${att.name} is an image too large to show (${(data.length / 1024 / 1024).toFixed(1)} MB).`;
+          return { text: `${att.name} (image)`, images: [{ mime: att.viewMime ?? att.mime, data: data.toString("base64") }] };
+        }
         const text = att.text ?? "";
         if (!text) return `${att.name} has no readable text${att.scanned ? " (it looks like a scanned document)" : ""}.`;
         const from = a.offset ?? 0;

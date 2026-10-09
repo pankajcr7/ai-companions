@@ -36,6 +36,7 @@ export async function complete(actor: Actor, instructions: string, turns: ChatTu
   let done: Extract<StreamEvent, { type: "done" }> | undefined;
   // A model that can't take pictures or PDFs gets the same message once more with notes in their place.
   let sent = turns;
+  let retried = false;
   let visionFallback = false;
   try {
     const provider = clientFor(actor.connection!);
@@ -50,9 +51,12 @@ export async function complete(actor: Actor, instructions: string, turns: ChatTu
         }
         break;
       } catch (e) {
-        if (!text && !visionFallback && !signal.aborted && e instanceof ProviderError && ["bad_request", "unsupported", "refused"].includes(e.code) && hasMedia(sent)) {
+        // A request that is simply too big (413) isn't a model that can't see: no retry without media then.
+        if (!text && !retried && !signal.aborted && e instanceof ProviderError && ["bad_request", "unsupported", "refused"].includes(e.code) && e.status !== 413 && hasMedia(sent)) {
+          // Only dropped pictures earn the "can't see images" hint; dropped PDFs still reach the model as text.
+          visionFallback = sent.some((t) => typeof t.content !== "string" && t.content.some((p) => p.type === "image"));
           sent = withoutMedia(sent);
-          visionFallback = true;
+          retried = true;
           continue;
         }
         if (attempt === 0 && !text && e instanceof ProviderError && e.retryable && !signal.aborted) {
