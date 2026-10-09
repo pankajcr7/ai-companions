@@ -9,7 +9,8 @@ export type PickedItem = { key: string; name: string; size: number; previewUrl: 
 
 /** A smaller copy of a big photo for the AI to look at; the original still goes to the project. */
 async function viewCopy(file: File): Promise<Blob | null> {
-  if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return null;
+  // GIFs get a still copy too: the AI only needs one frame, and animated GIFs are often too big to send.
+  if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) return null;
   const bmp = await createImageBitmap(file).catch(() => null);
   if (!bmp || !needsViewCopy(file.size, bmp.width, bmp.height)) return null;
   const { w, h } = fitWithin(bmp.width, bmp.height);
