@@ -89,7 +89,7 @@ export function GoalCard({ goalId, onStatus }: { goalId: string; onStatus?: (goa
           <ul className="mt-2 space-y-1.5">
             {goal.tasks.map((t) => (
               <li key={t.id} className="flex items-center gap-2">
-                {agent(t.agentId) && <CompanionAvatar look={agent(t.agentId)!.appearance} size={24} />}
+                {agent(t.agentId) && <CompanionAvatar identity={t.agentId} look={agent(t.agentId)!.appearance} size={24} />}
                 <span>{planSentence(t.agentName, t.title)}</span>
               </li>
             ))}
@@ -115,7 +115,7 @@ export function GoalCard({ goalId, onStatus }: { goalId: string; onStatus?: (goa
             {goal.tasks.map((t) => (
               <li key={t.id}>
                 <button onClick={() => setOpen((o) => (o === t.id ? null : t.id))} aria-expanded={open === t.id} className="flex w-full items-center gap-2 rounded-[8px] px-1 py-1 text-left hover:bg-bg">
-                  {agent(t.agentId) && <CompanionAvatar look={agent(t.agentId)!.appearance} size={24} />}
+                  {agent(t.agentId) && <CompanionAvatar identity={t.agentId} look={agent(t.agentId)!.appearance} size={24} />}
                   <span className="min-w-0 flex-1 truncate">{planSentence(t.agentName, t.title)}</span>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATE[t.status][1]}`}>
                     {STATE[t.status][0]}

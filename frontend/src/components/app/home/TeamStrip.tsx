@@ -19,7 +19,7 @@ export function TeamStrip({ workingIds }: { workingIds: string[] }) {
         return (
           <span key={a.id} role="listitem">
             <Link href={`/w/${snapshot.workspace.slug}/team/${a.id}`} title={`${a.name}: ${state[0]}`} className="flex items-center gap-1.5 rounded-full border border-line bg-paper py-0.5 pl-0.5 pr-2.5 text-xs hover:border-ink">
-              <CompanionAvatar look={a.appearance} size={22} />
+              <CompanionAvatar identity={a.id} look={a.appearance} size={22} />
               {a.name}
               <span className={`size-2 rounded-full ${state[1]}`} aria-label={state[0]} />
             </Link>

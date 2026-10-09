@@ -16,7 +16,7 @@ function Tree({ agents, managerId }: { agents: Agent[]; managerId: string }) {
       {reports.map((a) => (
         <li key={a.id} className="py-1.5">
           <span className="flex flex-wrap items-center gap-x-2 text-sm">
-            <CompanionAvatar look={a.appearance} size={28} /> <span className="font-medium">{a.name}</span> <span className="text-muted">{roleLabel(a)}, {statusLabel(a)}</span>
+            <CompanionAvatar identity={a.id} look={a.appearance} size={28} /> <span className="font-medium">{a.name}</span> <span className="text-muted">{roleLabel(a)}, {statusLabel(a)}</span>
           </span>
           <Tree agents={agents} managerId={a.id} />
         </li>
@@ -135,7 +135,7 @@ export function OrganizeDialog({ onClose }: { onClose: () => void }) {
             <ul className="ml-5 border-l border-line pl-4">
               <li className="py-1.5">
                 <span className="flex flex-wrap items-center gap-x-2 text-sm">
-                  <CompanionAvatar look={head.appearance} size={28} /> <span className="font-medium">{head.name}</span> <span className="text-muted">{roleLabel(head)}</span>
+                  <CompanionAvatar identity={head.id} look={head.appearance} size={28} /> <span className="font-medium">{head.name}</span> <span className="text-muted">{roleLabel(head)}</span>
                 </span>
                 <Tree agents={snapshot.agents} managerId={head.id} />
               </li>

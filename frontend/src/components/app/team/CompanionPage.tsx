@@ -76,7 +76,7 @@ export function CompanionPage({ agentId }: { agentId: string }) {
       <section aria-label={`About ${agent.name}`} className="min-w-0 lg:w-80 lg:shrink-0 lg:overflow-y-auto">
         <Link href={`${base}/team`} className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink"><ArrowLeft size={14} /> Back to team</Link>
         <div className="mt-4 flex items-center gap-4">
-          <CompanionAvatar look={agent.appearance} size={72} />
+          <CompanionAvatar identity={agent.id} look={agent.appearance} size={72} />
           <div className="min-w-0">
             <h1 className="truncate text-2xl font-semibold">{agent.name}</h1>
             <p className="text-sm text-muted">{roleLabel(agent)}{agent.kind === "human" ? " · person" : ""}</p>

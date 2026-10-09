@@ -11,7 +11,7 @@ export function TeamCard({ agent, status, base, role, onSetUp }: { agent: Agent;
   return (
     <article aria-label={agent.name} className="relative flex flex-col gap-3 rounded-[14px] border border-line bg-paper p-4 hover:border-ink">
       <div className="flex items-center gap-3">
-        <CompanionAvatar look={agent.appearance} size={48} />
+        <CompanionAvatar identity={agent.id} look={agent.appearance} size={48} />
         <div className="min-w-0">
           <Link href={page} className="block truncate font-semibold after:absolute after:inset-0">{agent.name}</Link>
           <p className="truncate text-sm text-muted">{roleLabel(agent)}</p>

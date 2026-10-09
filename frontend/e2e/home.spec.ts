@@ -5,10 +5,12 @@ test("ask Nova for work on the home screen, start, stop, resume, and ask about t
   const co = await newCompany(page, { prefix: "Home", company: "Home Bakery", template: /Just the head agent/ });
   await connectFakeLLM(page, co.id);
 
-  await page.getByRole("link", { name: "Home", exact: true }).click();
+  await page.getByRole("link", { name: "Chat", exact: true }).click();
   const chat = page.getByRole("region", { name: "Chat with Nova" });
-  await expect(chat.getByText("What should the team work on today?")).toBeVisible();
+  await expect(chat.getByRole("heading", { name: "What would you like to create?" })).toBeVisible();
+  await chat.getByText("Your team", { exact: true }).click();
   await expect(page.getByRole("list", { name: "Your team" }).getByText("Nova")).toBeVisible();
+  await chat.getByText("Your team", { exact: true }).click();
   await chat.getByLabel("Message Nova").fill("Write the launch posts for my bakery");
   await chat.getByRole("button", { name: "Send", exact: true }).click();
 
@@ -38,11 +40,14 @@ test("ask Nova for work on the home screen, start, stop, resume, and ask about t
 
   // Chats can be renamed and deleted from the list.
   const list = page.getByRole("navigation", { name: "Conversations" });
-  page.once("dialog", (d) => d.accept("Bakery launch"));
-  await list.getByRole("button", { name: "Rename Write the launch posts for my bakery" }).click();
+  await list.getByRole("button", { name: "Options for Write the launch posts for my bakery" }).click();
+  await list.getByRole("button", { name: "Rename", exact: true }).click();
+  await list.getByLabel("Chat name", { exact: true }).fill("Bakery launch");
+  await list.getByRole("button", { name: "Save chat name" }).click();
   await expect(list.getByText("Bakery launch")).toBeVisible();
-  page.once("dialog", (d) => d.accept());
-  await list.getByRole("button", { name: "Delete Bakery launch" }).click();
+  await list.getByRole("button", { name: "Options for Bakery launch" }).click();
+  await list.getByRole("button", { name: "Delete", exact: true }).click();
+  await list.getByRole("button", { name: "Delete chat", exact: true }).click();
   await expect(list.getByText("Bakery launch")).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Chat with Nova" }).getByText("What should the team work on today?")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Chat with Nova" }).getByRole("heading", { name: "What would you like to create?" })).toBeVisible();
 });

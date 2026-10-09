@@ -255,7 +255,7 @@ export function OfficeScene({
                 <rect x={-46} y={26} width={92} height={14} rx={4} fill="var(--line)" />
                 {thinking && <text y={-46} textAnchor="middle" className="fill-ink" style={{ fontSize: 18 }}>…</text>}
                 <g className="bob">
-                  <CompanionFigure look={a.appearance} />
+                  <CompanionFigure look={a.appearance} identity={a.id} working={thinking} />
                 </g>
                 <text y={62} textAnchor="middle" className="fill-ink" style={{ fontSize: 15, fontWeight: 600 }}>{a.name}</text>
                 <text y={80} textAnchor="middle" className="fill-muted" style={{ fontSize: 12 }}>

@@ -41,7 +41,7 @@ export function TaskCard({ task, edits, goalPath, editable, onChanged }: { task:
   return (
     <article className="mt-3 rounded-[12px] border border-line p-3" aria-label={`Task: ${task.title}`}>
       <div className="flex items-start gap-2">
-        {agent && <CompanionAvatar look={agent.appearance} size={28} />}
+        {agent && <CompanionAvatar identity={agent.id} look={agent.appearance} size={28} />}
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">{task.title}</p>
           <p className="text-xs text-muted">

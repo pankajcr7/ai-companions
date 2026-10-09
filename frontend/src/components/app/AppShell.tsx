@@ -2,57 +2,112 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ChatCircle, FolderSimple, GearSix, SignOut, UsersThree } from "@phosphor-icons/react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { ChatCircle, FolderSimple, GearSix, List, SignOut, UsersThree, X } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/lib/workspace";
 import { Logo } from "@/components/landing/ui";
+import "./dashboard.css";
+
+// Chat history lives in the app sidebar while its state stays with the chat page.
+const SidebarContext = createContext<{ history: HTMLDivElement | null; close: () => void }>({ history: null, close: () => {} });
+export const useAppSidebar = () => useContext(SidebarContext);
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { snapshot } = useWorkspace();
   const pathname = usePathname();
   const router = useRouter();
+  const [history, setHistory] = useState<HTMLDivElement | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [error, setError] = useState("");
+  const sidebar = useRef<HTMLElement>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const close = useCallback(() => setMenuOpen(false), []);
   const base = `/w/${snapshot.workspace.slug}`;
+  const isChat = pathname === base;
   const nav = [
-    { href: base, label: "Home", icon: ChatCircle },
-    { href: `${base}/team`, label: "Team", icon: UsersThree },
+    { href: base, label: "Chat", icon: ChatCircle },
     { href: `${base}/projects`, label: "Projects", icon: FolderSimple },
-    { href: `${base}/settings`, label: "Settings", icon: GearSix },
+    { href: `${base}/team`, label: "Team", icon: UsersThree },
   ];
   const { theme, reducedMotion, calmMode } = snapshot.preferences;
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    const trigger = menuButton.current;
+    sidebar.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const onResize = () => { if (desktop.matches) close(); };
+    desktop.addEventListener("change", onResize);
+    return () => {
+      desktop.removeEventListener("change", onResize);
+      trigger?.focus();
+    };
+  }, [menuOpen, close]);
+
   async function signOut() {
-    await authClient.signOut();
-    router.push("/sign-in");
+    try {
+      await authClient.signOut();
+      router.push("/sign-in");
+    } catch {
+      setError("Couldn't sign out. Please try again.");
+    }
   }
 
   return (
-    <div className="app flex min-h-[100dvh] flex-col lg:h-[100dvh] lg:flex-row" data-theme={theme} data-still={reducedMotion || calmMode}>
-      <aside className="flex items-center justify-between gap-2 border-b border-line bg-paper px-4 py-3 lg:w-60 lg:flex-col lg:items-stretch lg:justify-start lg:border-b-0 lg:border-r lg:p-5">
-        <Link href={base} aria-label="Agent Company home"><Logo compact className="text-base sm:text-lg" /></Link>
-        <p className="hidden truncate text-sm font-medium text-muted lg:mt-6 lg:block">{snapshot.workspace.name}</p>
-        <nav aria-label="App" className="fixed inset-x-0 bottom-0 z-30 flex justify-around border-t border-line bg-paper px-2 py-1.5 sm:static sm:justify-start sm:gap-1 sm:border-0 sm:bg-transparent sm:p-0 lg:mt-4 lg:flex-col">
-          {nav.map(({ href, label, icon: Icon }) => {
-            const active = href === base ? pathname === href : pathname.startsWith(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                aria-label={label}
-                title={label}
-                className={`flex flex-col items-center gap-0.5 rounded-[10px] px-2.5 py-1.5 text-[11px] font-medium sm:flex-row sm:gap-2 sm:px-3 sm:py-2 sm:text-sm ${active ? "bg-ink text-paper" : "text-ink hover:bg-bg"}`}
-              >
-                <Icon size={18} /> <span>{label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-        <button onClick={signOut} aria-label="Sign out" title="Sign out" className="flex items-center gap-2 rounded-[10px] px-2.5 py-2 text-sm text-muted hover:bg-bg sm:px-3 lg:mt-auto">
-          <SignOut size={18} /> <span className="hidden sm:inline">Sign out</span>
-        </button>
-      </aside>
-      {/* On desktop the window is the frame: each page scrolls inside it, so side panels scroll on their own. */}
-      <div className="flex min-h-0 flex-1 flex-col pb-16 sm:pb-0 lg:overflow-y-auto">{children}</div>
-    </div>
+    <SidebarContext value={{ history, close }}>
+      <div className="app workspace-shell" data-theme={theme} data-still={reducedMotion || calmMode}>
+        <a href="#workspace-content" className="workspace-skip">Skip to content</a>
+        {menuOpen && <div className="workspace-backdrop" onClick={close} aria-hidden="true" />}
+        <aside
+          ref={sidebar}
+          id="workspace-sidebar"
+          className="workspace-sidebar"
+          data-open={menuOpen}
+          role={menuOpen ? "dialog" : undefined}
+          aria-modal={menuOpen || undefined}
+          aria-label="Workspace navigation"
+          onKeyDown={(e) => {
+            if (!menuOpen) return;
+            if (e.key === "Escape") { e.preventDefault(); close(); }
+            if (e.key !== "Tab") return;
+            const controls = [...(sidebar.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input, select, [tabindex="0"]') ?? [])].filter((el) => el.getClientRects().length);
+            const first = controls[0];
+            const last = controls.at(-1);
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+            if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+          }}
+        >
+          <div className="workspace-brand">
+            <Link href={base} aria-label="Agent Company home" onClick={close}><Logo className="!text-[19px]" /></Link>
+            <button className="workspace-icon-button workspace-close" onClick={close} aria-label="Close navigation"><X size={20} /></button>
+          </div>
+          <div className="workspace-company">
+            <span className="workspace-company-avatar" aria-hidden="true">{snapshot.workspace.name.slice(0, 1).toUpperCase()}</span>
+            <div className="min-w-0"><p className="truncate text-sm font-semibold">{snapshot.workspace.name}</p><p className="text-xs text-muted">Your workspace</p></div>
+          </div>
+          <nav aria-label="App" className="workspace-nav">
+            {nav.map(({ href, label, icon: Icon }) => {
+              const active = href === base ? isChat : pathname.startsWith(href);
+              return <Link key={href} href={href} onClick={close} aria-current={active ? "page" : undefined} className="workspace-nav-link"><Icon size={19} weight={active ? "fill" : "regular"} /><span>{label}</span>{active && <span className="workspace-active-dot" />}</Link>;
+            })}
+          </nav>
+          <div ref={setHistory} className="workspace-history-slot" />
+          <div className="workspace-sidebar-footer">
+            <Link href={`${base}/settings`} onClick={close} aria-current={pathname.startsWith(`${base}/settings`) ? "page" : undefined} className="workspace-nav-link"><GearSix size={19} /><span>Settings</span></Link>
+            <button onClick={signOut} className="workspace-nav-link"><SignOut size={19} /><span>Sign out</span></button>
+            {error && <p role="alert" className="px-3 text-xs text-[#b42318]">{error}</p>}
+          </div>
+        </aside>
+        <div className="workspace-main" inert={menuOpen}>
+          <div className="workspace-mobile-bar">
+            <button ref={menuButton} onClick={() => setMenuOpen(true)} aria-label="Open navigation" aria-expanded={menuOpen} aria-controls="workspace-sidebar" className="workspace-icon-button"><List size={22} /></button>
+            <Link href={base} aria-label="Agent Company home"><Logo className="!text-base" /></Link>
+            <span className="workspace-company-avatar !size-8 !text-xs" aria-hidden="true">{snapshot.workspace.name.slice(0, 1).toUpperCase()}</span>
+          </div>
+          <main id="workspace-content" tabIndex={-1} className={`workspace-content ${isChat ? "workspace-content-chat" : ""}`}>{children}</main>
+        </div>
+      </div>
+    </SidebarContext>
   );
 }

@@ -37,11 +37,19 @@ test("a companion's page: profile, chat, edit, and a missing teammate", async ({
   await expect(page).toHaveURL(new RegExp(`/w/${co.slug}/team$`));
 });
 
-test("the Team page: cards by department, the office view, organizing, and old links", async ({ page }) => {
+test("the Team page: office desks, cards by department, organizing, and old links", async ({ page }) => {
   const co = await newCompany(page, { prefix: "Cards", company: "Cards Bakery", template: /Starter/ });
   await connectFakeLLM(page, co.id);
   await page.getByRole("link", { name: "Team", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Your team" })).toBeVisible();
+  const office = page.getByRole("group", { name: /^Team office\./ });
+  await expect(office).toBeVisible();
+  const desk = office.getByRole("button", { name: /^Nova, Team lead, Free$/ });
+  await desk.focus();
+  await desk.press("Enter");
+  await expect(page.getByRole("region", { name: "Chat with Nova" })).toBeVisible();
+  await page.goBack();
+  await page.getByRole("button", { name: "Cards", exact: true }).click();
   const lead = page.getByRole("region", { name: "Team lead" });
   const nova = lead.getByRole("article", { name: "Nova" });
   await expect(nova.getByText("Team lead")).toBeVisible();
@@ -49,9 +57,14 @@ test("the Team page: cards by department, the office view, organizing, and old l
   await expect(page.getByRole("article").filter({ hasText: "Needs setup" }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Office", exact: true }).click();
-  await expect(page.getByLabel(/^Office map\./)).toBeVisible();
+  await expect(office).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel(/^Office map\./)).toBeVisible();
+  await expect(office).toBeVisible();
+  const zoom = page.getByRole("group", { name: "Office zoom" });
+  await zoom.getByRole("button", { name: "Zoom in" }).click();
+  await expect(zoom).toContainText("120%");
+  await zoom.getByRole("button", { name: "Reset view" }).click();
+  await expect(zoom).toContainText("100%");
   await page.getByRole("button", { name: "Cards", exact: true }).click();
 
   await nova.getByRole("link", { name: "Chat with Nova" }).click();
@@ -74,8 +87,8 @@ test("the Team page: cards by department, the office view, organizing, and old l
 test("Settings has Company and AI services tabs; the old providers link keeps its message", async ({ page }) => {
   const co = await newCompany(page, { prefix: "Tabs", company: "Tabs Bakery", template: /Just the head agent/ });
   const nav = page.getByRole("navigation", { name: "App" });
-  await expect(nav.getByRole("link")).toHaveText(["Home", "Team", "Projects", "Settings"]);
-  await nav.getByRole("link", { name: "Settings" }).click();
+  await expect(nav.getByRole("link")).toHaveText(["Chat", "Projects", "Team"]);
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
   await expect(page.getByRole("tab", { name: "Company", selected: true })).toBeVisible();
   await page.getByRole("tab", { name: "AI services" }).click();
   await expect(page).toHaveURL(/tab=ai/);
@@ -88,7 +101,7 @@ test("Settings has Company and AI services tabs; the old providers link keeps it
 test("first-run setup card, then Give a task fills the home input", async ({ page }) => {
   const co = await newCompany(page, { prefix: "Setup", company: "Setup Bakery", template: /Starter/ });
   const setup = page.getByRole("region", { name: "Finish setting up" });
-  await expect(setup.getByText("Connect an AI service")).toBeVisible();
+  await expect(setup.getByRole("link", { name: "Connect an AI service" })).toBeVisible();
   await setup.getByRole("link", { name: "Connect an AI service" }).click();
   await expect(page).toHaveURL(/\/settings\?tab=ai/);
   await page.getByRole("button", { name: "Add a service" }).click();
@@ -99,8 +112,8 @@ test("first-run setup card, then Give a task fills the home input", async ({ pag
   await dialog.getByRole("button", { name: "Test and save" }).click();
   await page.getByRole("link", { name: "Back to home" }).click();
 
-  await expect(setup.getByText("✓ Connect an AI service")).toBeVisible();
-  await setup.getByRole("button", { name: "Choose Nova's AI model" }).click();
+  await expect(setup.getByText("One more step to meet Nova")).toBeVisible();
+  await setup.getByRole("button", { name: "Choose Nova’s AI model" }).click();
   const form = page.getByRole("dialog");
   await form.getByLabel("AI service").selectOption({ label: "Fake LLM (127.0.0.1:4199)" });
   await form.getByLabel("AI model").fill("fake-model");
@@ -112,6 +125,7 @@ test("first-run setup card, then Give a task fills the home input", async ({ pag
   const other = snap.agents.find((a: { isHead: boolean }) => !a.isHead);
   await page.request.patch(`/api/workspaces/${co.id}/agents/${other.id}`, { headers: { origin: "http://localhost:3100" }, data: { name: "Mira & Co", connectionId: snap.agents.find((a: { isHead: boolean }) => a.isHead).connectionId, model: "fake-model" } });
   await page.reload();
+  await page.getByRole("button", { name: "Cards", exact: true }).click();
   await page.getByRole("article", { name: "Mira & Co" }).getByRole("link", { name: "Give a task" }).click();
   await expect(page.getByLabel("Message Nova")).toHaveValue("@Mira & Co ");
   // The name is filled in once: a new chat (or a reload) starts empty.

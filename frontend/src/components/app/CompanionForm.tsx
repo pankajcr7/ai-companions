@@ -113,7 +113,7 @@ export function CompanionForm({ agent, preset, onClose, onSaved }: { agent: Agen
     <dialog ref={dialog} onClose={onClose} aria-labelledby="companion-form-title" className="m-auto w-[min(860px,calc(100vw-32px))] rounded-[16px] border border-line bg-paper p-0 text-ink backdrop:bg-black/40">
       <form onSubmit={submit} className="grid gap-6 p-6 md:grid-cols-[240px_1fr]">
         <div className="grid place-items-center rounded-[14px] bg-bg p-6">
-          <CompanionAvatar look={form.appearance} size={160} label={`Preview of ${form.name || "new companion"}`} />
+          <CompanionAvatar identity={agent?.id ?? form.name} look={form.appearance} size={160} label={`Preview of ${form.name || "new companion"}`} />
           <p className="mt-3 text-center font-semibold">{form.name || "New companion"}</p>
           <p className="text-center text-sm text-muted">{form.role || "Role"}</p>
         </div>
