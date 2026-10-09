@@ -12,3 +12,12 @@ frontend/test-results
 frontend/playwright-report
 frontend/.next-check
 !frontend/e2e/fixtures/sample-app/node_modules/
+
+# Local agent skills (installed per machine)
+.agents
+.claude
+skills-lock.json
+
+# Video renders and working files
+video/out
+video/work
