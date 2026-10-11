@@ -173,7 +173,7 @@ export function ChatThread({ welcome, composerTools, disabledHint, attachmentsPa
             <div key={m.id} className={bubble(m.role)}>
               {welcome && m.role === "assistant" && <p className="chat-message-author">{name}</p>}
               {m.role === "user" ? m.content : text ? <RichText text={text} /> : m.status !== "complete" ? <span className="italic text-muted">No reply</span> : null}
-              {m.role === "user" && <AttachmentList items={m.attachments ?? []} canSave={canSend} />}
+              <AttachmentList items={m.attachments ?? []} canSave={canSend} />
               {m.role === "assistant" && m.visionFallback && <p className="mt-1.5 text-[11px] text-[#7a5200]">This AI model can&apos;t see images. Choose a vision model (GPT, Claude, Gemini) for {name}.</p>}
               {suggestion && !m.goalId && <SuggestionCard suggestion={suggestion} onPlan={canSend && suggestions?.onPlan ? (goal, newProject) => suggestions.onPlan!(goal, newProject, m.id) : undefined} onHire={canSend ? suggestions?.onHire : undefined} />}
               {m.role === "assistant" && <ToolActivity uses={m.toolUses ?? []} suggestions={m.edits?.length ?? 0} />}

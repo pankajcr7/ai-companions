@@ -18,4 +18,10 @@ test("live labels say what's happening now", () => {
   assert.equal(liveLabel({ name: "web_search", label: "“bread”" }), "🌐 Searching the web for “bread”…");
   assert.equal(liveLabel({ name: "write_file", label: "index.html" }), "✏️ Writing index.html…");
   assert.equal(liveLabel({ name: "list_files", label: "project" }), "📁 Looking through project…");
+  assert.equal(liveLabel({ name: "generate_image", label: "“A bakery logo”" }), "🎨 Making “A bakery logo”…");
+});
+
+test("made images show up in the activity line, so their cost can be opened", () => {
+  assert.equal(activitySummary([u("generate_image", "“logo” · free")], 0), "Made 1 image");
+  assert.equal(activitySummary([u("read_file"), u("generate_image"), u("generate_image")], 0), "Read 1 file · Made 2 images");
 });

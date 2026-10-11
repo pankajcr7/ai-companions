@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
-    "dev:test": "USE_TEST_DB=1 ALLOW_LOCAL_ENDPOINTS=true CHATGPT_LOCAL_LOGIN=false PORT=4100 BETTER_AUTH_URL=http://localhost:3100 FRONTEND_URL=http://localhost:3100 tsx src/server.ts",
+    "dev:test": "USE_TEST_DB=1 ALLOW_LOCAL_ENDPOINTS=true CHATGPT_LOCAL_LOGIN=false PORT=4100 BETTER_AUTH_URL=http://localhost:3100 FRONTEND_URL=http://localhost:3100 TEST_CLOUDFLARE_BASE_URL=http://127.0.0.1:4199/cf TEST_POLLINATIONS_BASE_URL=http://127.0.0.1:4199/pollinations tsx src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "prisma generate",
