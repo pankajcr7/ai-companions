@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 
-export type FakeRequest = { method: string; path: string; headers: IncomingMessage["headers"]; body: unknown; raw: string };
+export type FakeRequest = { method: string; path: string; headers: IncomingMessage["headers"]; body: unknown; raw: string; bytes: Buffer };
 export type Handler = (req: FakeRequest, res: ServerResponse) => void | Promise<void>;
 
 /** A tiny HTTP server. Routes are "METHOD /path"; every request is recorded. */
@@ -10,11 +10,12 @@ export async function fakeServer(routes: Record<string, Handler>) {
   const server = createServer(async (req, res) => {
     const chunks: Buffer[] = [];
     for await (const c of req) chunks.push(c as Buffer);
-    const raw = Buffer.concat(chunks).toString();
+    const bytes = Buffer.concat(chunks);
+    const raw = bytes.toString();
     const type = req.headers["content-type"] ?? "";
     const body = !raw ? undefined : type.includes("json") ? JSON.parse(raw) : type.includes("x-www-form-urlencoded") ? Object.fromEntries(new URLSearchParams(raw)) : raw;
     const path = (req.url ?? "/").split("?")[0];
-    const record = { method: req.method ?? "GET", path, headers: req.headers, body, raw };
+    const record = { method: req.method ?? "GET", path, headers: req.headers, body, raw, bytes };
     requests.push(record);
     const handler = routes[`${record.method} ${path}`];
     if (!handler) return void res.writeHead(404, { "content-type": "application/json" }).end('{"error":{"message":"not found"}}');
