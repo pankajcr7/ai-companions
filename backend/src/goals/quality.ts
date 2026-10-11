@@ -7,7 +7,8 @@ const REVIEW_FILES_CAP = 40_000;
 
 export const DESIGN_GUIDE = `DESIGN GUIDE (follow it for anything people will see):
 Do: use real, specific content (no placeholders); build around one clear visual idea; use a deliberate type scale and generous spacing; design mobile-first so it works at 390px wide; keep text contrast accessible; reuse the same buttons, cards and colours throughout; follow the design brief and brand.
-Don't: generic purple or blue gradients; emoji as icons; "Lorem ipsum" or made-up data presented as real; the stock "centered hero + three feature cards" layout unless asked; buzzwords like unlock, elevate, seamless, revolutionize; fake testimonials, logos or numbers; sections that add nothing.`;
+Don't: generic purple or blue gradients; emoji as icons; "Lorem ipsum" or made-up data presented as real; the stock "centered hero + three feature cards" layout unless asked; buzzwords like unlock, elevate, seamless, revolutionize; fake testimonials, logos or numbers; sections that add nothing.
+Pictures: if you have generate_image, make the key pictures (hero, products, illustrations) with it instead of placeholder or stock-photo links, and use their images/ path in the site.`;
 
 const VISUAL = /\b(web ?site|web ?page|page|landing|design|ui|ux|screen|html|css|banner|ad|ads|poster|post|posts|slide|slides|presentation|logo|mockup|layout|email template)\b/i;
 export const isVisualTask = (t: { title: string; instructions: string; deliverable: string }) => VISUAL.test(`${t.title} ${t.instructions} ${t.deliverable}`);

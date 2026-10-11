@@ -5,7 +5,8 @@ import { trimTurns } from "../companion.js";
 import { prisma } from "../db.js";
 import type { Attachment, ChatEdit, ChatMessage } from "../generated/prisma/client.js";
 import { historyTurns } from "../attachments/parts.js";
-import { attachmentDTO, linkGoalAttachments, ownAttachments } from "../attachments/service.js";
+import { attachmentDTO, linkGoalAttachments, madeImages, ownAttachments } from "../attachments/service.js";
+import { imageTool, loadImageKeys } from "../harness/images.js";
 import { loadProject } from "../files/service.js";
 import { attachmentTools, projectTools, webTools } from "../harness/tools.js";
 import { loadSearchKey } from "../harness/web.js";
@@ -126,7 +127,7 @@ export async function conversationRoutes(app: FastifyInstance) {
     const projectRow = project.kind === "existing" ? await loadProject(id, project.id) : null;
     const writer = chatWriter();
     const tools = [...(projectRow ? projectTools(projectRow, { write: writer.write, read: new Map() }) : []), ...webTools(await loadSearchKey(id))];
-    const withFiles = () => (chatFiles.length ? [...tools, ...attachmentTools(chatFiles)] : tools);
+    const withFiles = () => [...tools, ...(chatFiles.length ? attachmentTools(chatFiles) : []), ...(image ? [image] : [])];
 
     const atts = await ownAttachments(id, user.id, attachmentIds);
     const history = await prisma.chatMessage.findMany({ where: { conversationId: cid, status: "complete" }, orderBy: { createdAt: "desc" }, take: 20, include: { attachments: { orderBy: { createdAt: "asc" } } } });
@@ -135,6 +136,8 @@ export async function conversationRoutes(app: FastifyInstance) {
     await prisma.conversation.update({ where: { id: cid }, data: conv.title === "New chat" ? { title: titleFrom(message) } : { updatedAt: new Date() } });
     const turns = trimTurns(await historyTurns([...history.reverse(), { role: "user" as const, content: message, attachments: atts }], conn.kind), 24_000);
     const chatFiles = await prisma.attachment.findMany({ where: { workspaceId: id, userId: user.id, message: { conversationId: cid } }, orderBy: { createdAt: "asc" } });
+    const made = madeImages({ workspaceId: id, userId: user.id, files: chatFiles, project: projectRow });
+    const image = imageTool(await loadImageKeys(id), made.media, made.source);
 
     const linked = await prisma.chatMessage.findMany({ where: { conversationId: cid, goalId: { not: null } }, orderBy: { createdAt: "desc" }, take: 3, select: { goalId: true } });
     const goals = await prisma.goal.findMany({ where: { id: { in: linked.map((l) => l.goalId!) }, workspaceId: id }, include: { tasks: { orderBy: { position: "asc" }, include: { agent: { select: { name: true } } } } }, orderBy: { createdAt: "asc" } });
@@ -159,6 +162,7 @@ export async function conversationRoutes(app: FastifyInstance) {
           data: { workspaceId: id, agentId: nova.id, userId: user.id, conversationId: cid, role: "assistant", content: r.text, status: r.status, connectionId: conn.id, kind: conn.kind, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens, errorCode: r.errorCode, errorMessage: r.errorMessage, toolUses: r.toolUses, visionFallback: r.visionFallback },
         });
         await saveChatEdits(id, saved.id, projectRow?.id ?? null, writer.edits);
+        await made.link({ messageId: saved.id });
         const suggestion = r.status === "complete" ? parseSuggestion(r.text) : null;
         if (!suggestion?.goal) return saved;
         // Work requests become a plan right away; nothing runs until the owner presses Start.

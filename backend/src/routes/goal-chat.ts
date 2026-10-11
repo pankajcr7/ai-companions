@@ -9,7 +9,8 @@ import { goalContext, loadHead, loadRoster } from "../goals/load.js";
 import { goalChatContext, goalChatInstructions } from "../goals/prompts.js";
 import { attachmentTools, projectTools, webTools } from "../harness/tools.js";
 import { historyTurns } from "../attachments/parts.js";
-import { attachmentDTO, ownAttachments } from "../attachments/service.js";
+import { attachmentDTO, madeImages, ownAttachments } from "../attachments/service.js";
+import { imageTool, loadImageKeys } from "../harness/images.js";
 import { loadSearchKey } from "../harness/web.js";
 import { HttpError, perUser, requireMember } from "../http.js";
 import type { ChatTurn } from "../providers/types.js";
@@ -79,6 +80,8 @@ export async function goalChatRoutes(app: FastifyInstance) {
     const userMsg = await prisma.goalMessage.create({ data: { goalId: gid, workspaceId: id, userId: user.id, role: "user", content: message } });
     if (atts.length) await prisma.attachment.updateMany({ where: { id: { in: atts.map((a) => a.id) } }, data: { goalMessageId: userMsg.id } });
     const chatFiles = await prisma.attachment.findMany({ where: { workspaceId: id, userId: user.id, goalMessageId: { in: [...history.map((m) => m.id), userMsg.id] } }, orderBy: { createdAt: "asc" } });
+    const made = madeImages({ workspaceId: id, userId: user.id, files: chatFiles, project: goal.project });
+    const image = imageTool(await loadImageKeys(id), made.media, made.source);
     const rows = [...history.reverse().map((m) => ({ role: m.role, content: m.content, attachments: chatFiles.filter((f) => f.goalMessageId === m.id) })), { role: "user" as const, content: message, attachments: atts }];
     const turns = trimTurns(await historyTurns(rows, conn.kind), 24_000);
     const ctx = await goalContext(goal.project);
@@ -88,7 +91,7 @@ export async function goalChatRoutes(app: FastifyInstance) {
     await streamReply(req, reply, watch, {
       actor: { ...nova, model, connection: conn },
       // Read-only here: goal chat messages have nowhere to keep suggested changes; "Continue with a new goal" makes changes.
-      tools: [...(goal.project ? projectTools(goal.project, { write: null, read: new Map() }) : []), ...webTools(await loadSearchKey(id)), ...(chatFiles.length ? attachmentTools(chatFiles) : [])],
+      tools: [...(goal.project ? projectTools(goal.project, { write: null, read: new Map() }) : []), ...webTools(await loadSearchKey(id)), ...(chatFiles.length ? attachmentTools(chatFiles) : []), ...(image ? [image] : [])],
       limit: 6,
       instructions,
       turns,
@@ -98,6 +101,7 @@ export async function goalChatRoutes(app: FastifyInstance) {
           data: { goalId: gid, workspaceId: id, userId: user.id, role: "assistant", content: r.text, status: r.status, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens, errorCode: r.errorCode, errorMessage: r.errorMessage },
         });
         await prisma.goalStep.create({ data: { workspaceId: id, goalId: gid, phase: "chat", agentId: nova.id, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens, ms: r.ms, errorCode: r.errorCode } });
+        await made.link({ goalMessageId: saved.id });
         return saved;
       },
     });
