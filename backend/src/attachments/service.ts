@@ -47,9 +47,9 @@ export async function copyIntoProject(att: Attachment, project: Project, userId:
   return path;
 }
 
-/** Uploads that were never sent with a message are removed after a day. */
+/** Uploads never sent with a message, and images never linked to a reply or task, are removed after a day. */
 export async function cleanupAttachments(now = Date.now()): Promise<number> {
-  const r = await prisma.attachment.deleteMany({ where: { messageId: null, goalMessageId: null, goalId: null, createdAt: { lt: new Date(now - DAY_MS) } } });
+  const r = await prisma.attachment.deleteMany({ where: { messageId: null, goalMessageId: null, goalId: null, taskId: null, createdAt: { lt: new Date(now - DAY_MS) } } });
   return r.count;
 }
 

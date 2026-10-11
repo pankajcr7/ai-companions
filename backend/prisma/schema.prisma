@@ -121,6 +121,7 @@ model Workspace {
   goals        Goal[]
   goalSteps    GoalStep[]
   searchKey    SearchKey?
+  imageKeys    ImageKey[]
 }
 
 model Membership {
@@ -501,6 +502,7 @@ model GoalTask {
   goal             Goal           @relation(fields: [goalId], references: [id], onDelete: Cascade)
   agent            Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
   edits            ProposedEdit[]
+  media            Attachment[]
 
   @@unique([goalId, position])
 }
@@ -605,7 +607,22 @@ model SearchKey {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
-/// A file the owner attached in a chat. Stored in the blob store; text pulled out once on upload.
+/// Keys for image services; secret is encrypted (Cloudflare: JSON {accountId, apiToken}).
+model ImageKey {
+  id          String    @id @default(cuid())
+  workspaceId String
+  provider    String
+  secret      String
+  hint        String
+  createdById String
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, provider])
+}
+
+/// A file the owner attached in a chat, or an image a companion made (then linked to its reply or task).
+/// Stored in the blob store; text pulled out once on upload.
 model Attachment {
   id            String       @id @default(cuid())
   workspaceId   String
@@ -613,6 +630,7 @@ model Attachment {
   messageId     String?
   goalMessageId String?
   goalId        String?
+  taskId        String?
   name          String
   mime          String
   kind          String
@@ -625,9 +643,11 @@ model Attachment {
   scanned       Boolean      @default(false)
   createdAt     DateTime     @default(now())
   message       ChatMessage? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  task          GoalTask?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([messageId])
   @@index([goalMessageId])
   @@index([goalId])
+  @@index([taskId])
   @@index([userId, createdAt])
 }
