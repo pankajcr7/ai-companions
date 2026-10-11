@@ -26,9 +26,9 @@ Out of scope: transparent backgrounds, several images in one call, style presets
    - `name` (optional, 1–60 letters, digits, `-` or `_`): the file name without extension;
    - `from` (optional, at most 4): names of images to edit or combine.
 2. Its purpose line tells the companion to use `high` only for images that must show readable words (logos, posters, social posts with text) or when the owner asks for high quality, and that it costs about 5 cents.
-3. The finished image comes back as a picture for the AI, through the part 1 tool-result image path, so the companion can check it. The text says where it went and which service made it: "Made images/hero.png (Cloudflare, free)."
+3. The finished image comes back as a picture for the AI, through the part 1 tool-result image path, so the companion can check it. The text says where it went and which service made it: "Saved as images/hero.png (Cloudflare, free)." in a task with a project, or "Shown to the owner under your reply as logo.png (Cloudflare, free)." in a chat, so the companion knows the name to edit later.
 4. The tool appears only when at least one image key is set, and only where images can be stored: Nova's chat, one-to-one companion chat, goal follow-up chat and goal tasks. Nova's planning step gets no image tool.
-5. The tool runs for up to 2 minutes (a new optional `timeoutMs` on tools; other tools keep 20 s). Cancelling the task or chat aborts the request.
+5. The tool runs for up to 2 minutes (a new optional `timeoutMs` on tools; other tools keep 20 s). Cancelling the task or chat aborts the request. Chat streams send a keep-alive comment every 15 s so proxies don't close a stream that's quiet while an image is made.
 
 ### 2.2 Choosing the service
 
