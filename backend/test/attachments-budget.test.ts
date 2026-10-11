@@ -13,7 +13,7 @@ let n = 0;
 async function att(over: Partial<Attachment> & { bytes: number }): Promise<Attachment> {
   const { bytes, ...rest } = over;
   const blobHash = await putBlob(Buffer.alloc(bytes, ++n));
-  return { id: `a${n}`, workspaceId: "w", userId: "u", messageId: null, goalMessageId: null, goalId: null, name: `f${n}`, mime: "image/png", kind: "image", size: bytes, blobHash, viewHash: null, viewMime: null, text: null, pages: null, scanned: false, createdAt: new Date(), ...rest };
+  return { id: `a${n}`, workspaceId: "w", userId: "u", messageId: null, goalMessageId: null, goalId: null, taskId: null, name: `f${n}`, mime: "image/png", kind: "image", size: bytes, blobHash, viewHash: null, viewMime: null, text: null, pages: null, scanned: false, createdAt: new Date(), ...rest };
 }
 const kinds = (turn: { content: unknown }) => (Array.isArray(turn.content) ? (turn.content as { type: string }[]).map((p) => p.type) : ["string"]);
 
