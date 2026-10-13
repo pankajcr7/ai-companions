@@ -12,6 +12,7 @@ import type { Loaded } from "../goals/context.js";
 import { loadText } from "../goals/load.js";
 import { HttpError } from "../http.js";
 import { ToolError, type Tool } from "./loop.js";
+import { lookAtWebsite, studyWebsite } from "./site.js";
 import { exaSearch, openUrl, tavilySearch, untrusted } from "./web.js";
 
 const DOC_EXT = /\.(pdf|docx|xlsx|pptx)$/i;
@@ -154,6 +155,14 @@ export function projectTools(project: Project, o: { write: ((w: Write) => Promis
   return tools;
 }
 
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url.slice(0, 60);
+  }
+};
+
 export function webTools(searchKey: string | null): Tool[] {
   const tools: Tool[] = [
     {
@@ -161,14 +170,24 @@ export function webTools(searchKey: string | null): Tool[] {
       purpose: "Opens a public web page and returns its text.",
       argsHelp: '{"url": "https://..."}',
       args: z.object({ url: z.string().url().max(2000) }),
-      label: (a) => {
-        try {
-          return new URL(a.url).host;
-        } catch {
-          return a.url.slice(0, 60);
-        }
-      },
+      label: (a) => hostOf(a.url),
       run: (a, signal) => openUrl(a.url, signal),
+    },
+    {
+      name: "look_at_website",
+      purpose: "Shows a screenshot of a public web page and its text. Use it when asked to build something like an existing site.",
+      argsHelp: '{"url": "https://..."}',
+      args: z.object({ url: z.string().url().max(2000) }),
+      label: (a) => hostOf(a.url),
+      run: (a, signal) => lookAtWebsite(a.url, signal),
+    },
+    {
+      name: "study_website",
+      purpose: "Checks how a public web page is built: frameworks, API calls in its scripts, pages it links to and outside services.",
+      argsHelp: '{"url": "https://..."}',
+      args: z.object({ url: z.string().url().max(2000) }),
+      label: (a) => hostOf(a.url),
+      run: (a, signal) => studyWebsite(a.url, signal),
     },
   ];
   tools.push({

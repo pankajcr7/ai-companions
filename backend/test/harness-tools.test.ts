@@ -105,7 +105,7 @@ test("open_url returns readable, wrapped text and refuses what it can't open", a
 
 test("web_search uses the Tavily key when set and returns wrapped results", async () => {
   const tools = webTools("good-key");
-  expect(tools.map((t) => t.name)).toEqual(["open_url", "web_search"]);
+  expect(tools.map((t) => t.name)).toEqual(["open_url", "look_at_website", "study_website", "web_search"]);
   const out = await run(tools, "web_search", { query: "bread" });
   expect(out).toContain("Bread — https://b.example — About bread");
   expect(out).toMatch(/^UNTRUSTED WEB CONTENT/);
@@ -114,12 +114,19 @@ test("web_search uses the Tavily key when set and returns wrapped results", asyn
 
 test("without a key, web_search uses free Exa search", async () => {
   const tools = webTools(null);
-  expect(tools.map((t) => t.name)).toEqual(["open_url", "web_search"]);
+  expect(tools.map((t) => t.name)).toEqual(["open_url", "look_at_website", "study_website", "web_search"]);
   const out = await run(tools, "web_search", { query: "rye" });
   expect(out).toContain("Rye — https://rye.example — All about rye bread");
   expect(out).toContain("Spelt — https://spelt.example — Spelt facts");
   expect(out).toMatch(/^UNTRUSTED WEB CONTENT/);
   await expect(run(tools, "web_search", { query: "busy" })).rejects.toThrow(/busy/i);
+});
+
+test("the website tools are labelled with the host", () => {
+  const tools = webTools(null);
+  for (const name of ["look_at_website", "study_website"]) {
+    expect(tools.find((t) => t.name === name)!.label({ url: "https://stripe.com/pricing" })).toBe("stripe.com");
+  }
 });
 
 test("htmlToText keeps text and line breaks, drops scripts and tags", () => {
