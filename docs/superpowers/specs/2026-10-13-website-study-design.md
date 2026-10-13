@@ -30,7 +30,7 @@ Relation to the web visuals spec (2026-10-11, moli): that spec is not built. `lo
 
 1. Both take `{"url": "https://..."}` and are labelled with the host.
 2. The URL is checked with the same rules as `open_url` (`checkBaseUrl`: `http` or `https`, no username or password, no private host or address) before any request. A refused URL returns "That address isn't allowed: only public web pages can be opened."
-3. Results are wrapped with `untrusted(...)` and end with a rebuild line: "Rebuild the idea and layout in your own code. Don't copy this site's code, images, logos or wording." (`study_website` says "the idea and how it works".)
+3. What came from the site is wrapped with `untrusted(...)`; our own lines come after the wrapper, so the model doesn't treat them as web content. Results end with a rebuild line: "Rebuild the idea and layout in your own code. Don't copy this site's code, images, logos or wording." (`study_website` says "the idea and how it works".)
 4. Both are added in `webTools()` next to `open_url`, so every place companions have `open_url` gets them: chats, goal chat, planning and tasks. No setting turns them on.
 
 ### 2.2 look_at_website
@@ -58,7 +58,7 @@ Relation to the web visuals spec (2026-10-11, moli): that spec is not built. `lo
 ### 2.3 study_website
 
 12. Purpose line: "Checks how a public web page is built: frameworks, API calls in its scripts, pages it links to and outside services."
-13. The page is fetched through `safeFetch` with today's `open_url` rules and messages (no redirects, private addresses refused, 2 MB cap, `text/html` only).
+13. The page is fetched through `safeFetch` with today's `open_url` rules and messages (no redirects, private addresses refused, 2 MB cap, HTML or plain text). A plain-text page returns "Only web pages can be studied."
 14. Up to 5 scripts on the page's own host (`<script src>`, in page order) are fetched side by side through `safeFetch`, each capped at 1 MB; a script that fails is skipped.
 15. Text:
     ```
@@ -71,7 +71,7 @@ Relation to the web visuals spec (2026-10-11, moli): that spec is not built. `lo
     These are clues from the page's HTML and scripts, not a full analysis.
     Rebuild the idea and how it works in your own code. Don't copy this site's code, images, logos or wording.
     ```
-16. Built with: the `<meta name="generator">` content first, then these markers found in the HTML or script URLs, in this order: Next.js (`/_next/`, `__NEXT_DATA__`), Nuxt (`/_nuxt/`, `__NUXT__`), Gatsby (`___gatsby`), Remix (`__remixContext`), SvelteKit (`__sveltekit`), Astro (`astro-island`), Angular (`ng-version`), Vue (`data-v-`), React (`data-reactroot`, `react-dom`, or Next.js / Gatsby / Remix found), WordPress (`wp-content`), Shopify (`cdn.shopify.com`), Webflow (`data-wf-page`), Framer (`framerusercontent.com`), Wix (`wixstatic.com`), Squarespace (`squarespace`), Bootstrap (`bootstrap`), jQuery (`jquery`). Each name appears once.
+16. Built with: the `<meta name="generator">` content first, then these markers found in the HTML or script URLs, in this order: Next.js (`/_next/`, `__NEXT_DATA__`), Nuxt (`/_nuxt/`, `__NUXT__`), Gatsby (`___gatsby`), Remix (`__remixContext`), SvelteKit (`__sveltekit`), Astro (`astro-island`), Angular (`ng-version=`), Vue (`data-v-` followed by 8 hex digits), React (`data-reactroot`, `react-dom`, or Next.js / Gatsby / Remix found), WordPress (`wp-content`), Shopify (`cdn.shopify.com`), Webflow (`data-wf-page`), Framer (`framerusercontent.com`), Wix (`wixstatic.com`), Squarespace (`static1.squarespace.com`), Bootstrap (a `bootstrap…css` or `bootstrap…js` file), jQuery (a `jquery…js` file). Each name appears once. Markers are narrow on purpose: a word like "bootstrap" inside page code is not enough.
 17. API calls: in the fetched scripts and the page's inline scripts, quoted strings passed to `fetch(` or `axios.get/post/put/patch/delete(`, and any quoted string starting with `/api/` or `/graphql`.
 18. Pages it links to: `<a href>` paths on the page's own host, without query or fragment, skipping files (`.png`, `.jpg`, `.svg`, `.pdf`, `.css`, `.js` and similar).
 19. Outside services: hosts in `src` or `href` of `script`, `link`, `img`, `iframe` and `source` tags that differ from the page's host.
