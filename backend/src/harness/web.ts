@@ -27,24 +27,29 @@ export function htmlToText(html: string): string {
 
 type FetchResponse = Awaited<ReturnType<typeof safeFetch>>;
 
-async function readCapped(res: FetchResponse): Promise<string> {
+/** Reads a body up to `max` bytes; `cut` says the body was longer. */
+export async function readBytes(res: FetchResponse, max: number): Promise<{ data: Buffer; cut: boolean }> {
   const reader = res.body!.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
   for (;;) {
     const { value, done } = await reader.read();
-    if (done || !value) break;
+    if (done || !value) return { data: Buffer.concat(chunks), cut: false };
     size += value.length;
-    if (size > MAX_DOWNLOAD) {
+    if (size > max) {
       await reader.cancel();
-      break;
+      return { data: Buffer.concat(chunks), cut: true };
     }
     chunks.push(value);
   }
-  return Buffer.concat(chunks).toString("utf8");
 }
 
-export async function openUrl(url: string, signal: AbortSignal): Promise<string> {
+export async function readCapped(res: FetchResponse): Promise<string> {
+  return (await readBytes(res, MAX_DOWNLOAD)).data.toString("utf8");
+}
+
+/** Fetches a public page with open_url's rules: no redirects, web pages and plain text only, 2 MB at most. */
+export async function fetchPage(url: string, signal: AbortSignal): Promise<{ body: string; type: string }> {
   let res: FetchResponse;
   try {
     res = await safeFetch(url, { signal, headers: { accept: "text/html, text/plain" } });
@@ -59,7 +64,11 @@ export async function openUrl(url: string, signal: AbortSignal): Promise<string>
   if (!res.ok) throw new ToolError(`The page answered with an error (${res.status}).`);
   const type = res.headers.get("content-type") ?? "";
   if (!/text\/(html|plain)/i.test(type)) throw new ToolError("Only web pages and plain text can be opened.");
-  const body = await readCapped(res);
+  return { body: await readCapped(res), type };
+}
+
+export async function openUrl(url: string, signal: AbortSignal): Promise<string> {
+  const { body, type } = await fetchPage(url, signal);
   const text = /html/i.test(type) ? htmlToText(body) : body;
   const capped = text.length > PAGE_CHARS ? `${text.slice(0, PAGE_CHARS)}\n[truncated]` : text;
   return untrusted(`${url}\n\n${capped}`);
