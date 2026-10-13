@@ -42,7 +42,7 @@ test("the web search key can be added and removed in AI services", async ({ page
   const co = await newCompany(page, { prefix: "Search", company: "Search Bakery", template: /Just the head agent/ });
   await page.goto(`/w/${co.slug}/providers`);
   const card = page.getByRole("region", { name: "Web search" });
-  await expect(card.getByText("Not set up")).toBeVisible();
+  await expect(card.getByText("Using free search · no key")).toBeVisible();
   await card.getByLabel("Tavily API key").fill("tvly-wrong");
   await card.getByRole("button", { name: "Save key" }).click();
   await expect(card.getByRole("alert")).toContainText(/rejected|reach/i);

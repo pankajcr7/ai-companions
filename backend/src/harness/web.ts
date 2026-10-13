@@ -79,6 +79,46 @@ export async function tavilySearch(key: string, query: string, signal: AbortSign
   return (data.results ?? []).slice(0, 5).map((r) => ({ title: r.title ?? "", url: r.url ?? "", content: (r.content ?? "").slice(0, 500) }));
 }
 
+/** Keyless search through Exa's public MCP endpoint (what Agent Reach uses). Used when the workspace has no Tavily key. */
+// ponytail: the free endpoint is rate-limited per server IP, shared by every workspace. Add an Exa key if it throttles.
+export async function exaSearch(query: string, signal: AbortSignal) {
+  let res: FetchResponse;
+  try {
+    res = await safeFetch(process.env.EXA_URL ?? "https://mcp.exa.ai/mcp", {
+      method: "POST",
+      signal,
+      headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "web_search_exa", arguments: { query, objective: query, numResults: 5 } } }),
+    });
+  } catch (e) {
+    if (signal.aborted) throw e;
+    throw new ToolError("Web search isn't reachable right now.");
+  }
+  if (res.status === 429) throw new ToolError("The free web search is busy. Try again in a minute, or add a Tavily key in Settings › AI services.");
+  if (!res.ok) throw new ToolError(`Web search failed (${res.status}).`);
+  const body = await readCapped(res);
+  // The reply is plain JSON or a server-sent event whose data lines hold the JSON.
+  const json = body.trimStart().startsWith("{") ? body : body.split("\n").filter((l) => l.startsWith("data:")).map((l) => l.slice(5).trim()).join("\n");
+  let msg: { result?: { isError?: boolean; content?: { type: string; text?: string }[] } };
+  try {
+    msg = JSON.parse(json);
+  } catch {
+    throw new ToolError("Web search sent back something unreadable.");
+  }
+  if (!msg.result || msg.result.isError) throw new ToolError("Web search failed.");
+  const text = msg.result.content?.find((c) => c.type === "text")?.text ?? "";
+  // Results come as text blocks: "Title: …\nURL: …\n…\nHighlights:\n…".
+  return text
+    .split(/\n(?=Title: )/)
+    .map((block) => {
+      const field = (name: string) => block.match(new RegExp(`^${name}: (.*)$`, "m"))?.[1].trim() ?? "";
+      const content = (block.split(/\nHighlights:\n/)[1] ?? "").replace(/\s+/g, " ").trim();
+      return { title: field("Title"), url: field("URL"), content: content.slice(0, 500) };
+    })
+    .filter((r) => r.url)
+    .slice(0, 5);
+}
+
 export async function loadSearchKey(workspaceId: string): Promise<string | null> {
   const row = await prisma.searchKey.findUnique({ where: { workspaceId } });
   return row ? decryptSecret(row.secret) : null;

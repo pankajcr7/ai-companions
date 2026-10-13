@@ -125,7 +125,7 @@ function WebSearchCard({ admin }: { admin: boolean }) {
   return (
     <section aria-label="Web search" className="rounded-[14px] border border-line bg-paper p-4">
       <h2 className="font-semibold">Web search</h2>
-      <p className="mt-1 text-sm text-muted">Lets companions search the web while they work. Uses a Tavily key (free tier: about 1,000 searches a month).</p>
+      <p className="mt-1 text-sm text-muted">Companions search the web while they work, using free Exa search. Add a Tavily key for steadier results (free tier: about 1,000 searches a month).</p>
       {key === undefined ? null : key ? (
         <div className="mt-3 flex items-center gap-3 text-sm">
           <span>Connected · <span className="font-mono">{key.hint}</span></span>
@@ -133,7 +133,7 @@ function WebSearchCard({ admin }: { admin: boolean }) {
         </div>
       ) : (
         <>
-          <p className="mt-3 text-sm">Not set up</p>
+          <p className="mt-3 text-sm">Using free search · no key</p>
           {admin && (
             <form className="mt-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); run(async () => { const r = await api<{ hint: string }>(path, { method: "PUT", body: { apiKey: draft } }); setKey(r); setDraft(""); }); }}>
               <label className="sr-only" htmlFor="tavily-key">Tavily API key</label>

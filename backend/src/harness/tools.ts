@@ -12,7 +12,7 @@ import type { Loaded } from "../goals/context.js";
 import { loadText } from "../goals/load.js";
 import { HttpError } from "../http.js";
 import { ToolError, type Tool } from "./loop.js";
-import { openUrl, tavilySearch, untrusted } from "./web.js";
+import { exaSearch, openUrl, tavilySearch, untrusted } from "./web.js";
 
 const DOC_EXT = /\.(pdf|docx|xlsx|pptx)$/i;
 // ponytail: per-process cache of document text by blob, oldest out past 50; move to a column if documents get large or many.
@@ -171,19 +171,18 @@ export function webTools(searchKey: string | null): Tool[] {
       run: (a, signal) => openUrl(a.url, signal),
     },
   ];
-  if (searchKey) {
-    tools.push({
-      name: "web_search",
-      purpose: "Searches the web and returns the top 5 results.",
-      argsHelp: '{"query": text}',
-      args: z.object({ query: z.string().trim().min(2).max(300) }),
-      label: (a) => `“${a.query}”`,
-      run: async (a, signal) => {
-        const results = await tavilySearch(searchKey, a.query, signal);
-        return untrusted(results.length ? results.map((r) => `${r.title} — ${r.url} — ${r.content}`).join("\n") : "No results.");
-      },
-    });
-  }
+  tools.push({
+    name: "web_search",
+    purpose: "Searches the web and returns the top 5 results.",
+    argsHelp: '{"query": text}',
+    args: z.object({ query: z.string().trim().min(2).max(300) }),
+    label: (a) => `“${a.query}”`,
+    run: async (a, signal) => {
+      // A saved Tavily key wins; without one, the free keyless Exa search is used.
+      const results = searchKey ? await tavilySearch(searchKey, a.query, signal) : await exaSearch(a.query, signal);
+      return untrusted(results.length ? results.map((r) => `${r.title} — ${r.url} — ${r.content}`).join("\n") : "No results.");
+    },
+  });
   return tools;
 }
 

@@ -66,7 +66,7 @@ test("without a project only web tools are offered; one-to-one chats get web too
   for (const s of seen) {
     expect(s).toContain("- open_url:");
     expect(s).not.toContain("- read_file:");
-    expect(s).not.toContain("- web_search:");
+    expect(s).toContain("- web_search:");
   }
 });
 
