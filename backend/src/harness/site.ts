@@ -1,6 +1,7 @@
-import { safeFetch } from "../safe-fetch.js";
-import { ToolError } from "./loop.js";
-import { fetchPage, htmlToText, readBytes, untrusted } from "./web.js";
+import { MAX_IMAGE_BYTES } from "../attachments/parts.js";
+import { checkBaseUrl, safeFetch } from "../safe-fetch.js";
+import { ToolError, type ToolOutput } from "./loop.js";
+import { fetchPage, htmlToText, readBytes, readCapped, untrusted } from "./web.js";
 
 const MAX_LIST = 40;
 const SCRIPTS = 5;
@@ -91,4 +92,93 @@ export async function studyWebsite(url: string, signal: AbortSignal): Promise<st
     `Scripts: ${scripts.length} on the page, looked through ${fetched.length}.`,
   ].join("\n");
   return `${untrusted(body)}\nThese are clues from the page's HTML and scripts, not a full analysis.\n${rebuild("the idea and how it works")}`;
+}
+
+const PART_MS = 17_000;
+const MARKDOWN_CHARS = 12_000;
+const MAX_SECTIONS = 60;
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const READER_FAILED = "Couldn't open that page through the page reader.";
+
+type ReaderData = { title?: string; content?: string; screenshotUrl?: string; httpStatus?: number };
+
+/** One Jina Reader request: the page's title and Markdown, or (screenshot) a link to its picture. */
+async function reader(url: string, screenshot: boolean, signal: AbortSignal): Promise<ReaderData> {
+  const headers: Record<string, string> = { accept: "application/json" };
+  if (screenshot) headers["x-respond-with"] = "screenshot";
+  if (process.env.JINA_API_KEY) headers.authorization = `Bearer ${process.env.JINA_API_KEY}`;
+  const res = await safeFetch(`${process.env.JINA_URL ?? "https://r.jina.ai"}/${url}`, { signal, headers });
+  if (res.status === 429) throw new ToolError("The free page reader is busy. Try again in a minute.");
+  if (!res.ok) throw new ToolError(READER_FAILED);
+  let data: ReaderData | undefined;
+  try {
+    data = (JSON.parse(await readCapped(res)) as { data?: ReaderData }).data;
+  } catch {
+    throw new ToolError(READER_FAILED);
+  }
+  if (!data) throw new ToolError(READER_FAILED);
+  if (data.httpStatus && data.httpStatus >= 400) throw new ToolError(`The page answered with an error (${data.httpStatus}).`);
+  return data;
+}
+
+/** Runs one part with its own deadline and turns any failure into a message the companion can use. */
+async function part<T>(signal: AbortSignal, run: (s: AbortSignal) => Promise<T>): Promise<T> {
+  const deadline = AbortSignal.timeout(PART_MS);
+  try {
+    return await run(AbortSignal.any([signal, deadline]));
+  } catch (e) {
+    if (signal.aborted) throw e;
+    if (e instanceof ToolError) throw e;
+    if (deadline.aborted) throw new ToolError("That page took too long to load.");
+    throw new ToolError(READER_FAILED);
+  }
+}
+
+const sectionsOf = (md: string) =>
+  md
+    .split("\n")
+    .filter((l) => /^#{1,3} /.test(l))
+    .map((l) => l.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").trim())
+    .filter((l) => l.replace(/^#+/, "").trim())
+    .slice(0, MAX_SECTIONS);
+
+/** A screenshot and the Markdown of a public page, both from Jina Reader, which renders the page in its own browser. */
+export async function lookAtWebsite(url: string, signal: AbortSignal): Promise<ToolOutput> {
+  try {
+    checkBaseUrl(url);
+  } catch {
+    throw new ToolError("That address isn't allowed: only public web pages can be opened.");
+  }
+  const [text, shot] = await Promise.allSettled([
+    part(signal, async (s) => {
+      const d = await reader(url, false, s);
+      if (!d.content?.trim()) throw new ToolError(READER_FAILED);
+      return { title: d.title, markdown: d.content };
+    }),
+    part(signal, async (s) => {
+      const d = await reader(url, true, s);
+      if (!d.screenshotUrl) throw new ToolError(READER_FAILED);
+      const res = await safeFetch(d.screenshotUrl, { signal: s });
+      const mime = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+      if (!res.ok || !IMAGE_TYPES.includes(mime)) throw new ToolError(READER_FAILED);
+      const { data, cut } = await readBytes(res, MAX_IMAGE_BYTES);
+      if (cut) throw new ToolError(READER_FAILED);
+      return { title: d.title, image: { mime, data: data.toString("base64") } };
+    }),
+  ]);
+  if (text.status === "rejected" && shot.status === "rejected") throw text.reason;
+  const title = (text.status === "fulfilled" && text.value.title) || (shot.status === "fulfilled" && shot.value.title) || "(no title)";
+  const lines = [`Website: ${title} — ${url}`, shot.status === "fulfilled" ? "Screenshot: top of the page." : "No screenshot this time."];
+  if (text.status === "fulfilled") {
+    const md = text.value.markdown;
+    const sections = sectionsOf(md);
+    lines.push(sections.length ? `Sections:\n${sections.map((s) => `- ${s}`).join("\n")}` : "Sections: none found");
+    lines.push(`Page text (Markdown):\n${md.length > MARKDOWN_CHARS ? `${md.slice(0, MARKDOWN_CHARS)}\n[truncated]` : md.trim()}`);
+  } else {
+    lines.push("Couldn't read the page text.");
+  }
+  return {
+    text: `${untrusted(lines.join("\n"))}\n${rebuild("the idea and layout")}`,
+    images: shot.status === "fulfilled" ? [shot.value.image] : [],
+  };
 }
