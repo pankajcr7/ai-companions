@@ -19,3 +19,9 @@ test("live labels say what's happening now", () => {
   assert.equal(liveLabel({ name: "write_file", label: "index.html" }), "✏️ Writing index.html…");
   assert.equal(liveLabel({ name: "list_files", label: "project" }), "📁 Looking through project…");
 });
+
+test("website tools read plainly in the activity line", () => {
+  assert.equal(liveLabel({ name: "look_at_website", label: "stripe.com" }), "🖼️ Looking at stripe.com…");
+  assert.equal(liveLabel({ name: "study_website", label: "stripe.com" }), "🔎 Studying stripe.com…");
+  assert.equal(activitySummary([u("look_at_website"), u("study_website"), u("study_website", "b")], 0), "Looked at 1 website · Studied 2 websites");
+});
