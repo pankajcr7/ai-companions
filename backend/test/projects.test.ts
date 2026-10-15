@@ -85,3 +85,16 @@ test("roles: member cannot delete a project, owner can", async () => {
   expect((await client(app, member.cookie)("DELETE", `/api/workspaces/${id}/projects/${pid}`)).statusCode).toBe(403);
   expect((await req("DELETE", `/api/workspaces/${id}/projects/${pid}`)).statusCode).toBe(204);
 });
+
+test("project overview includes actual cover, team, and progress without changing the lightweight list", async () => {
+  const { req, id } = await owner();
+  const pid = (await req("POST", `/api/workspaces/${id}/projects`, { name: "Studio site" })).json().id;
+  const me = (await req("GET", "/api/me")).json().user.id;
+  const agentId = (await req("GET", `/api/workspaces/${id}`)).json().agents[0].id;
+  await seedFile(pid, ".company/brief.md", "Private brief", me);
+  await seedFile(pid, "index.html", "<h1>Studio</h1>", me);
+  await prisma.goal.create({ data: { workspaceId: id, projectId: pid, text: "Design a studio site", status: "running", createdById: me, tasks: { create: [{ agentId, position: 0, title: "Build", instructions: "Build", deliverable: "Website", criteria: [], dependsOn: [], status: "done" }, { agentId, position: 1, title: "Review", instructions: "Review", deliverable: "Review", criteria: [], dependsOn: [0], status: "running" }] } } });
+  const rows = (await req("GET", `/api/workspaces/${id}/projects?overview=1`)).json().projects;
+  expect(rows[0].overview).toMatchObject({ cover: { path: "index.html", kind: "website", revision: 1 }, goal: { status: "running", done: 1, total: 2, pendingEdits: 0, agentIds: [agentId] } });
+  expect((await req("GET", `/api/workspaces/${id}/projects`)).json().projects[0]).not.toHaveProperty("overview");
+});

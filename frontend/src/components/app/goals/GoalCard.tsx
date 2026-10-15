@@ -10,10 +10,12 @@ import { useWorkspace } from "@/lib/workspace";
 import { CompanionAvatar } from "../CompanionAvatar";
 import { CopyButton } from "../chat/CopyButton";
 import { RichText } from "../chat/RichText";
+import { WorkingIndicator } from "../chat/WorkingIndicator";
 import { FilesCreated } from "./FilesCreated";
 import { PlanEditor } from "./PlanEditor";
 import { ReviewLine } from "./ReviewLine";
 import { TaskCard } from "./TaskCard";
+import { GoalCompletion } from "./GoalCompletion";
 
 const STATE: Record<TaskDTO["status"], [string, string]> = {
   pending: ["Waiting", "bg-bg text-muted"],
@@ -79,14 +81,15 @@ export function GoalCard({ goalId, onStatus }: { goalId: string; onStatus?: (goa
   const waiting = pendingChanges(goal);
 
   return (
-    <div role="group" aria-label={`Goal: ${goal.text}`} className="mt-2 rounded-[14px] border border-line bg-paper p-3 text-sm">
-      {goal.status === "planning" && <p className="text-muted">Nova is making a plan...</p>}
+    <div role="group" aria-label={`Goal: ${goal.text}`} data-status={goal.status} data-working={isActive(goal.status)} className="chat-goal-card mt-2 rounded-[14px] border border-line bg-paper p-3 text-sm">
+      <GoalCompletion status={goal.status} />
+      {goal.status === "planning" && <p className="chat-live-activity"><WorkingIndicator />Nova is making a plan...</p>}
       {goal.newProject && goal.projectName && <p className="text-xs text-muted">New project: {goal.projectName}</p>}
 
       {goal.status === "awaiting_approval" && !changing && (
         <>
           <p className="font-semibold">Here&apos;s the plan</p>
-          <ul className="mt-2 space-y-1.5">
+          <ul className="chat-plan-steps mt-2 space-y-1.5">
             {goal.tasks.map((t) => (
               <li key={t.id} className="flex items-center gap-2">
                 {agent(t.agentId) && <CompanionAvatar identity={t.agentId} look={agent(t.agentId)!.appearance} size={24} />}
@@ -108,16 +111,19 @@ export function GoalCard({ goalId, onStatus }: { goalId: string; onStatus?: (goa
 
       {["running", "reviewing", "done", "failed", "cancelled"].includes(goal.status) && goal.tasks.length > 0 && (
         <>
-          <p className="font-semibold">
-            {goal.status === "cancelled" ? `Stopped. ${done} finished, ${goal.tasks.length - done} not started.` : goal.status === "done" ? "Done" : `Team working · ${done} of ${goal.tasks.length} done`}
+          <p className="chat-goal-heading font-semibold">
+            {isActive(goal.status) && <WorkingIndicator />}
+            {goal.status === "cancelled" ? `Stopped. ${done} finished, ${goal.tasks.length - done} not started.` : goal.status === "failed" ? `Work stopped · ${done} of ${goal.tasks.length} done` : goal.status === "done" ? "Done" : goal.status === "reviewing" ? "Nova is reviewing the results" : `Team working · ${done} of ${goal.tasks.length} done`}
           </p>
+          <div className="chat-goal-progress" role="progressbar" aria-label="Completed tasks" aria-valuemin={0} aria-valuemax={goal.tasks.length} aria-valuenow={done} aria-valuetext={`${done} of ${goal.tasks.length} tasks completed`}><span style={{ transform: `scaleX(${done / goal.tasks.length})` }} /></div>
           <ul className="mt-2 space-y-1.5">
             {goal.tasks.map((t) => (
-              <li key={t.id}>
-                <button onClick={() => setOpen((o) => (o === t.id ? null : t.id))} aria-expanded={open === t.id} className="flex w-full items-center gap-2 rounded-[8px] px-1 py-1 text-left hover:bg-bg">
+              <li key={t.id} className="chat-task-row" data-status={t.status} data-working={isActive(goal.status) && t.status === "running"}>
+                <button onClick={() => setOpen((o) => (o === t.id ? null : t.id))} aria-expanded={open === t.id} className="chat-task-toggle flex w-full items-center gap-2 rounded-[8px] px-1 py-1 text-left hover:bg-bg">
                   {agent(t.agentId) && <CompanionAvatar identity={t.agentId} look={agent(t.agentId)!.appearance} size={24} />}
                   <span className="min-w-0 flex-1 truncate">{planSentence(t.agentName, t.title)}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATE[t.status][1]}`}>
+                  <span className={`chat-task-state rounded-full px-2 py-0.5 text-xs font-semibold ${STATE[t.status][1]}`}>
+                    {isActive(goal.status) && t.status === "running" && <WorkingIndicator />}
                     {STATE[t.status][0]}
                     {t.status === "running" && minutes(t.startedAt) ? ` (${minutes(t.startedAt)} min)` : ""}
                   </span>
@@ -139,7 +145,7 @@ export function GoalCard({ goalId, onStatus }: { goalId: string; onStatus?: (goa
       {goal.error && <p className="mt-2 text-xs text-[#7a1b12]">{goal.error}</p>}
 
       {goal.summary && (
-        <div className="mt-3 rounded-[10px] bg-bg p-3">
+        <div className="chat-result-reveal mt-3 rounded-[10px] bg-bg p-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold">Nova&apos;s summary</p>
             <CopyButton text={goalAsMarkdown(goal)} label="Copy all results" />

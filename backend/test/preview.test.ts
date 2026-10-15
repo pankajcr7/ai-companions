@@ -75,3 +75,15 @@ test("tokens are per project; bad and expired links get 403; projects without HT
   expect(none.json().error.message).toBe("This project has no HTML file to preview.");
   expect((await b.req("POST", `/api/workspaces/${a.id}/projects/${a.pid}/preview-token`)).statusCode).toBe(404);
 });
+
+test("preview picker opens the requested HTML file and rejects non-HTML or missing paths", async () => {
+  const a = await project([["index.html", "<h1>Home</h1>"], ["about.html", "<h1>About</h1>"], ["notes.md", "# Notes"]]);
+  const endpoint = `/api/workspaces/${a.id}/projects/${a.pid}/preview-token`;
+  const picked = await a.req("POST", endpoint, { path: "about.html" });
+  expect(picked.statusCode).toBe(200);
+  expect(picked.json().entry).toBe("about.html");
+  expect((await app.inject({ method: "GET", url: picked.json().url })).body).toBe("<h1>About</h1>");
+  expect((await a.req("POST", endpoint, { path: "notes.md" })).statusCode).toBe(404);
+  expect((await a.req("POST", endpoint, { path: "../private.html" })).statusCode).toBe(400);
+  expect((await a.req("POST", endpoint, { path: "missing.html" })).statusCode).toBe(404);
+});

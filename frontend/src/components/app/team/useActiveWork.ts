@@ -21,6 +21,8 @@ export function useActiveWork(): GoalDTO | null {
         next = active ? (await api<{ goal: GoalDTO }>(`${path}/${active.id}`)).goal : null;
       } catch {
         // Keep showing the last known state; the next tick tries again.
+        if (!stopped) timer = setTimeout(tick, 15000);
+        return;
       }
       if (stopped) return;
       setGoal(next);

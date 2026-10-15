@@ -18,7 +18,7 @@ export function TeamStrip({ workingIds }: { workingIds: string[] }) {
         const state = workingIds.includes(a.id) ? ["working", "bg-[#e0a400]"] : ready(a.id) ? ["free", "bg-[#3c9a3c]"] : ["needs setup", "bg-[#b5b8b1]"];
         return (
           <span key={a.id} role="listitem">
-            <Link href={`/w/${snapshot.workspace.slug}/team/${a.id}`} title={`${a.name}: ${state[0]}`} className="flex items-center gap-1.5 rounded-full border border-line bg-paper py-0.5 pl-0.5 pr-2.5 text-xs hover:border-ink">
+            <Link href={`/w/${snapshot.workspace.slug}/team/${a.id}`} title={`${a.name}: ${state[0]}`} data-working={state[0] === "working"} className="chat-teammate flex items-center gap-1.5 rounded-full border border-line bg-paper py-0.5 pl-0.5 pr-2.5 text-xs hover:border-ink">
               <CompanionAvatar identity={a.id} look={a.appearance} size={22} />
               {a.name}
               <span className={`size-2 rounded-full ${state[1]}`} aria-label={state[0]} />

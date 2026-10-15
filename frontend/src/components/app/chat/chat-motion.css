@@ -1,0 +1,79 @@
+/* Live motion follows real chat/task state. Text stays still once it appears. */
+.workspace-shell { --chat-live: #87a960; --chat-live-soft: color-mix(in srgb, var(--chat-live) 12%, transparent); }
+
+.chat-working-indicator { display: inline-flex; align-items: center; justify-content: center; gap: 2px; width: 19px; height: 17px; flex-shrink: 0; color: var(--chat-live); }
+.chat-working-indicator i { width: 3px; height: 12px; border-radius: 3px; background: currentColor; transform: scaleY(.4); animation: chat-wave 1.15s ease-in-out infinite; }
+.chat-working-indicator i:nth-child(2) { animation-delay: 120ms; }
+.chat-working-indicator i:nth-child(3) { animation-delay: 240ms; }
+.chat-working-indicator i:nth-child(4) { animation-delay: 360ms; }
+.chat-live-activity { display: flex; align-items: center; gap: 9px; min-height: 29px; margin-bottom: 8px; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.chat-activity-label { overflow-wrap: anywhere; animation: chat-appear 220ms ease-out both; }
+.chat-log-entry { animation: chat-arrive 300ms cubic-bezier(.2,.7,.3,1) both; }
+.chat-live-message[data-working="true"] .chat-message-author::before { animation: chat-breathe 1.8s ease-in-out infinite; }
+.chat-stream-content > .rich > * { animation: chat-appear 240ms ease-out both; }
+.chat-stream-cursor { display: inline-block; width: 7px; height: 13px; margin-top: 7px; border-radius: 2px; background: var(--chat-live); vertical-align: middle; animation: chat-breathe 1s ease-in-out infinite; }
+
+.chat-header-avatar { position: relative; }
+.chat-header[data-working="true"] .chat-header-avatar::after { content: ""; position: absolute; inset: -4px; border: 1px solid var(--chat-live); border-radius: inherit; pointer-events: none; animation: chat-halo 2.4s ease-out infinite; }
+.chat-header[data-working="true"] .companion-avatar,
+.chat-teammate[data-working="true"] .companion-avatar { animation: chat-companion 2.8s ease-in-out infinite; }
+.chat-header[data-working="true"] .chat-header-status > span { background: var(--chat-live); animation: chat-breathe 1.8s ease-in-out infinite; }
+.chat-teammate[data-working="true"] { border-color: var(--chat-live); background: var(--chat-live-soft); }
+.chat-teammate[data-working="true"] > span[aria-label="working"] { animation: chat-breathe 1.8s ease-in-out infinite; }
+.chat-work-status { animation: chat-arrive 280ms ease-out both; }
+
+.chat-composer { position: relative; }
+.chat-composer[data-working="true"] { border-color: color-mix(in srgb, var(--chat-live) 65%, var(--line)); }
+.chat-composer-activity { position: absolute; bottom: -1px; left: 17px; right: 17px; height: 2px; overflow: hidden; border-radius: 2px; pointer-events: none; background: var(--chat-live-soft); }
+.chat-composer-activity i { display: block; width: 35%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, transparent, var(--chat-live), transparent); animation: chat-sweep 2.8s ease-in-out infinite; }
+.workspace-shell :is(.chat-send, .chat-starter) { transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, opacity 180ms ease; }
+.chat-send:active:not(:disabled), .chat-starter:active:not(:disabled) { transform: scale(.97); }
+@media (hover: hover) {
+  .chat-starter:hover:not(:disabled) { transform: translateY(-2px); }
+  .chat-send:hover:not(:disabled) > svg { transform: translateY(-1px); }
+}
+.chat-send > svg { transition: transform 180ms ease; }
+
+.chat-welcome > * { animation: chat-arrive 450ms cubic-bezier(.2,.7,.3,1) both; }
+.chat-welcome > :nth-child(2) { animation-delay: 45ms; }
+.chat-welcome > :nth-child(3) { animation-delay: 90ms; }
+.chat-welcome > :nth-child(4) { animation-delay: 135ms; }
+.chat-starter-section { animation: chat-arrive 400ms 160ms ease-out both; }
+.chat-help, .chat-team-popover { animation: chat-arrive 220ms ease-out both; }
+
+.chat-goal-card { position: relative; isolation: isolate; overflow: hidden; transition: border-color 240ms ease; animation: chat-arrive 300ms ease-out both; }
+.chat-goal-card[data-working="true"] { border-color: color-mix(in srgb, var(--chat-live) 45%, var(--line)); }
+.chat-goal-card[data-working="true"]::before { content: ""; position: absolute; left: 0; top: 0; height: 2px; width: 35%; pointer-events: none; background: linear-gradient(90deg, transparent, var(--chat-live), transparent); animation: chat-sweep 3s ease-in-out infinite; }
+.chat-goal-heading { display: flex; align-items: center; gap: 8px; }
+.chat-goal-progress { height: 4px; margin-top: 12px; border-radius: 4px; overflow: hidden; background: var(--bg); }
+.chat-goal-progress > span { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--chat-live); transform-origin: left; transition: transform 650ms cubic-bezier(.2,.7,.3,1); }
+.chat-task-toggle { transition: background-color 220ms ease; }
+.chat-task-row[data-working="true"] > .chat-task-toggle { background: var(--chat-live-soft); }
+.chat-task-state { display: inline-flex; flex-shrink: 0; align-items: center; gap: 5px; }
+.chat-task-state .chat-working-indicator { width: 13px; height: 12px; gap: 1px; color: currentColor; }
+.chat-task-state .chat-working-indicator i { width: 2px; height: 10px; }
+.chat-task-row[data-status="done"] .chat-task-state { animation: chat-complete 400ms ease-out both; }
+.chat-plan-steps > li { animation: chat-arrive 280ms ease-out both; }
+.chat-plan-steps > li:nth-child(2) { animation-delay: 45ms; }
+.chat-plan-steps > li:nth-child(3) { animation-delay: 90ms; }
+.chat-plan-steps > li:nth-child(n+4) { animation-delay: 135ms; }
+.chat-result-reveal, .chat-task-detail, .chat-tool-steps { animation: chat-arrive 300ms ease-out both; }
+
+@keyframes chat-wave { 0%, 100% { transform: scaleY(.35); opacity: .55; } 45% { transform: scaleY(1); opacity: 1; } }
+@keyframes chat-appear { from { opacity: .35; } to { opacity: 1; } }
+@keyframes chat-arrive { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes chat-breathe { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
+@keyframes chat-halo { 0% { transform: scale(.92); opacity: .65; } 85%, 100% { transform: scale(1.17); opacity: 0; } }
+@keyframes chat-companion { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-2px) rotate(-3deg); } }
+@keyframes chat-sweep { from { transform: translateX(-110%); } to { transform: translateX(390%); } }
+@keyframes chat-complete { from { transform: scale(.94); opacity: .6; } to { transform: scale(1); opacity: 1; } }
+
+/* Both operating-system and in-app preferences apply to every decorative layer. */
+@media (prefers-reduced-motion: reduce) {
+  .workspace-shell *, .workspace-shell *::before, .workspace-shell *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .chat-header[data-working="true"] .chat-header-avatar::after { opacity: .4; }
+  .chat-composer-activity i, .chat-goal-card[data-working="true"]::before { display: none; }
+}
+.workspace-shell[data-still="true"] *, .workspace-shell[data-still="true"] *::before, .workspace-shell[data-still="true"] *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+.workspace-shell[data-still="true"] .chat-header[data-working="true"] .chat-header-avatar::after { opacity: .4; }
+.workspace-shell[data-still="true"] .chat-composer-activity i, .workspace-shell[data-still="true"] .chat-goal-card[data-working="true"]::before { display: none; }

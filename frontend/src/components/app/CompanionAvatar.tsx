@@ -46,7 +46,7 @@ export function CompanionFigure({ look, identity = "", working = false }: { look
           <rect x={-10} y={19} width={19} height={4} rx={2} fill={paint("accent")} />
           <g className="companion-arms">
             <rect x={-30} y={7} width={9} height={15} rx={4.5} transform="rotate(16 -25 14)" fill={paint("accent")} />
-            <rect x={24} y={7} width={9} height={15} rx={4.5} transform="rotate(-20 28 14)" fill={paint("accent")} />
+            <g className="companion-wave-arm"><rect x={24} y={7} width={9} height={15} rx={4.5} transform="rotate(-20 28 14)" fill={paint("accent")} /></g>
           </g>
           <g transform="translate(4 3)">{shell(shadow)}</g>
           {shell(paint("shell"))}

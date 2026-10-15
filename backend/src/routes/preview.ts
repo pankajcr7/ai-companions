@@ -19,7 +19,9 @@ export async function previewRoutes(app: FastifyInstance) {
     await requireMember(req, id);
     await loadProject(id, pid);
     const files = await prisma.projectEntry.findMany({ where: { projectId: pid, kind: "file" }, select: { path: true } });
-    const entry = previewEntry(files.map((f) => f.path));
+    const requested = (req.body as { path?: unknown } | undefined)?.path;
+    const path = typeof requested === "string" ? requirePath(requested) : null;
+    const entry = path ? files.find((f) => f.path.toLowerCase() === path.toLowerCase() && /\.html?$/i.test(f.path))?.path : previewEntry(files.map((f) => f.path));
     if (!entry) throw new HttpError(404, "no_html", "This project has no HTML file to preview.");
     return { url: `/api/preview/${signPreview(pid)}/${entry.split("/").map(encodeURIComponent).join("/")}`, entry };
   });

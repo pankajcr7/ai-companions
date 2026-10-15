@@ -5,7 +5,7 @@ import { ArrowsOut, Minus, Plus } from "@phosphor-icons/react";
 import { companionSignature, shadeColor } from "@/lib/companion-look";
 import { roleLabel, statusText, teamStatus } from "@/lib/team";
 import type { Agent, Snapshot } from "@/lib/types";
-import { CompanionFigure } from "../CompanionAvatar";
+import { CompanionAvatar, CompanionFigure } from "../CompanionAvatar";
 
 // All furniture shares one projection. Characters stay upright, like miniature desk toys.
 const X = .866;
@@ -44,7 +44,7 @@ function Chair({ x, y, color = "#a2b4a0" }: { x: number; y: number; color?: stri
   </g>;
 }
 
-function Station({ agent, x, y, snapshot, working, onOpen }: { agent: Agent; x: number; y: number; snapshot: Snapshot; working: Map<string, string>; onOpen: (id: string) => void }) {
+function Station({ agent, x, y, snapshot, working, onOpen, onInspect }: { agent: Agent; x: number; y: number; snapshot: Snapshot; working: Map<string, string>; onOpen: (id: string) => void; onInspect: (id: string) => void }) {
   const state = teamStatus(agent, snapshot.connections, working);
   const busy = state.kind === "working";
   const ready = state.kind === "free";
@@ -54,7 +54,7 @@ function Station({ agent, x, y, snapshot, working, onOpen }: { agent: Agent; x: 
   const label = project(x + 8, y + 81);
   const status = busy ? "Working" : ready ? "Ready to help" : state.kind === "setup" ? "Needs setup" : state.kind === "paused" ? "Paused" : "Away";
   const dot = busy ? "#b88437" : ready ? "#72975d" : "#9b9e99";
-  return <g className="office-station" data-working={busy} data-agent={agent.id} role="button" tabIndex={0} aria-label={`${agent.name}, ${roleLabel(agent)}, ${statusText(state)}`} onClick={() => onOpen(agent.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(agent.id); } }}>
+  return <g className="office-station" data-working={busy} data-ready={ready} data-agent={agent.id} role="button" tabIndex={0} aria-label={`${agent.name}, ${roleLabel(agent)}, ${statusText(state)}`} onPointerEnter={() => onInspect(agent.id)} onFocus={() => onInspect(agent.id)} onClick={() => onOpen(agent.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(agent.id); } }}>
     <title>{agent.name} · {roleLabel(agent)} · {statusText(state)}. Click to chat.</title>
     <polygon className="office-station-focus" points={polygon([x - 92, y - 79], [x + 89, y - 79], [x + 89, y + 110], [x - 92, y + 110])} fill={accent} fillOpacity=".09" stroke={accent} strokeWidth="2" />
     <ellipse cx={project(x + 10, y + 32).x} cy={project(x + 10, y + 32).y + 6} rx={82} ry={30} fill="#283c31" opacity=".055" />
@@ -86,6 +86,7 @@ export function StudioOffice({ snapshot, working, onOpen }: { snapshot: Snapshot
   const id = useId().replace(/:/g, "");
   const scroll = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
+  const [inspected, setInspected] = useState<string | null>(null);
   const companions = snapshot.agents.filter((a) => a.status !== "archived").sort((a, b) => Number(b.isHead) - Number(a.isHead));
   const columns = Math.min(3, Math.max(2, companions.length));
   const rows = Math.max(2, Math.ceil(companions.length / columns));
@@ -97,9 +98,12 @@ export function StudioOffice({ snapshot, working, onOpen }: { snapshot: Snapshot
   const furnitureId = `${id}-window`;
   const meetingX = width - 152;
   const meetingY = depth - 175;
+  const companion = companions.find((a) => a.id === inspected) ?? companions[0];
+  const activity = companion ? teamStatus(companion, snapshot.connections, working) : null;
 
   return <div className="studio-office">
     <div className="office-scene-topline"><span><i />{snapshot.workspace.name}<span className="office-floor-label"> / The studio</span></span><span className="office-scene-badge">{companions.length} desks · One team</span></div>
+    {companion && activity && <div className="office-agent-info"><CompanionAvatar identity={companion.id} look={companion.appearance} size={34} /><div><strong>{companion.name}<span>{roleLabel(companion)}</span></strong><p>{activity.kind === "working" ? activity.task : activity.kind === "free" ? "At their desk, ready for your next idea." : statusText(activity)}</p></div><button onClick={() => onOpen(companion.id)}>Say hello</button></div>}
     <div className="office-scene-scroll" ref={scroll}>
       <svg viewBox={`0 0 ${sceneWidth} ${sceneHeight}`} className="office-diorama" style={{ width: `max(${zoom * 100}%, ${zoom * 720}px)` }} role="group" aria-label="Team office. Each companion has a desk. Select a companion to open their chat.">
         <defs>
@@ -135,7 +139,7 @@ export function StudioOffice({ snapshot, working, onOpen }: { snapshot: Snapshot
             <Chair x={meetingX - 24} y={meetingY + 67} color="#a7bba4" /><Chair x={meetingX + 55} y={meetingY + 57} color="#a7bba4" />
             <text x={project(meetingX, meetingY + 108).x} y={project(meetingX, meetingY + 108).y} fill="var(--office-label)" fontSize={11} textAnchor="middle">The meeting corner</text>
           </g>
-          {seats.map(({ agent, x, y }) => <Station key={agent.id} agent={agent} x={x} y={y} snapshot={snapshot} working={working} onOpen={onOpen} />)}
+          {seats.map(({ agent, x, y }) => <Station key={agent.id} agent={agent} x={x} y={y} snapshot={snapshot} working={working} onOpen={onOpen} onInspect={setInspected} />)}
           <Plant x={43} y={depth - 32} scale={1.1} />
           <Plant x={width - 38} y={depth - 32} scale={.9} />
         </g>

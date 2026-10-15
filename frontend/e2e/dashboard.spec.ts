@@ -1,14 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { ChatMessageDTO, Snapshot } from "../src/lib/types";
 
-async function workspace(page: Page, options: { setup?: boolean; viewer?: boolean; dark?: boolean } = {}) {
+async function workspace(page: Page, options: { setup?: boolean; viewer?: boolean; dark?: boolean; reducedMotion?: boolean; replyGate?: Promise<void> } = {}) {
   const snapshot: Snapshot = {
     workspace: { id: "demo", slug: "studio", name: "Acorn Studio", qualityChecks: true },
     role: options.viewer ? "viewer" : "owner",
     departments: [],
     agents: [{ id: "nova", name: "Nova", role: "Head agent", kind: "ai", workingStyle: "Helpful", status: "active", isHead: true, departmentId: null, managerId: null, appearance: { style: "robot", color: "#cedeb8", head: "square", eyes: "visor", accessory: "antenna" }, model: options.setup ? null : "test-model", connectionId: options.setup ? null : "service" }],
     layout: { zones: [], desks: {} },
-    preferences: { theme: options.dark ? "dark" : "light", reducedMotion: true, calmMode: false },
+    preferences: { theme: options.dark ? "dark" : "light", reducedMotion: options.reducedMotion ?? true, calmMode: false },
     connections: options.setup ? [] : [{ id: "service", kind: "custom", label: "Test service", hint: "test", status: "connected" }],
   };
   let conversations = [
@@ -52,6 +52,7 @@ async function workspace(page: Page, options: { setup?: boolean; viewer?: boolea
       if (method === "POST") {
         const body = request.postDataJSON();
         sent.push(body);
+        await options.replyGate;
         messages[id] = [...(messages[id] ?? []), message(`u-${sent.length}`, "user", body.message), message(`a-${sent.length}`, "assistant", "I can help with that. Let’s turn your idea into a clear next step.")];
         conversations = conversations.map((c) => c.id === id ? { ...c, title: body.message.slice(0, 60) } : c);
         return route.fulfill({ contentType: "text/event-stream", body: 'event: delta\ndata: {"text":"I can help with that. Let’s turn your idea into a clear next step."}\n\nevent: done\ndata: {}\n\n' });
@@ -173,4 +174,50 @@ test("dark mode and small laptops keep the welcome and composer within the viewp
   await expect(page.getByText("Start with a message.")).toBeVisible();
   await page.getByText("Your team", { exact: true }).click();
   await expect(page.getByRole("list", { name: "Your team" })).toBeVisible();
+});
+
+test("chat motion follows reply activity and respects both motion preferences", async ({ page }) => {
+  let finishReply!: () => void;
+  const replyGate = new Promise<void>((resolve) => { finishReply = resolve; });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await workspace(page, { reducedMotion: false, replyGate });
+  await page.getByLabel("Message Nova").fill("Help me plan a website");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  const live = page.locator(".chat-live-message");
+  const wave = live.locator(".chat-working-indicator i").first();
+  try {
+    await expect(live).toHaveAttribute("aria-busy", "true");
+    await expect(page.getByText("Nova is thinking", { exact: true })).toBeVisible();
+    await expect(page.locator(".chat-header")).toHaveAttribute("data-working", "true");
+    await expect(page.locator(".chat-composer")).toHaveAttribute("data-working", "true");
+    await expect(wave).toHaveCSS("animation-name", "chat-wave");
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(wave).toHaveCSS("animation-name", "none");
+    await expect(live).toHaveAttribute("aria-busy", "true");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await expect(wave).toHaveCSS("animation-name", "chat-wave");
+  } finally {
+    finishReply();
+  }
+  await expect(page.getByRole("log")).toContainText("I can help with that.");
+  await expect(live).toHaveCount(0);
+  await expect(page.locator(".chat-header")).toHaveAttribute("data-working", "false");
+  await expect(page.locator(".chat-composer-activity")).toHaveCount(0);
+
+  let releaseSecondReply!: () => void;
+  const secondReplyGate = new Promise<void>((resolve) => { releaseSecondReply = resolve; });
+  await workspace(page, { reducedMotion: true, replyGate: secondReplyGate });
+  await page.getByLabel("Message Nova").fill("Another idea");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  try {
+    await expect(wave).toHaveCSS("animation-name", "none");
+    await expect(page.getByText("Nova is thinking", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Stop", exact: true }).click();
+    await expect(live).toHaveAttribute("aria-busy", "false");
+    await expect(page.locator(".chat-working-indicator")).toHaveCount(0);
+    await expect(page.locator(".chat-header")).toHaveAttribute("data-working", "false");
+  } finally {
+    releaseSecondReply();
+  }
 });

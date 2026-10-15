@@ -10,11 +10,25 @@ import { loadHead } from "../goals/load.js";
 import { summarizeProject } from "../goals/summary.js";
 import { audit, HttpError, perUser, requireMember } from "../http.js";
 import { Name, WsParams } from "./workspaces.js";
+import { projectCover } from "../files/overview.js";
 
 export async function projectRoutes(app: FastifyInstance) {
   app.get("/api/workspaces/:id/projects", async (req) => {
     const { id } = WsParams.parse(req.params);
     await requireMember(req, id);
+    if ((req.query as { overview?: string }).overview === "1") {
+      const rows = await prisma.project.findMany({
+        where: { workspaceId: id }, orderBy: { updatedAt: "desc" },
+        include: {
+          entries: { where: { kind: "file" }, select: { path: true, revision: true }, orderBy: { path: "asc" } },
+          goals: { orderBy: { createdAt: "desc" }, take: 1, select: { id: true, text: true, status: true, tasks: { select: { agentId: true, status: true } }, _count: { select: { edits: { where: { status: "pending" } } } } } },
+        },
+      });
+      return { projects: rows.map((p) => {
+        const g = p.goals[0];
+        return { ...projectDTO(p), overview: { cover: projectCover(p.entries), goal: g ? { id: g.id, text: g.text, status: g.status, done: g.tasks.filter((t) => t.status === "done").length, total: g.tasks.length, pendingEdits: g._count.edits, agentIds: [...new Set(g.tasks.map((t) => t.agentId))] } : null } };
+      }) };
+    }
     const rows = await prisma.project.findMany({ where: { workspaceId: id }, orderBy: { updatedAt: "desc" } });
     return { projects: rows.map(projectDTO) };
   });

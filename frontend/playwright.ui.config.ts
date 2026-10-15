@@ -3,7 +3,7 @@ import { defineConfig } from "@playwright/test";
 // Isolated UI checks use mocked APIs, so they never reset or change a database.
 export default defineConfig({
   testDir: "e2e",
-  testMatch: "dashboard.spec.ts",
+  testMatch: ["dashboard.spec.ts", "studio.spec.ts"],
   timeout: 45_000,
   expect: { timeout: 15_000 },
   workers: 2,

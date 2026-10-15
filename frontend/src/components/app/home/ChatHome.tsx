@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { createPortal } from "react-dom";
-import { ArrowUpRight, CaretDown, ChatCircle, FolderSimple, Globe, PencilLine, Question, UsersThree } from "@phosphor-icons/react";
+import { ArrowUpRight, CaretDown, ChatCircle, Eye, FolderSimple, Globe, PencilLine, Question, UsersThree } from "@phosphor-icons/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { isActive, type GoalDTO } from "@/lib/goals";
+import { isActive, type GoalDTO, type GoalListItem } from "@/lib/goals";
 import type { ProjectSummary } from "@/lib/projects";
 import type { HireSuggestion } from "@/lib/suggest";
 import { isReady } from "@/lib/team";
@@ -15,11 +15,14 @@ import { CompanionAvatar } from "../CompanionAvatar";
 import { canEdit } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace";
 import { ChatThread } from "../chat/ChatThread";
+import { WorkingIndicator } from "../chat/WorkingIndicator";
 import { CompanionForm } from "../CompanionForm";
 import { GoalCard } from "../goals/GoalCard";
 import { ConversationList } from "./ConversationList";
 import { SetupCard } from "./SetupCard";
 import { TeamStrip } from "./TeamStrip";
+import { ContinueWorking } from "./ContinueWorking";
+import { ProjectPreview, ResultPreviewContext, type PreviewSelection } from "../files/ProjectPreview";
 
 const EXAMPLES = [
   { title: "Build a website", prompt: "Build a landing page for my bakery", icon: <Globe size={19} /> },
@@ -39,11 +42,16 @@ export function ChatHome() {
   const [showHelp, setShowHelp] = useState(false);
   const [goals, setGoals] = useState<Record<string, GoalDTO>>({});
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [recentGoals, setRecentGoals] = useState<GoalListItem[]>([]);
+  const [preview, setPreview] = useState<PreviewSelection | null>(null);
+  const [pane, setPane] = useState<"chat" | "preview">("chat");
+  const [draftRequest, setDraftRequest] = useState<{ text: string } | null>(null);
   const [chip, setChip] = useState("");
   const [error, setError] = useState("");
   const [threadKey, setThreadKey] = useState(0);
   const [hire, setHire] = useState<HireSuggestion | null>(null);
   const [editingHead, setEditingHead] = useState(false);
+  const [thinkingThread, setThinkingThread] = useState<string | null>(null);
   // "Give a task" on the Team page opens home with "@Name " ready in the input.
   const params = useSearchParams();
   const router = useRouter();
@@ -57,6 +65,7 @@ export function ChatHome() {
   const convPath = wsPath("/conversations");
   const newChat = useCallback(async (keepAsk = false) => {
     if (!keepAsk) setAsk("");
+    setDraftRequest(null);
     setCreating(true);
     setError("");
     try {
@@ -70,7 +79,7 @@ export function ChatHome() {
     } finally {
       setCreating(false);
     }
-  }, [convPath, setAsk, setActiveId, setGoals, setChip, setRefreshKey]);
+  }, [convPath, setAsk, setDraftRequest, setActiveId, setGoals, setChip, setRefreshKey]);
 
   // Open the latest conversation, or start one.
   useEffect(() => {
@@ -82,10 +91,18 @@ export function ChatHome() {
       (e) => setError((e as Error).message),
     );
   }, [convPath, editable, newChat]);
-  const projectsPath = wsPath("/projects");
+  const projectsPath = wsPath("/projects?overview=1");
+  const goalsPath = wsPath("/goals");
   useEffect(() => {
-    api<{ projects: ProjectSummary[] }>(projectsPath).then((r) => setProjects(r.projects), () => setProjects([]));
-  }, [projectsPath]);
+    let cancelled = false;
+    const refresh = () => {
+      api<{ projects: ProjectSummary[] }>(projectsPath).then((r) => { if (!cancelled) setProjects(r.projects); }, () => {});
+      api<{ goals: GoalListItem[] }>(goalsPath).then((r) => { if (!cancelled) setRecentGoals(r.goals ?? []); }, () => {});
+    };
+    refresh();
+    const timer = setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 15000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [projectsPath, goalsPath, refreshKey]);
 
   const onStatus = useCallback((g: GoalDTO) => setGoals((prev) => ({ ...prev, [g.id]: g })), [setGoals]);
   const running = Object.values(goals).find((g) => isActive(g.status));
@@ -95,12 +112,22 @@ export function ChatHome() {
   const project = chip === "__new__" ? { kind: "new" } : chip ? { kind: "existing", id: chip } : { kind: "none" };
   const headReady = !!head && isReady(head, snapshot.connections);
   const name = head?.name ?? "Nova";
+  const currentThread = `${activeId}:${threadKey}`;
+  const thinking = thinkingThread === currentThread;
   const base = `/w/${snapshot.workspace.slug}`;
+  const previewProject = projects.find((p) => p.id === chip) ?? projects.find((p) => p.id === running?.projectId) ?? projects[0];
+  const previewVersion = preview ? Object.values(goals).filter((g) => g.projectId === preview.projectId).flatMap((g) => g.edits.filter((e) => e.status === "applied").map((e) => e.id)).join(":") : "";
+  function openPreview(selection: PreviewSelection) { setPreview(selection); setPane("preview"); }
+  function requestChanges(selection: PreviewSelection) {
+    setChip(selection.projectId); setPane("chat");
+    setDraftRequest({ text: `Please update ${selection.path ? `${selection.path} in ` : ""}${selection.title}: ` });
+  }
 
   return (
-    <div className="chat-home">
+    <ResultPreviewContext value={{ open: openPreview, requestChanges }}>
+    <div className="chat-home studio-chat-workspace" data-preview={!!preview} data-pane={pane}>
       {sidebar.history && createPortal(
-        <ConversationList activeId={activeId} editable={editable} creating={creating} onOpen={(id) => { setAsk(""); setActiveId(id); setGoals({}); setChip(""); sidebar.close(); }} onNew={() => { void newChat(); sidebar.close(); }} refreshKey={refreshKey} onDeleted={(id, rest) => {
+        <ConversationList activeId={activeId} editable={editable} creating={creating} onOpen={(id) => { setAsk(""); setDraftRequest(null); setActiveId(id); setGoals({}); setChip(""); sidebar.close(); }} onNew={() => { void newChat(); sidebar.close(); }} refreshKey={refreshKey} onDeleted={(id, rest) => {
           if (id !== activeId) return;
           setGoals({});
           setAsk("");
@@ -110,13 +137,16 @@ export function ChatHome() {
           else setActiveId(null);
         }} />, sidebar.history,
       )}
+      {preview && <div className="studio-chat-tabs" role="group" aria-label="Chat workspace view"><button aria-pressed={pane === "chat"} onClick={() => setPane("chat")}><ChatCircle size={16} />Chat</button><button aria-pressed={pane === "preview"} onClick={() => setPane("preview")}><Eye size={16} />Preview</button></div>}
+      <div className="studio-chat-columns">
       <section className="chat-panel" aria-label={`Chat with ${name}`}>
-        <header className="chat-header">
+        <header className="chat-header" data-working={thinking || !!running}>
           <div className="chat-header-person">
             <span className="chat-header-avatar">{head ? <CompanionAvatar identity={head.id} look={head.appearance} size={34} /> : <ChatCircle size={24} />}</span>
-            <div><p className="text-sm font-semibold">{name}<span className="chat-header-role">Your team lead</span></p><p className="chat-header-status"><span data-ready={headReady} />{running ? "Working with your team" : headReady ? "Ready to help" : "Let’s finish setup"}</p></div>
+            <div><p className="text-sm font-semibold">{name}<span className="chat-header-role">Your team lead</span></p><p className="chat-header-status"><span data-ready={headReady} />{running ? "Working with your team" : thinking ? "Working on your message" : headReady ? "Ready to help" : "Let’s finish setup"}</p></div>
           </div>
           <div className="chat-header-actions">
+            {previewProject && <button className="studio-preview-trigger" onClick={() => openPreview({ projectId: previewProject.id, title: previewProject.name, path: previewProject.overview?.cover?.path })}><Eye size={17} /><span>Preview</span></button>}
             <details className="chat-team-menu">
               <summary><UsersThree size={18} /><span>Your team</span><CaretDown size={12} /></summary>
               <div className="chat-team-popover"><p className="mb-3 text-sm font-semibold">The people behind your ideas</p><TeamStrip workingIds={workingIds} /></div>
@@ -124,9 +154,11 @@ export function ChatHome() {
             <button className="workspace-icon-button" onClick={() => setShowHelp((v) => !v)} aria-label="How chat works" aria-expanded={showHelp}><Question size={21} /></button>
           </div>
         </header>
+        <ContinueWorking projects={projects} goals={recentGoals} />
         {showHelp && <div className="chat-help"><p><strong>Start with a message.</strong> Ask a question or describe what you want to make. {name} brings in your team when needed and shows you a plan to approve before work starts.</p><Link href={`${base}/team`}>Meet your team<ArrowUpRight size={14} /></Link></div>}
         {running && (
           <div role="status" className="chat-work-status">
+            <WorkingIndicator />
             <span className="flex-1">{running.status === "planning" ? `${name} is making a plan...` : `Team working · ${doneCount} of ${running.tasks.length} done`}</span>
             {stop && running.status !== "planning" && (
               <button onClick={stop.onClick} className="rounded-full bg-[#c62828] px-4 py-1.5 text-sm font-bold text-white">■ Stop</button>
@@ -140,11 +172,12 @@ export function ChatHome() {
             <ChatThread
               key={`${activeId}:${threadKey}`}
               initialDraft={ask}
+              draftRequest={draftRequest}
               attachmentsPath={wsPath("/attachments")}
               fill
               hideMeta
               // When Nova finishes a reply, the chat list picks up the new title.
-              onThinking={(busy) => !busy && setRefreshKey((k) => k + 1)}
+              onThinking={(busy) => { setThinkingThread((current) => busy ? currentThread : current === currentThread ? null : current); if (!busy) setRefreshKey((k) => k + 1); }}
               path={`${convPath}/${activeId}`}
               postPath={`${convPath}/${activeId}/messages`}
               extraBody={() => ({ project })}
@@ -194,6 +227,8 @@ export function ChatHome() {
 
         </div>
       </section>
+      {preview && <aside className="studio-chat-preview"><ProjectPreview key={`${preview.projectId}:${preview.path ?? ""}`} selection={preview} version={previewVersion} onClose={() => { setPreview(null); setPane("chat"); }} onRequestChanges={editable ? (path) => requestChanges({ ...preview, path }) : undefined} /></aside>}
+      </div>
       {editingHead && head && (
         <CompanionForm
           agent={head}
@@ -217,5 +252,6 @@ export function ChatHome() {
         />
       )}
     </div>
+    </ResultPreviewContext>
   );
 }

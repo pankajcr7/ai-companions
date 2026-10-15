@@ -3,11 +3,15 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { ChatCircle, FolderSimple, GearSix, List, SignOut, UsersThree, X } from "@phosphor-icons/react";
+import { ArrowsIn, ArrowsOut, ChatCircle, FolderSimple, GearSix, List, Palette, SignOut, UsersThree, X } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/lib/workspace";
 import { Logo } from "@/components/landing/ui";
+import { StudioPreferences, useStudioPreferences } from "./StudioPreferences";
+import { AppearanceControls } from "./settings/AppearanceControls";
 import "./dashboard.css";
+import "./chat/chat-motion.css";
+import "./studio.css";
 
 // Chat history lives in the app sidebar while its state stays with the chat page.
 const SidebarContext = createContext<{ history: HTMLDivElement | null; close: () => void }>({ history: null, close: () => {} });
@@ -15,11 +19,18 @@ export const useAppSidebar = () => useContext(SidebarContext);
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { snapshot } = useWorkspace();
+  return <StudioPreferences key={snapshot.workspace.id}><WorkspaceShell>{children}</WorkspaceShell></StudioPreferences>;
+}
+
+function WorkspaceShell({ children }: { children: React.ReactNode }) {
+  const { snapshot } = useWorkspace();
+  const { prefs, update } = useStudioPreferences();
   const pathname = usePathname();
   const router = useRouter();
   const [history, setHistory] = useState<HTMLDivElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [error, setError] = useState("");
+  const [appearance, setAppearance] = useState(false);
   const sidebar = useRef<HTMLElement>(null);
   const menuButton = useRef<HTMLButtonElement>(null);
   const close = useCallback(() => setMenuOpen(false), []);
@@ -56,7 +67,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarContext value={{ history, close }}>
-      <div className="app workspace-shell" data-theme={theme} data-still={reducedMotion || calmMode}>
+      <div className="app workspace-shell" data-theme={theme} data-warm={prefs.warm && theme === "light"} data-accent={prefs.accent} data-focus={prefs.focus} data-still={reducedMotion || calmMode}>
         <a href="#workspace-content" className="workspace-skip">Skip to content</a>
         {menuOpen && <div className="workspace-backdrop" onClick={close} aria-hidden="true" />}
         <aside
@@ -94,12 +105,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
           <div ref={setHistory} className="workspace-history-slot" />
           <div className="workspace-sidebar-footer">
+            <div className="studio-sidebar-tools"><button onClick={() => { close(); setAppearance(true); }}><Palette size={17} />Appearance</button><button aria-label="Enter focus mode" title="Focus mode" onClick={() => { close(); update({ focus: true }); }}><ArrowsOut size={17} /></button></div>
             <Link href={`${base}/settings`} onClick={close} aria-current={pathname.startsWith(`${base}/settings`) ? "page" : undefined} className="workspace-nav-link"><GearSix size={19} /><span>Settings</span></Link>
             <button onClick={signOut} className="workspace-nav-link"><SignOut size={19} /><span>Sign out</span></button>
             {error && <p role="alert" className="px-3 text-xs text-[#b42318]">{error}</p>}
           </div>
         </aside>
         <div className="workspace-main" inert={menuOpen}>
+          {prefs.focus && <div className="studio-focus-bar"><span><ArrowsOut size={14} /> A little space to focus</span><button onClick={() => update({ focus: false })}><ArrowsIn size={14} />Exit focus</button></div>}
           <div className="workspace-mobile-bar">
             <button ref={menuButton} onClick={() => setMenuOpen(true)} aria-label="Open navigation" aria-expanded={menuOpen} aria-controls="workspace-sidebar" className="workspace-icon-button"><List size={22} /></button>
             <Link href={base} aria-label="Agent Company home"><Logo className="!text-base" /></Link>
@@ -107,7 +120,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <main id="workspace-content" tabIndex={-1} className={`workspace-content ${isChat ? "workspace-content-chat" : ""}`}>{children}</main>
         </div>
+        {appearance && <AppearanceDialog onClose={() => setAppearance(false)} />}
       </div>
     </SidebarContext>
   );
+}
+
+function AppearanceDialog({ onClose }: { onClose: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => { ref.current?.showModal(); }, []);
+  return <dialog ref={ref} onClose={onClose} aria-labelledby="studio-appearance-title" className="studio-dialog studio-appearance-dialog"><header><div><p className="studio-eyebrow">YOUR SPACE</p><h2 id="studio-appearance-title">Make yourself at home.</h2></div><button aria-label="Close appearance" onClick={() => ref.current?.close()} className="studio-icon-button"><X size={20} /></button></header><AppearanceControls /></dialog>;
 }

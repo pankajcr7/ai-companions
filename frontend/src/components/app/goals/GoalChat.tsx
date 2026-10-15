@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import type { HireSuggestion } from "@/lib/suggest";
 import { useWorkspace } from "@/lib/workspace";
@@ -9,6 +10,7 @@ import { ChatThread } from "../chat/ChatThread";
 /** Ask Nova about a goal's results, or continue the work as a follow-up goal. */
 export function GoalChat({ goalId, goalPath, canSend, projectId, onOpenGoal, onHire }: { goalId: string; goalPath: string; canSend: boolean; projectId: string | null; onOpenGoal: (id: string) => void; onHire?: (hire: HireSuggestion) => void }) {
   const { snapshot, wsPath } = useWorkspace();
+  const params = useSearchParams();
   const nova = snapshot.agents.find((a) => a.isHead);
   const name = nova?.name ?? "Nova";
   const [next, setNext] = useState<string | null>(null);
@@ -36,9 +38,11 @@ export function GoalChat({ goalId, goalPath, canSend, projectId, onOpenGoal, onH
   }
 
   return (
-    <section aria-label={`Chat with ${name} about this goal`} className="mt-5 border-t border-line pt-4">
+    <section id="goal-followup" aria-label={`Chat with ${name} about this goal`} className="mt-5 border-t border-line pt-4">
       <h3 className="mb-2 text-sm font-semibold">Ask {name} about this goal</h3>
       <ChatThread
+        key={params.get("change") ?? "chat"}
+        initialDraft={params.get("change") ?? undefined}
         attachmentsPath={wsPath("/attachments")}
         path={`${goalPath}/chat`}
         name={name}

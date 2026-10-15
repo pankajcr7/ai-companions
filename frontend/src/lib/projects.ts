@@ -1,6 +1,7 @@
 import { exclusionReason, normalizePath } from "./file-rules.ts";
+import type { ProjectOverview } from "./studio.ts";
 
-export type ProjectSummary = { id: string; name: string; fileCount: number; totalBytes: number; updatedAt: string };
+export type ProjectSummary = { id: string; name: string; fileCount: number; totalBytes: number; updatedAt: string; overview?: ProjectOverview };
 export type TreeEntry = { path: string; kind: "file" | "dir"; size: number; isText: boolean; revision: number; updatedAt: string };
 export type Picked = { path: string; file: File };
 export type Plan = { included: Picked[]; excluded: { path: string; reason: string; top: string | null }[]; dirs: string[]; bytes: number };

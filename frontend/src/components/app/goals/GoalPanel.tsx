@@ -1,5 +1,7 @@
 "use client";
 
+import { GoalCompletion } from "./GoalCompletion";
+
 import { useCallback, useEffect, useState } from "react";
 import { X } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
@@ -79,6 +81,7 @@ export function GoalPanel({ goalId, onClose, onWorking, onOpenGoal, onHire }: { 
         </p>
       )}
       {goal?.newProject && goal.projectName && <p className="text-xs text-muted">New project: {goal.projectName}</p>}
+      {goal && <GoalCompletion status={goal.status} />}
       {error && <p role="alert" className="mt-3 text-sm text-[#b42318]">{error}</p>}
       {goal?.error && <p className="mt-3 rounded-[10px] bg-[#fde8e6] px-3 py-2 text-sm text-[#7a1b12]">{goal.error}</p>}
       {goal?.status === "planning" && <div className="mt-4 h-24 animate-pulse rounded-[12px] bg-bg" aria-busy="true" />}

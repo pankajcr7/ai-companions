@@ -16,11 +16,12 @@ import { ChatEditCard } from "./ChatEditCard";
 import { RichText } from "./RichText";
 import { SuggestionCard } from "./SuggestionCard";
 import { ToolActivity } from "./ToolActivity";
+import { WorkingIndicator } from "./WorkingIndicator";
 
-type Pending = { sent: string; text: string; stopped?: boolean; error?: { code: string; message: string }; activity?: { name: string; label: string }[] };
+type Pending = { sent: string; text: string; stopped?: boolean; settled?: boolean; error?: { code: string; message: string }; activity?: { name: string; label: string }[] };
 
 /** A streaming chat against any endpoint that speaks the start/delta/error/done SSE protocol. */
-export function ChatThread({ welcome, composerTools, disabledHint, attachmentsPath, initialDraft, path, name, inputLabel, logLabel, placeholder, emptyText, canSend, usageLink, footer, command, onCommandSent, onThinking, suggestions, postPath, extraBody, examples, renderExtra, goalStop, fill, hideMeta }: {
+export function ChatThread({ welcome, composerTools, disabledHint, attachmentsPath, initialDraft, draftRequest, path, name, inputLabel, logLabel, placeholder, emptyText, canSend, usageLink, footer, command, onCommandSent, onThinking, suggestions, postPath, extraBody, examples, renderExtra, goalStop, fill, hideMeta }: {
   path: string;
   name: string;
   inputLabel: string;
@@ -49,6 +50,8 @@ export function ChatThread({ welcome, composerTools, disabledHint, attachmentsPa
   goalStop?: { label: string; onClick: () => void } | null;
   /** Text already in the input when the chat opens (e.g. "@Lina " from the Team page). */
   initialDraft?: string;
+  /** Fill the composer from a result action, leaving the user in control of sending. */
+  draftRequest?: { text: string } | null;
   /** Upload URL for chat attachments; when set, files can be attached, pasted or dropped. */
   attachmentsPath?: string;
   /** Fill the available height (full-page chat) instead of a fixed-height panel. */
@@ -61,7 +64,10 @@ export function ChatThread({ welcome, composerTools, disabledHint, attachmentsPa
   const [messages, setMessages] = useState<ChatMessageDTO[] | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState("");
-  const [draft, setDraft] = useState(initialDraft ?? "");
+  const [draft, setDraft] = useState(draftRequest?.text ?? initialDraft ?? "");
+  const [appliedDraft, setAppliedDraft] = useState(draftRequest);
+  if (draftRequest && draftRequest !== appliedDraft) { setAppliedDraft(draftRequest); setDraft(draftRequest.text); }
+  useEffect(() => { if (draftRequest) input.current?.focus(); }, [draftRequest]);
   const att = useAttachments(canSend ? attachmentsPath : undefined);
   const abort = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
@@ -115,6 +121,7 @@ export function ChatThread({ welcome, composerTools, disabledHint, attachmentsPa
     } finally {
       onThinking?.(false);
       abort.current = null;
+      setPending((p) => p ? { ...p, settled: true, stopped: p.stopped || stopped } : p);
       if (stopped) {
         // The server saves the stopped reply a moment later; keep it on screen until the saved copy arrives.
         setPending((p) => (p ? { ...p, stopped: true } : p));
@@ -134,9 +141,12 @@ export function ChatThread({ welcome, composerTools, disabledHint, attachmentsPa
   }
 
   const empty = messages?.length === 0 && !pending;
-  const bubble = (role: "user" | "assistant") => welcome
+  const responding = !!pending && !pending.stopped && !pending.settled && !pending.error && !error;
+  const lastActivity = pending?.activity?.at(-1);
+  const activityLabel = pending?.text ? `${name} is writing` : lastActivity ? liveLabel(lastActivity) : `${name} is thinking`;
+  const bubble = (role: "user" | "assistant") => "chat-log-entry " + (welcome
     ? `chat-message chat-message-${role}`
-    : role === "user" ? "ml-auto max-w-[85%] whitespace-pre-wrap rounded-[14px] bg-ink px-3.5 py-2.5 text-sm text-paper" : "max-w-[94%] min-w-0 rounded-[14px] bg-bg px-3.5 py-2.5 text-sm";
+    : role === "user" ? "ml-auto max-w-[85%] whitespace-pre-wrap rounded-[14px] bg-ink px-3.5 py-2.5 text-sm text-paper" : "max-w-[94%] min-w-0 rounded-[14px] bg-bg px-3.5 py-2.5 text-sm");
   const starters = examples && (
     <div className={welcome ? "chat-starters" : "flex flex-wrap justify-center gap-2"}>
       {examples.map((example) => {
@@ -198,10 +208,10 @@ export function ChatThread({ welcome, composerTools, disabledHint, attachmentsPa
         })}
         {pending && <div className={bubble("user")}>{pending.sent}</div>}
         {pending && (
-          <div className={bubble("assistant")} aria-live="polite" aria-busy={!pending.error}>
+          <div className={`${bubble("assistant")} chat-live-message`} data-working={responding} aria-live="polite" aria-busy={responding}>
             {welcome && <p className="chat-message-author">{name}</p>}
-            {pending.activity?.length ? <p className="mb-1 text-[11px] text-muted">{liveLabel(pending.activity.at(-1)!)}</p> : null}
-            {pending.text ? <RichText text={visibleWhileStreaming(pending.text)} /> : pending.activity?.length ? null : <span className="text-muted">{pending.stopped ? "No reply" : `${name} is thinking...`}</span>}
+            {responding && <div className="chat-live-activity"><WorkingIndicator /><span key={activityLabel} className="chat-activity-label">{activityLabel}</span></div>}
+            {pending.text ? <div className="chat-stream-content"><RichText text={visibleWhileStreaming(pending.text)} />{responding && <span className="chat-stream-cursor" aria-hidden="true" />}</div> : pending.stopped ? <span className="text-muted">No reply</span> : null}
             {pending.error && <p className="mt-1.5 text-[11px] text-[#b42318]">{pending.error.message}</p>}
             {pending.stopped && <p className="mt-1.5 text-[11px] text-muted">Stopped.</p>}
           </div>
@@ -221,7 +231,9 @@ export function ChatThread({ welcome, composerTools, disabledHint, attachmentsPa
           }}
           className={welcome ? "chat-composer" : "flex items-end gap-2"}
           data-disabled={!canSend}
+          data-working={responding || !!goalStop}
         >
+          {welcome && (responding || goalStop) && <span className="chat-composer-activity" aria-hidden="true"><i /></span>}
           {!welcome && attachmentsPath && <AttachButton onFiles={att.add} disabled={!!pending} />}
           <label htmlFor={inputId} className="sr-only">{inputLabel}</label>
           <textarea
@@ -252,7 +264,7 @@ export function ChatThread({ welcome, composerTools, disabledHint, attachmentsPa
           <div className={welcome ? "chat-composer-toolbar" : "contents"}>
             {welcome && <div className="chat-composer-tools">{attachmentsPath && <AttachButton onFiles={att.add} disabled={!canSend || !!pending} label="Attach" />}<fieldset disabled={!canSend}>{composerTools}</fieldset></div>}
             {pending ? (
-              <button type="button" onClick={() => abort.current?.abort()} className={welcome ? "chat-send chat-stop" : "btn-light rounded-[10px] px-4 py-2.5 text-sm font-semibold"}>{welcome && <Stop size={16} weight="fill" />}Stop</button>
+              <button type="button" disabled={!responding} onClick={() => { setPending((p) => p ? { ...p, stopped: true } : p); onThinking?.(false); abort.current?.abort(); }} className={welcome ? "chat-send chat-stop" : "btn-light rounded-[10px] px-4 py-2.5 text-sm font-semibold"}>{welcome && <Stop size={16} weight="fill" />}Stop</button>
             ) : goalStop ? (
               <button type="button" onClick={goalStop.onClick} className={welcome ? "chat-send chat-stop" : "rounded-[10px] bg-[#c62828] px-4 py-2.5 text-sm font-semibold text-white"}><Stop size={16} weight="fill" />{goalStop.label}</button>
             ) : (

@@ -9,15 +9,16 @@ test("build a new project from a goal, preview it, and download it", async ({ pa
   const goal = page.getByRole("complementary", { name: "Team task" });
   await expect(goal.getByLabel("New project name")).toHaveValue("Bakery landing page");
   await goal.getByRole("button", { name: "Start" }).click();
-  await expect(goal.getByRole("status")).toContainText("Done", { timeout: 60_000 });
+  await expect(goal.getByRole("status").filter({ hasText: "Done" })).toBeVisible({ timeout: 60_000 });
 
   const created = goal.getByRole("region", { name: "Files created" });
+  await created.getByText(/Files created ·/).click();
   await expect(created).toContainText("index.html");
   await expect(created).toContainText("style.css");
-  await created.getByRole("button", { name: "Preview" }).click();
+  await created.getByRole("button", { name: "Preview", exact: true }).click();
   const frame = page.frameLocator('iframe[title="Preview of Bakery landing page"]');
   await expect(frame.getByRole("heading", { name: "Crumb Bakery" })).toBeVisible();
-  await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Close preview" }).click();
 
   const download = page.waitForEvent("download");
   await created.getByRole("link", { name: "Download ZIP" }).click();
