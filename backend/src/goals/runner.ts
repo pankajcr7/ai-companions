@@ -185,6 +185,8 @@ async function runTask(goalId: string, taskId: string) {
       tools,
       limit: 12,
       signal,
+      // A task reply that only announces work is asked to act instead of ending the task.
+      nudge: true,
       log: stepLog(goal.workspaceId, goalId, taskId, "execute"),
       // Counted per call, so a stopped task still reports what it used.
       onCall: add,
@@ -226,7 +228,7 @@ async function runTask(goalId: string, taskId: string) {
           break;
         }
         review.rounds++;
-        const again = await runLoop({ actor: agent, instructions, turns: [...turns, { role: "user", content: `NOVA'S REVIEW — please fix:\n${r.fixes.map((f) => `- ${f}`).join("\n")}\n\nThen reply with your complete final answer; it replaces your previous one.` }], tools, limit: 6, signal, log: stepLog(goal.workspaceId, goalId, taskId, "execute"), onCall: add });
+        const again = await runLoop({ actor: agent, instructions, turns: [...turns, { role: "user", content: `NOVA'S REVIEW — please fix:\n${r.fixes.map((f) => `- ${f}`).join("\n")}\n\nThen reply with your complete final answer; it replaces your previous one.` }], tools, limit: 6, signal, nudge: true, log: stepLog(goal.workspaceId, goalId, taskId, "execute"), onCall: add });
         turns = again.turns;
         toolUses.push(...again.toolUses);
         result = await finish(again.text);

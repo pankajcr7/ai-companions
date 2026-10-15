@@ -162,3 +162,32 @@ test("a tool can set its own time limit, and a result note is added to the saved
   expect(r.toolUses.map((u) => [u.name, u.label, u.ok])).toEqual([["slow", "a · free", true], ["stuck", "b", false]]);
   expect(JSON.stringify(r.turns)).toContain("That took too long and was stopped.");
 });
+
+const runNudged = (replies: string[]) => {
+  const s = scripted(replies);
+  return { s, done: runLoop({ actor, instructions: "BASE", turns: [{ role: "user", content: "hi" }], tools: [echo], limit: 3, signal: new AbortController().signal, callModel: s.model, nudge: true }) };
+};
+
+test("in tasks, a reply that only announces work is asked to act, then the work continues", async () => {
+  const { s, done } = runNudged(["I'll inspect the supplied files first, then create the PNG.", fence({ tool: "echo", args: { word: "hi" } }), "Made it."]);
+  const r = await done;
+  expect(r.text).toBe("Made it.");
+  expect(r.toolUses.map((u) => u.name)).toEqual(["echo"]);
+  expect(String(s.seen[1].turns.at(-1)!.content)).toContain("Don't describe what you will do: do it now.");
+  expect(String(s.seen[1].turns.at(-1)!.content)).toContain("echo");
+});
+
+test("in tasks, an empty reply or a claim that tools are missing is also asked to act, at most twice", async () => {
+  const { s, done } = runNudged(["", "I'm unable to create the image because the image-generation tools are not available in this session.", "Still nothing."]);
+  expect((await done).text).toBe("Still nothing.");
+  expect(s.seen).toHaveLength(3);
+});
+
+test("a finished answer, an answer with a block, and chat replies are never nudged", async () => {
+  expect((await runNudged(["Here is the final post copy: Talk smarter."]).done).text).toBe("Here is the final post copy: Talk smarter.");
+  const suggest = `I'll get the team on it.\n\n${fence({ suggest: { goal: "x" } })}`;
+  expect((await runNudged([suggest]).done).text).toContain("I'll get the team on it.");
+  const chat = run([echo], ["I'll check that for you."]);
+  expect((await chat.done).text).toBe("I'll check that for you.");
+  expect(chat.s.seen).toHaveLength(1);
+});

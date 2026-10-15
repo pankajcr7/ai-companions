@@ -21,6 +21,15 @@ export const TOOL_RESULT = "TOOL RESULT ";
 export const TOOL_TIMEOUT_MS = 20_000;
 export const CONTEXT_BUDGET = 60_000;
 const MAX_BAD = 3;
+const MAX_NUDGES = 2;
+
+/** A task reply that isn't an answer: empty, only announcing work ("I'll inspect the files first…"), or claiming the tools are missing. */
+function stalls(text: string): boolean {
+  const t = text.trim();
+  if (!t) return true;
+  if (t.length > 800 || t.includes("```")) return false;
+  return /\b(I'll|I will|I'm going to|I am going to|Let me|First,? I)\b|\btools? (?:are|is) (?:not |un)available\b|\bdon't have (?:access to )?(?:the )?tools?\b/i.test(t);
+}
 
 function protocol(tools: Tool[], limit: number) {
   return [
@@ -89,7 +98,7 @@ async function runTool(tool: Tool, args: unknown, signal: AbortSignal): Promise<
 }
 
 /** Calls the model until it answers without a tool block, running one tool per round within the limits. */
-export async function runLoop(o: { actor: Actor; instructions: string; turns: ChatTurn[]; tools: Tool[]; limit: number; signal: AbortSignal; log?: StepLog; onEvent?: (e: LoopEvent) => void; onCall?: (c: Call) => void; callModel?: CallModel }) {
+export async function runLoop(o: { actor: Actor; instructions: string; turns: ChatTurn[]; tools: Tool[]; limit: number; signal: AbortSignal; log?: StepLog; onEvent?: (e: LoopEvent) => void; onCall?: (c: Call) => void; callModel?: CallModel; nudge?: boolean }) {
   const callModel: CallModel = o.callModel ?? ((instructions, turns, onDelta) => complete(o.actor, instructions, turns, o.signal, o.log, onDelta));
   const instructions = o.tools.length ? `${o.instructions}\n\n${protocol(o.tools, o.limit)}` : o.instructions;
   const byName = new Map(o.tools.map((t) => [t.name, t]));
@@ -97,6 +106,7 @@ export async function runLoop(o: { actor: Actor; instructions: string; turns: Ch
   const calls: Call[] = [];
   const toolUses: ToolUse[] = [];
   let bad = 0;
+  let nudges = 0;
   let lastKey = "";
   for (;;) {
     const c = await callModel(instructions, trimToolResults(turns), (text) => o.onEvent?.({ type: "delta", text }));
@@ -104,7 +114,15 @@ export async function runLoop(o: { actor: Actor; instructions: string; turns: Ch
     o.onCall?.(c);
     turns.push({ role: "assistant", content: c.text });
     const parsed = o.tools.length ? parseToolCall(c.text) : null;
-    if (!parsed) return { text: without(c.text, "done"), calls, toolUses, turns };
+    if (!parsed) {
+      // In tasks, a reply that only says what it will do isn't the result: ask the model to act, at most twice.
+      if (o.nudge && nudges < MAX_NUDGES && stalls(c.text)) {
+        nudges++;
+        turns.push({ role: "user", content: `Don't describe what you will do: do it now. Your tools: ${[...byName.keys()].join(", ")}. Reply with one tool block to use one. Give your final answer only when the work is finished.` });
+        continue;
+      }
+      return { text: without(c.text, "done"), calls, toolUses, turns };
+    }
     if (toolUses.length >= o.limit) return { text: answerAfterTools(c.text, toolUses), calls, toolUses, turns };
 
     let head = "error";
