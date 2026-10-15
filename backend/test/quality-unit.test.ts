@@ -1,10 +1,17 @@
 import { expect, test } from "vitest";
+import { planInstructions } from "../src/goals/prompts.js";
 import { DESIGN_GUIDE, isVisualTask, Review, reviewPrompt } from "../src/goals/quality.js";
 
 test("visual tasks are recognised from their words", () => {
   expect(isVisualTask({ title: "Build the landing page", instructions: "", deliverable: "" })).toBe(true);
   expect(isVisualTask({ title: "Write posts", instructions: "Three Instagram posts with a banner", deliverable: "" })).toBe(true);
   expect(isVisualTask({ title: "Research competitors", instructions: "Compare prices", deliverable: "A table" })).toBe(false);
+  expect(DESIGN_GUIDE.length).toBeLessThan(2000);
+});
+
+test("planning and visual tasks look at a website the owner wants matched", () => {
+  expect(planInstructions("Co", false)).toContain("If the goal names a website to match, look at it with look_at_website before planning");
+  expect(DESIGN_GUIDE).toContain("If the goal, brief or task gives a website to match, look at it with look_at_website first");
   expect(DESIGN_GUIDE.length).toBeLessThan(2000);
 });
 

@@ -50,6 +50,25 @@ test("a question gets an answer; a work request becomes a planned goal linked to
   expect(list[0]).toMatchObject({ id: c.cid, title: "What do we sell?" });
 });
 
+test("a website the owner names reaches the team's goal even when Nova's goal leaves it out", async () => {
+  const co = await company(app, llm);
+  llm.setScript((s, u) => {
+    if (isPlan(s)) return fence({ tasks: [{ agentId: co.others[0].id, title: "Build the page", instructions: "w", deliverable: "d", criteria: ["c"], dependsOn: [] }] });
+    if (isNova(s)) return u.includes("stripe") ? suggest("Build a pricing page like Stripe's") : suggest("Build a shop like https://shop.example/home");
+    return "ok";
+  });
+  const goalOf = async (c: Awaited<ReturnType<typeof conversation>>) => {
+    const gid = (await c.get()).messages.at(-1).goalId as string;
+    return waitFor(async () => (await co.req("GET", `/api/workspaces/${co.id}/goals/${gid}`)).json().goal, (g) => g.status === "awaiting_approval");
+  };
+  const a = await conversation(co);
+  await a.send("Make a pricing page like https://stripe.com/pricing.");
+  expect((await goalOf(a)).text).toBe("Build a pricing page like Stripe's\n\nReference sites from the owner: https://stripe.com/pricing");
+  const b = await conversation(co);
+  await b.send("A shop like https://shop.example/home please");
+  expect((await goalOf(b)).text).toBe("Build a shop like https://shop.example/home");
+});
+
 test("Nova sees the conversation's goal results; the chip picks the project; new projects too", async () => {
   const co = await company(app, llm);
   const pid = (await co.req("POST", `/api/workspaces/${co.id}/projects`, { name: "Site" })).json().id as string;

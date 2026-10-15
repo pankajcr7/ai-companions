@@ -44,6 +44,12 @@ const dto = (m: ChatMessage & { edits?: ChatEdit[]; attachments?: Attachment[] }
 
 const titleFrom = (text: string) => (text.length > 60 ? `${text.slice(0, 57)}...` : text);
 
+/** Nova's goal is short and may drop the sites the owner named; the team only gets the goal, so the addresses go with it. */
+function withReferences(goal: string, ownerMessage: string): string {
+  const urls = [...new Set((ownerMessage.match(/https?:\/\/[^\s<>"'()[\]]+/g) ?? []).map((u) => u.replace(/[.,;:!?]+$/, "")))].filter((u) => !goal.includes(u)).slice(0, 5);
+  return urls.length ? `${goal}\n\nReference sites from the owner: ${urls.join(" ")}` : goal;
+}
+
 async function loadConversation(workspaceId: string, userId: string, cid: string) {
   const c = await prisma.conversation.findFirst({ where: { id: cid, workspaceId, userId } });
   if (!c) throw new HttpError(404, "not_found", "Conversation not found");
@@ -103,8 +109,9 @@ export async function conversationRoutes(app: FastifyInstance) {
     const { text } = z.object({ text: z.string().trim().min(1).max(4000).optional() }).parse(req.body ?? {});
     const latest = await prisma.chatMessage.findFirst({ where: { conversationId: cid, goalId: { not: null } }, orderBy: { createdAt: "desc" }, select: { goalId: true } });
     // The owner's message just before Nova's reply carries the files for this request.
-    const request = await prisma.chatMessage.findFirst({ where: { conversationId: cid, role: "user", createdAt: { lte: msg.createdAt } }, orderBy: { createdAt: "desc" }, select: { id: true } });
-    const goal = await createGoal({ workspaceId: id, userId: user.id, text: text ?? suggestion.goal, newProject: suggestion.newProject, parentGoalId: latest?.goalId ?? null, projectId: latest ? undefined : null, log: (e) => req.log.error(e), beforePlan: request ? (goalId) => linkGoalAttachments(goalId, request.id, cid, text ?? suggestion.goal!) : undefined });
+    const request = await prisma.chatMessage.findFirst({ where: { conversationId: cid, role: "user", createdAt: { lte: msg.createdAt } }, orderBy: { createdAt: "desc" }, select: { id: true, content: true } });
+    const goalText = withReferences(text ?? suggestion.goal, request?.content ?? "");
+    const goal = await createGoal({ workspaceId: id, userId: user.id, text: goalText, newProject: suggestion.newProject, parentGoalId: latest?.goalId ?? null, projectId: latest ? undefined : null, log: (e) => req.log.error(e), beforePlan: request ? (goalId) => linkGoalAttachments(goalId, request.id, cid, goalText) : undefined });
     // Conditional, so two clicks can't link two goals to one message.
     const linked = await prisma.chatMessage.updateMany({ where: { id: mid, goalId: null }, data: { goalId: goal.id, planBlocked: null } });
     if (!linked.count) throw new HttpError(409, "planned", "This request already has a plan.");
@@ -163,15 +170,16 @@ export async function conversationRoutes(app: FastifyInstance) {
         if (!suggestion?.goal) return saved;
         // Work requests become a plan right away; nothing runs until the owner presses Start.
         try {
+          const goalText = withReferences(suggestion.goal, message);
           const goal = await createGoal({
             workspaceId: id,
             userId: user.id,
-            text: suggestion.goal,
+            text: goalText,
             newProject: suggestion.newProject || project.kind === "new",
             projectId: project.kind === "existing" ? project.id : latestGoalId ? undefined : null,
             parentGoalId: latestGoalId,
             log: (e) => req.log.error(e),
-            beforePlan: (goalId) => linkGoalAttachments(goalId, userMsg.id, cid, suggestion.goal!),
+            beforePlan: (goalId) => linkGoalAttachments(goalId, userMsg.id, cid, goalText),
           });
           await prisma.chatMessage.update({ where: { id: saved.id }, data: { goalId: goal.id } });
         } catch (e) {

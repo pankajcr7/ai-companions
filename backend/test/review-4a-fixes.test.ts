@@ -74,13 +74,13 @@ test("a busy work request can be planned later from its message, linked into the
   const gate = new Promise<void>((r) => (open = r));
   llm.setScript(async (s, u) => {
     if (isPlan(s)) return (await gate, fence({ tasks: [task(co.nova.id, "t")] }));
-    if (isNova(s)) return `On it.\n\n${fence({ suggest: { goal: u } })}`;
+    if (isNova(s)) return `On it.\n\n${fence({ suggest: { goal: u.split(" like ")[0] } })}`;
     return "ok";
   });
   const cid = (await co.req("POST", `/api/workspaces/${co.id}/conversations`)).json().id as string;
   const cbase = `/api/workspaces/${co.id}/conversations/${cid}`;
   await co.req("POST", `${cbase}/messages`, { message: "First job", project: { kind: "none" } });
-  await co.req("POST", `${cbase}/messages`, { message: "Second job", project: { kind: "none" } });
+  await co.req("POST", `${cbase}/messages`, { message: "Second job like https://stripe.com/pricing", project: { kind: "none" } });
   const msgs = (await co.req("GET", cbase)).json().messages.filter((m: { role: string }) => m.role === "assistant");
   const firstGoal = msgs[0].goalId as string;
   expect(msgs[1].planBlocked).toBe("busy");
@@ -92,7 +92,7 @@ test("a busy work request can be planned later from its message, linked into the
   const after = (await co.req("GET", cbase)).json().messages.filter((m: { role: string }) => m.role === "assistant")[1];
   expect(after).toMatchObject({ planBlocked: null });
   const g = (await co.req("GET", `/api/workspaces/${co.id}/goals/${after.goalId}`)).json().goal;
-  expect(g).toMatchObject({ text: "Second job", parent: { id: firstGoal } });
+  expect(g).toMatchObject({ text: "Second job\n\nReference sites from the owner: https://stripe.com/pricing", parent: { id: firstGoal } });
 });
 
 test("long conversations show their newest 200 messages", async () => {
