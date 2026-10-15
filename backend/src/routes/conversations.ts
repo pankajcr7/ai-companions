@@ -8,6 +8,7 @@ import { historyTurns } from "../attachments/parts.js";
 import { attachmentDTO, linkGoalAttachments, madeImages, ownAttachments } from "../attachments/service.js";
 import { imageTool, loadImageKeys } from "../harness/images.js";
 import { loadProject } from "../files/service.js";
+import { webAddresses } from "../harness/site.js";
 import { attachmentTools, projectTools, webTools } from "../harness/tools.js";
 import { loadSearchKey } from "../harness/web.js";
 import { chatEditDTO, chatWriter, saveChatEdits } from "./chat-edits.js";
@@ -47,7 +48,7 @@ const titleFrom = (text: string) => (text.length > 60 ? `${text.slice(0, 57)}...
 
 /** Nova's goal is short and may drop the sites the owner named; the team only gets the goal, so the addresses go with it. */
 function withReferences(goal: string, ownerMessage: string): string {
-  const urls = [...new Set((ownerMessage.match(/https?:\/\/[^\s<>"'()[\]]+/g) ?? []).map((u) => u.replace(/[.,;:!?]+$/, "")))].filter((u) => !goal.includes(u)).slice(0, 5);
+  const urls = webAddresses(ownerMessage).filter((u) => !goal.includes(u)).slice(0, 5);
   return urls.length ? `${goal}\n\nReference sites from the owner: ${urls.join(" ")}` : goal;
 }
 

@@ -12,7 +12,7 @@ import type { Loaded } from "../goals/context.js";
 import { loadText } from "../goals/load.js";
 import { HttpError } from "../http.js";
 import { ToolError, type Tool } from "./loop.js";
-import { lookAtWebsite, studyWebsite } from "./site.js";
+import { hostOf, lookAtWebsite, studyWebsite } from "./site.js";
 import { exaSearch, openUrl, tavilySearch, untrusted } from "./web.js";
 
 const DOC_EXT = /\.(pdf|docx|xlsx|pptx)$/i;
@@ -154,14 +154,6 @@ export function projectTools(project: Project, o: { write: ((w: Write) => Promis
   }
   return tools;
 }
-
-const hostOf = (url: string) => {
-  try {
-    return new URL(url).host;
-  } catch {
-    return url.slice(0, 60);
-  }
-};
 
 export function webTools(searchKey: string | null): Tool[] {
   const tools: Tool[] = [

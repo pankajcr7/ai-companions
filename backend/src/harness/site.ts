@@ -10,6 +10,17 @@ const SCRIPT_BYTES = 1024 * 1024;
 
 const clip = (s: string) => (s.length > MAX_ENTRY ? `${s.slice(0, MAX_ENTRY)}…` : s);
 
+export const hostOf = (url: string) => {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url.slice(0, 60);
+  }
+};
+
+/** The http(s) addresses in some text, each once, without trailing punctuation. */
+export const webAddresses = (text: string) => [...new Set((text.match(/https?:\/\/[^\s<>"'`()[\]]+/g) ?? []).map((u) => u.replace(/[.,;:!?]+$/, "")))];
+
 /** Each entry at most 200 characters, de-duplicated, first 40, or "none found". */
 export const list = (items: Iterable<string>) => {
   const all = [...new Set([...items].map(clip))].slice(0, MAX_LIST);
@@ -190,4 +201,22 @@ export async function lookAtWebsite(url: string, signal: AbortSignal): Promise<T
     text: `${untrusted(lines.join("\n"))}\n${rebuild("the idea and layout")}${shot.status === "fulfilled" ? `\n${SHOT_WARNING}` : ""}`,
     images: shot.status === "fulfilled" ? [shot.value.image] : [],
   };
+}
+
+const GOAL_LOOK_MS = 30 * 60_000;
+// ponytail: in-process cache, right for one server; a second server instance would look again.
+const goalLooks = new Map<string, { at: number; out: Promise<ToolOutput> }>();
+
+/** One look per goal and address for half an hour, so every task of a goal sees the same page without asking Jina again. */
+export function lookForGoal(goalId: string, url: string, signal: AbortSignal): Promise<ToolOutput> {
+  const now = Date.now();
+  for (const [key, look] of goalLooks) if (now - look.at > GOAL_LOOK_MS) goalLooks.delete(key);
+  const key = `${goalId} ${url}`;
+  const hit = goalLooks.get(key);
+  if (hit) return hit.out;
+  const out = lookAtWebsite(url, signal);
+  goalLooks.set(key, { at: now, out });
+  // A failed look isn't kept: the next task tries again.
+  out.catch(() => goalLooks.delete(key));
+  return out;
 }

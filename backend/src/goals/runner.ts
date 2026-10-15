@@ -8,11 +8,16 @@ import { CallError, completeJson, readiness, type Call } from "./llm.js";
 import { isVisualTask, reviewTask } from "./quality.js";
 import { madeImages } from "../attachments/service.js";
 import { imageTool, loadImageKeys } from "../harness/images.js";
-import { runLoop, ToolError } from "../harness/loop.js";
+import { runLoop, ToolError, type ToolUse } from "../harness/loop.js";
+import { hostOf, lookForGoal, webAddresses } from "../harness/site.js";
 import { projectTools, webTools, type Write } from "../harness/tools.js";
+import type { Part } from "../providers/types.js";
 import { loadSearchKey } from "../harness/web.js";
 import { goalContext, loadHead, loadText, stepLog } from "./load.js";
 import { selectInstructions, selectPrompt, summaryInstructions, summaryPrompt, taskInstructions, taskPrompt } from "./prompts.js";
+
+// At most this many reference sites are looked at before a task starts.
+const MAX_SITES = 2;
 
 // ponytail: in-process runner; move to a job table with SKIP LOCKED if the backend ever runs as several instances.
 const controllers = new Map<string, Set<AbortController>>();
@@ -155,12 +160,28 @@ async function runTask(goalId: string, taskId: string) {
     const made = madeImages({ workspaceId: goal.workspaceId, userId: goal.createdById, files: await prisma.attachment.findMany({ where: { goalId } }), project: goal.project, task: { id: taskId, goalId } });
     const image = imageTool(await loadImageKeys(goal.workspaceId), made.media, made.source);
     const tools = [...(goal.project ? projectTools(goal.project, { write: saveOrSuggest, read }) : []), ...webTools(await loadSearchKey(goal.workspaceId)), ...(image ? [image] : [])];
+    // The team always sees the site the owner wants matched: looked at here, before the task starts, not left to the model.
+    const reference: Part[] = [];
+    const lookUses: ToolUse[] = [];
+    for (const url of webAddresses(`${goal.text}\n${goal.brief ?? ""}\n${task.instructions}`).slice(0, MAX_SITES)) {
+      const started = Date.now();
+      try {
+        const look = await lookForGoal(goalId, url, signal);
+        reference.push({ type: "text", text: `REFERENCE SITE ${url} (looked at for you before you started; match its layout, section order, colours and spacing):\n${look.text}` }, ...look.images.map((i) => ({ type: "image" as const, ...i })));
+        lookUses.push({ name: "look_at_website", label: hostOf(url), ok: true, ms: Date.now() - started, chars: look.text.length });
+      } catch (e) {
+        if (signal.aborted) throw new CallError("aborted", "Stopped");
+        notes.push(`Couldn't look at ${url} before you started (${e instanceof ToolError ? e.message : "the page reader failed"}). Try look_at_website yourself.`);
+        lookUses.push({ name: "look_at_website", label: hostOf(url), ok: false, ms: Date.now() - started, chars: 0 });
+      }
+    }
     const visual = !!goal.project || isVisualTask(task);
     const instructions = taskInstructions(agent, goal.workspace.name, agent.department?.name ?? null, !!goal.project, visual);
+    const prompt = taskPrompt(task, goal.text, ctx, deps, files, notes.join(" "), goal.brief && !ctx.shared.includes(goal.brief) ? goal.brief : null);
     const loop = await runLoop({
       actor: agent,
       instructions,
-      turns: [{ role: "user", content: taskPrompt(task, goal.text, ctx, deps, files, notes.join(" "), goal.brief && !ctx.shared.includes(goal.brief) ? goal.brief : null) }],
+      turns: [{ role: "user", content: reference.length ? [{ type: "text", text: prompt }, ...reference] : prompt }],
       tools,
       limit: 12,
       signal,
@@ -183,7 +204,7 @@ async function runTask(goalId: string, taskId: string) {
     };
     let result = await finish(loop.text);
     let turns = loop.turns;
-    const toolUses = [...loop.toolUses];
+    const toolUses = [...lookUses, ...loop.toolUses];
     // Nova checks the work against the request, criteria, brief and guide; the companion revises at most twice.
     const nova = goal.workspace.qualityChecks ? await loadHead(goal.workspaceId) : null;
     let review: { rounds: number; approved: boolean; fixes: string[][] } | null = null;
