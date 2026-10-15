@@ -7,8 +7,9 @@ export type ToolUse = { name: string; label: string; ok: boolean; ms: number; ch
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 /** finishOnStop: a tool that saves something runs to completion on Stop, so whatever it saved is still recorded. */
 /** What a tool returns: text, or text plus pictures (e.g. an image file) for models that can see. */
-export type ToolOutput = { text: string; images: { mime: string; data: string }[] };
-export type Tool<A = any> = { name: string; purpose: string; argsHelp: string; args: z.ZodType<A>; label: (a: A) => string; run: (a: A, signal: AbortSignal) => Promise<string | ToolOutput>; finishOnStop?: boolean };
+/** note: a few words added to the saved activity label (an image's cost); timeoutMs: a tool slower than the 20 s default (image generation). */
+export type ToolOutput = { text: string; images: { mime: string; data: string }[]; note?: string };
+export type Tool<A = any> = { name: string; purpose: string; argsHelp: string; args: z.ZodType<A>; label: (a: A) => string; run: (a: A, signal: AbortSignal) => Promise<string | ToolOutput>; finishOnStop?: boolean; timeoutMs?: number };
 /** reset: the text streamed so far was a tool call, not part of the answer. */
 export type LoopEvent = { type: "delta"; text: string } | { type: "tool"; name: string; label: string } | { type: "reset" };
 export type CallModel = (instructions: string, turns: ChatTurn[], onDelta?: (t: string) => void) => Promise<Call>;
@@ -70,8 +71,8 @@ export function trimToolResults(turns: ChatTurn[], budget = CONTEXT_BUDGET): Cha
   return out;
 }
 
-async function runTool(tool: Tool, args: unknown, signal: AbortSignal): Promise<{ ok: boolean; text: string; images: ToolOutput["images"] }> {
-  const timeout = AbortSignal.timeout(TOOL_TIMEOUT_MS);
+async function runTool(tool: Tool, args: unknown, signal: AbortSignal): Promise<{ ok: boolean; text: string; images: ToolOutput["images"]; note?: string }> {
+  const timeout = AbortSignal.timeout(tool.timeoutMs ?? TOOL_TIMEOUT_MS);
   const stopper = tool.finishOnStop ? timeout : AbortSignal.any([signal, timeout]);
   const stopped = new Promise<never>((_r, reject) => stopper.addEventListener("abort", () => reject(stopper.reason), { once: true }));
   try {
@@ -124,7 +125,7 @@ export async function runLoop(o: { actor: Actor; instructions: string; turns: Ch
         o.onEvent?.({ type: "tool", name: tool.name, label });
         const started = Date.now();
         const r = await runTool(tool, args.data, o.signal);
-        toolUses.push({ name: tool.name, label, ok: r.ok, ms: Date.now() - started, chars: r.text.length });
+        toolUses.push({ name: tool.name, label: r.note ? `${label} · ${r.note}` : label, ok: r.ok, ms: Date.now() - started, chars: r.text.length });
         result = r.text;
         images = r.images;
         bad = 0;

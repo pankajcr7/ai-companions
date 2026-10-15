@@ -9,7 +9,7 @@ import { loadHead } from "../goals/load.js";
 import { Plan, planProblems } from "../goals/plan.js";
 import { ACTIVE, createGoal } from "../goals/create.js";
 import { BRIEF_PATH } from "../goals/quality.js";
-import { copyGoalAttachments } from "../attachments/service.js";
+import { attachmentDTO, copyGoalAttachments } from "../attachments/service.js";
 import { planGoal } from "../goals/planner.js";
 import { abortGoal, kickGoal } from "../goals/runner.js";
 import { audit, HttpError, perUser, requireMember } from "../http.js";
@@ -19,7 +19,7 @@ const GoalParams = WsParams.extend({ gid: z.string().min(1).max(64) });
 const TaskParams = GoalParams.extend({ tid: z.string().min(1).max(64) });
 export const RATING_REASONS = ["wrong facts", "off-brand", "too generic", "ignored files", "too long"] as const;
 
-const withTasks = { parent: { select: { id: true, text: true } }, tasks: { orderBy: { position: "asc" }, include: { agent: { select: { name: true } } } }, edits: { orderBy: { createdAt: "asc" } } } satisfies Prisma.GoalInclude;
+const withTasks = { parent: { select: { id: true, text: true } }, tasks: { orderBy: { position: "asc" }, include: { agent: { select: { name: true } }, media: { orderBy: { createdAt: "asc" } } } }, edits: { orderBy: { createdAt: "asc" } } } satisfies Prisma.GoalInclude;
 type FullGoal = Prisma.GoalGetPayload<{ include: typeof withTasks }>;
 
 async function loadGoal(workspaceId: string, gid: string) {
@@ -60,6 +60,7 @@ async function goalDTO(goal: FullGoal) {
       result: t.result,
       filesRead: t.filesRead,
       toolUses: t.toolUses,
+      media: t.media.map(attachmentDTO),
       review: t.review ?? null,
       error: t.error,
       errorCode: t.errorCode,

@@ -1,4 +1,5 @@
 import type { ToolUseDTO } from "./activity.ts";
+import type { AttachmentDTO } from "./types.ts";
 export type GoalStatus = "planning" | "awaiting_approval" | "running" | "reviewing" | "done" | "failed" | "cancelled";
 export type TaskStatus = "pending" | "running" | "done" | "failed" | "skipped" | "interrupted";
 export type TaskDTO = {
@@ -17,6 +18,7 @@ export type TaskDTO = {
   finishedAt: string | null;
   filesRead: { path: string; revision: number }[];
   toolUses?: ToolUseDTO[];
+  media?: AttachmentDTO[];
   error: string | null;
   errorCode: string | null;
   verdict: "meets" | "needs_eyes" | null;

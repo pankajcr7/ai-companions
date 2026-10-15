@@ -1,8 +1,11 @@
 import { prisma } from "../db.js";
 import { addFiles } from "../files/service.js";
-import { getBlob } from "../files/store.js";
+import { getBlob, putBlob } from "../files/store.js";
 import type { Attachment, Project } from "../generated/prisma/client.js";
+import type { ImageSource, MediaStore } from "../harness/images.js";
+import { ToolError } from "../harness/loop.js";
 import { HttpError } from "../http.js";
+import { detect } from "./detect.js";
 
 export const MAX_ATTACHMENTS = 10;
 const DAY_MS = 24 * 3600_000;
@@ -47,9 +50,9 @@ export async function copyIntoProject(att: Attachment, project: Project, userId:
   return path;
 }
 
-/** Uploads that were never sent with a message are removed after a day. */
+/** Uploads never sent with a message, and images never linked to a reply or task, are removed after a day. */
 export async function cleanupAttachments(now = Date.now()): Promise<number> {
-  const r = await prisma.attachment.deleteMany({ where: { messageId: null, goalMessageId: null, goalId: null, createdAt: { lt: new Date(now - DAY_MS) } } });
+  const r = await prisma.attachment.deleteMany({ where: { messageId: null, goalMessageId: null, goalId: null, taskId: null, createdAt: { lt: new Date(now - DAY_MS) } } });
   return r.count;
 }
 
@@ -77,4 +80,44 @@ export async function copyGoalAttachments(workspaceId: string, goalId: string, u
     }
   }
   if (problems.length) await prisma.goal.update({ where: { id: goalId }, data: { error: problems.join(" ") } });
+}
+
+/**
+ * Images companions make while replying or working. Each is stored like an upload, so thumbnails and Save to project work.
+ * A chat image is linked to the reply once it's saved (`link`); a task image is linked to the task right away,
+ * and in a project it's also copied to images/ and listed with the goal's changes.
+ * `source` finds images to edit by name: images made here, the given files, then the project's files.
+ */
+export function madeImages(o: { workspaceId: string; userId: string; files: Attachment[]; project: Project | null; task?: { id: string; goalId: string } }) {
+  const made: Attachment[] = [];
+  const media: MediaStore = {
+    async save(data, fileName) {
+      const mime = detect(fileName, data)?.mime ?? "image/png";
+      const row = await prisma.attachment.create({ data: { workspaceId: o.workspaceId, userId: o.userId, name: fileName, mime, kind: "image", size: data.length, blobHash: await putBlob(data), taskId: o.task?.id ?? null } });
+      made.push(row);
+      if (!o.task) return `Shown to the owner under your reply as ${fileName}`;
+      if (!o.project) return `Shown to the owner on the task card as ${fileName}`;
+      const path = await freePath(o.project.id, "images", fileName);
+      const result = await addFiles(o.project.id, o.userId, [{ path, data }], []);
+      if (!result.added) return `Shown to the owner on the task card as ${fileName}; it couldn't be added to the project (${result.skipped[0]?.reason ?? "the project is full"})`;
+      await prisma.proposedEdit.create({ data: { taskId: o.task.id, goalId: o.task.goalId, path, baseRevision: 0, content: "", note: "Image", status: "applied", decidedById: o.userId } });
+      return `Saved as ${path}`;
+    },
+  };
+  const source: ImageSource = async (name) => {
+    const want = name.trim().toLowerCase();
+    const att = [...made, ...o.files].find((a) => a.name.toLowerCase() === want);
+    let data = att ? await getBlob(att.blobHash) : null;
+    if (!data && o.project) {
+      const entry = await prisma.projectEntry.findFirst({ where: { projectId: o.project.id, pathLower: want, kind: "file" } });
+      if (entry?.blobHash) data = await getBlob(entry.blobHash);
+    }
+    if (!data) throw new ToolError(`There's no image called ${name}. Use list_attachments or list_files to see them.`);
+    if (detect(name, data)?.kind !== "image") throw new ToolError(`${name} isn't an image.`);
+    return data;
+  };
+  const link = async (to: { messageId: string } | { goalMessageId: string }) => {
+    if (made.length) await prisma.attachment.updateMany({ where: { id: { in: made.map((m) => m.id) } }, data: to });
+  };
+  return { media, source, link };
 }

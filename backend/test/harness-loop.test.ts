@@ -153,3 +153,12 @@ test("a tool can return pictures; they reach the model as parts in the result tu
   await done;
   expect(s.seen[1].turns.at(-1)!.content).toEqual([{ type: "text", text: `${TOOL_RESULT}echo logo:\nthe logo` }, { type: "image", mime: "image/png", data: "AAAA" }]);
 });
+
+test("a tool can set its own time limit, and a result note is added to the saved label", async () => {
+  const slowOk: Tool<{ word: string }> = { ...echo, name: "slow", timeoutMs: 1_000, run: async (a) => { await new Promise((r) => setTimeout(r, 200)); return { text: `slow ${a.word}`, images: [], note: "free" }; } };
+  const stuck: Tool<{ word: string }> = { ...echo, name: "stuck", timeoutMs: 50, run: () => new Promise(() => {}) };
+  const { done } = run([slowOk, stuck], [fence({ tool: "slow", args: { word: "a" } }), fence({ tool: "stuck", args: { word: "b" } }), "final"]);
+  const r = await done;
+  expect(r.toolUses.map((u) => [u.name, u.label, u.ok])).toEqual([["slow", "a · free", true], ["stuck", "b", false]]);
+  expect(JSON.stringify(r.turns)).toContain("That took too long and was stopped.");
+});

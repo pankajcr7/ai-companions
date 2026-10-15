@@ -8,6 +8,7 @@ export const FAKE_REPLY = ["Hello ", "from the ", "fake model."];
 
 const fence = (v: unknown) => `\`\`\`json\n${JSON.stringify(v)}\n\`\`\``;
 export const MATH_EDIT = "// Adds two numbers.\nexport const add = (a: number, b: number) => a + b;\n";
+const FAKE_IMAGE = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 /** Scripted replies for goals, keyed on phrases in the system prompt; plain chat gets FAKE_REPLY. */
 function scripted(system: string, user: string): string | null {
@@ -58,6 +59,8 @@ function scripted(system: string, user: string): string | null {
   if (system.includes("When the owner asks for work to be done") && user.startsWith("TOOL RESULT read_file sample-app/README.md")) return "Your app is a small sample with a math helper.";
   if (system.includes("When the owner asks for work to be done") && /add a changelog/i.test(user)) return fence({ tool: "write_file", args: { path: "sample-app/CHANGELOG.md", content: "# Changelog\n\n- First release\n", note: "Start a changelog" } });
   if (system.includes("When the owner asks for work to be done") && user.startsWith("TOOL RESULT write_file sample-app/CHANGELOG.md")) return "I suggested a changelog. Review it below.";
+  if (system.includes("When the owner asks for work to be done") && /draw a logo/i.test(user)) return fence({ tool: "generate_image", args: { prompt: "A warm bakery logo", name: "logo" } });
+  if (system.includes("When the owner asks for work to be done") && user.startsWith("TOOL RESULT generate_image")) return "Here's your logo.";
   return null;
 }
 
@@ -85,6 +88,16 @@ export function startFakeLlm(): Promise<Server> {
       for (const text of reply ? [reply] : FAKE_REPLY) res.write(`data: ${JSON.stringify({ model: "fake-model", choices: [{ delta: { content: text } }] })}\n\n`);
       res.write(`data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 50, completion_tokens: 6 } })}\n\n`);
       res.end("data: [DONE]\n\n");
+      return;
+    }
+    // Cloudflare Workers AI stand-in for image generation: the key check and FLUX.2 klein, any account.
+    if (req.method === "GET" && /^\/cf\/accounts\/[^/]+\/ai\/models\/search/.test(req.url ?? "")) {
+      res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ success: true, result: [] }));
+      return;
+    }
+    if (req.method === "POST" && /^\/cf\/accounts\/[^/]+\/ai\/run\//.test(req.url ?? "")) {
+      for await (const _chunk of req) void _chunk;
+      res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ success: true, result: { image: FAKE_IMAGE } }));
       return;
     }
     res.writeHead(404).end();

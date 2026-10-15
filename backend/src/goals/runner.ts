@@ -6,6 +6,8 @@ import { cap, DEP_RESULT_CAP, FILE_BUDGET, pickFiles, RESULT_CAP, type Loaded } 
 import { checkEdit, splitEdits } from "./edits.js";
 import { CallError, completeJson, readiness, type Call } from "./llm.js";
 import { isVisualTask, reviewTask } from "./quality.js";
+import { madeImages } from "../attachments/service.js";
+import { imageTool, loadImageKeys } from "../harness/images.js";
 import { runLoop, ToolError } from "../harness/loop.js";
 import { projectTools, webTools, type Write } from "../harness/tools.js";
 import { loadSearchKey } from "../harness/web.js";
@@ -149,7 +151,10 @@ async function runTask(goalId: string, taskId: string) {
         throw new ToolError(`Not saved: ${reason}`);
       }
     };
-    const tools = [...(goal.project ? projectTools(goal.project, { write: saveOrSuggest, read }) : []), ...webTools(await loadSearchKey(goal.workspaceId))];
+    // The owner's goal files can be edited too; images made here go to the task card (and images/ in a project).
+    const made = madeImages({ workspaceId: goal.workspaceId, userId: goal.createdById, files: await prisma.attachment.findMany({ where: { goalId } }), project: goal.project, task: { id: taskId, goalId } });
+    const image = imageTool(await loadImageKeys(goal.workspaceId), made.media, made.source);
+    const tools = [...(goal.project ? projectTools(goal.project, { write: saveOrSuggest, read }) : []), ...webTools(await loadSearchKey(goal.workspaceId)), ...(image ? [image] : [])];
     const visual = !!goal.project || isVisualTask(task);
     const instructions = taskInstructions(agent, goal.workspace.name, agent.department?.name ?? null, !!goal.project, visual);
     const loop = await runLoop({

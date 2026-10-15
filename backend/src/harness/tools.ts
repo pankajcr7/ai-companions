@@ -215,7 +215,7 @@ export function attachmentTools(atts: Attachment[]): Tool[] {
   return [
     {
       name: "list_attachments",
-      purpose: "Lists the files the owner attached in this chat.",
+      purpose: "Lists the files in this chat: the owner's attachments and images companions made.",
       argsHelp: "{}",
       args: z.object({}).passthrough(),
       label: () => "attachments",

@@ -47,6 +47,10 @@ export async function streamReply(
   raw.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache, no-transform", "x-accel-buffering": "no" });
   const send = (event: string, data: unknown) => raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   send("start", opts.start);
+  // Keeps proxies from closing a stream that's quiet while a slow tool (an image) runs; readers skip comment lines.
+  const ping = setInterval(() => {
+    if (!raw.writableEnded && !raw.destroyed) raw.write(": ping\n\n");
+  }, 15_000);
 
   // A reply may use several tools, each a slow model call.
   const signal = AbortSignal.any([watch.signal, AbortSignal.timeout(15 * 60_000)]);
@@ -118,6 +122,7 @@ export async function streamReply(
     req.log.error(e);
     if (!watch.gone()) send("error", { messageId: null, code: "server_error", message: "The reply couldn't be saved. Try again." });
   } finally {
+    clearInterval(ping);
     if (!raw.writableEnded) raw.end();
   }
 }

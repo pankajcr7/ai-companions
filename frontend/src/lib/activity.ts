@@ -14,12 +14,13 @@ export function activitySummary(uses: ToolUseDTO[], suggestions: number): string
     count("open_url") ? `Opened ${plural(count("open_url"), "page", "pages")}` : "",
     count("look_at_website") ? `Looked at ${plural(count("look_at_website"), "website", "websites")}` : "",
     count("study_website") ? `Studied ${plural(count("study_website"), "website", "websites")}` : "",
+    count("generate_image") ? `Made ${plural(count("generate_image"), "image", "images")}` : "",
     suggestions ? plural(suggestions, "suggested change", "suggested changes") : "",
   ];
   return parts.filter(Boolean).join(" · ");
 }
 
 export function liveLabel(e: { name: string; label: string }): string {
-  const what: Record<string, string> = { read_file: "📄 Reading", search: "🔍 Searching", open_url: "🌐 Opening", web_search: "🌐 Searching the web for", write_file: "✏️ Writing", list_files: "📁 Looking through", look_at_website: "🖼️ Looking at", study_website: "🔎 Studying" };
+  const what: Record<string, string> = { read_file: "📄 Reading", search: "🔍 Searching", open_url: "🌐 Opening", web_search: "🌐 Searching the web for", write_file: "✏️ Writing", list_files: "📁 Looking through", look_at_website: "🖼️ Looking at", study_website: "🔎 Studying", generate_image: "🎨 Making" };
   return `${what[e.name] ?? "Using"} ${e.label}…`;
 }

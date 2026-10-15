@@ -7,7 +7,8 @@ import { headInstructions } from "../goals/prompts.js";
 import { prisma } from "../db.js";
 import type { Attachment, ChatEdit, ChatMessage } from "../generated/prisma/client.js";
 import { historyTurns } from "../attachments/parts.js";
-import { attachmentDTO, ownAttachments } from "../attachments/service.js";
+import { attachmentDTO, madeImages, ownAttachments } from "../attachments/service.js";
+import { imageTool, loadImageKeys } from "../harness/images.js";
 import { attachmentTools, webTools } from "../harness/tools.js";
 import { loadSearchKey } from "../harness/web.js";
 import { chatEditDTO } from "./chat-edits.js";
@@ -82,21 +83,26 @@ export async function chatRoutes(app: FastifyInstance) {
       if (atts.length) await prisma.attachment.updateMany({ where: { id: { in: atts.map((a) => a.id) } }, data: { messageId: userMsg.id } });
       const turns = trimTurns(await historyTurns([...history.reverse(), { role: "user" as const, content: message, attachments: atts }], conn.kind), CONTEXT_CHARS);
       const chatFiles = await prisma.attachment.findMany({ where: { workspaceId: id, userId: user.id, message: { agentId, conversationId: null } }, orderBy: { createdAt: "asc" } });
+      const made = madeImages({ workspaceId: id, userId: user.id, files: chatFiles, project: null });
+      const image = imageTool(await loadImageKeys(id), made.media, made.source);
       // Nova leads the team, so its chat knows the roster and can hand work to it; other companions just chat.
       const instructions = agent.isHead
         ? headInstructions(agent, agent.workspace.name, agent.department?.name ?? null, await loadRoster(id))
         : companionInstructions(agent, agent.workspace.name, agent.department?.name ?? null);
       await streamReply(req, reply, watch, {
         actor: { ...agent, model: agent.model, connection: conn },
-        tools: [...webTools(await loadSearchKey(id)), ...(chatFiles.length ? attachmentTools(chatFiles) : [])],
+        tools: [...webTools(await loadSearchKey(id)), ...(chatFiles.length ? attachmentTools(chatFiles) : []), ...(image ? [image] : [])],
         limit: 6,
         instructions,
         turns,
         start: { userMessageId: userMsg.id },
-        save: (r) =>
-          prisma.chatMessage.create({
+        save: async (r) => {
+          const saved = await prisma.chatMessage.create({
             data: { workspaceId: id, agentId, userId: user.id, role: "assistant", content: r.text, status: r.status, connectionId: conn.id, kind: conn.kind, model: r.model, inputTokens: r.inputTokens, outputTokens: r.outputTokens, errorCode: r.errorCode, errorMessage: r.errorMessage, toolUses: r.toolUses, visionFallback: r.visionFallback },
-          }),
+          });
+          await made.link({ messageId: saved.id });
+          return saved;
+        },
       });
     },
   );

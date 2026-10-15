@@ -148,6 +148,78 @@ function WebSearchCard({ admin }: { admin: boolean }) {
   );
 }
 
+type ImageKeys = { cloudflare: { hint: string } | null; pollinations: { hint: string } | null };
+
+function ImageGenerationCard({ admin }: { admin: boolean }) {
+  const { wsPath } = useWorkspace();
+  const [keys, setKeys] = useState<ImageKeys | undefined>(undefined);
+  const [accountId, setAccountId] = useState("");
+  const [apiToken, setApiToken] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const path = wsPath("/image-keys");
+  useEffect(() => {
+    api<ImageKeys>(path).then(setKeys, () => setKeys({ cloudflare: null, pollinations: null }));
+  }, [path]);
+  async function run(fn: () => Promise<unknown>) {
+    setBusy(true);
+    setError("");
+    try {
+      await fn();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const remove = (provider: keyof ImageKeys) =>
+    run(async () => {
+      await api(`${path}/${provider}`, { method: "DELETE" });
+      setKeys((k) => k && { ...k, [provider]: null });
+    });
+  const connected = (provider: keyof ImageKeys, hint: string) => (
+    <div className="mt-2 flex items-center gap-3 text-sm">
+      <span>Connected · <span className="font-mono">{hint}</span></span>
+      {admin && <button disabled={busy} onClick={() => remove(provider)} className="rounded-[8px] px-3 py-1.5 font-semibold text-[#b42318] hover:bg-bg">Remove</button>}
+    </div>
+  );
+  return (
+    <section aria-label="Image generation" className="rounded-[14px] border border-line bg-paper p-4">
+      <h2 className="font-semibold">Image generation</h2>
+      <p className="mt-1 text-sm text-muted">Lets companions create and edit images: logos, social posts, website pictures. Cloudflare is free; Pollinations adds readable text in images.</p>
+      {keys && (
+        <>
+          <div className="mt-4 border-t border-line pt-3">
+            <h3 className="text-sm font-semibold">Cloudflare (free)</h3>
+            <p className="mt-0.5 text-sm text-muted">About 95 free images a day; never bills on the free plan.</p>
+            {keys.cloudflare ? connected("cloudflare", keys.cloudflare.hint) : admin ? (
+              <form className="mt-2 space-y-2" onSubmit={(e) => { e.preventDefault(); run(async () => { const r = await api<{ hint: string }>(`${path}/cloudflare`, { method: "PUT", body: { accountId, apiToken } }); setKeys((k) => k && { ...k, cloudflare: r }); setAccountId(""); setApiToken(""); }); }}>
+                <p className="text-xs text-muted">In the Cloudflare dashboard, open Workers AI and choose “Use REST API”: copy your Account ID and create an API token.</p>
+                <label htmlFor="cf-account" className="block text-sm">Account ID<input id="cf-account" value={accountId} onChange={(e) => setAccountId(e.target.value)} placeholder="32 letters and digits" className={field} /></label>
+                <label htmlFor="cf-token" className="block text-sm">API token<input id="cf-token" type="password" value={apiToken} onChange={(e) => setApiToken(e.target.value)} className={field} /></label>
+                <button disabled={busy || accountId.trim().length !== 32 || apiToken.trim().length < 20} className="btn-dark rounded-[10px] px-4 py-2 text-sm font-semibold">Save Cloudflare</button>
+              </form>
+            ) : <p className="mt-2 text-sm">Not set up</p>}
+          </div>
+          <div className="mt-4 border-t border-line pt-3">
+            <h3 className="text-sm font-semibold">Pollinations (optional, paid)</h3>
+            <p className="mt-0.5 text-sm text-muted">Readable text in images and more volume. Prepaid, about $0.005–0.05 an image.</p>
+            {keys.pollinations ? connected("pollinations", keys.pollinations.hint) : admin ? (
+              <form className="mt-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); run(async () => { const r = await api<{ hint: string }>(`${path}/pollinations`, { method: "PUT", body: { apiKey } }); setKeys((k) => k && { ...k, pollinations: r }); setApiKey(""); }); }}>
+                <label className="sr-only" htmlFor="pol-key">Pollinations key</label>
+                <input id="pol-key" type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk_..." className="min-w-0 flex-1 rounded-[10px] border border-line bg-paper px-3 py-2 text-sm" />
+                <button disabled={busy || !apiKey.trim().startsWith("sk_")} className="btn-dark rounded-[10px] px-4 text-sm font-semibold">Save Pollinations</button>
+              </form>
+            ) : <p className="mt-2 text-sm">Not set up</p>}
+          </div>
+        </>
+      )}
+      {error && <p role="alert" className="mt-2 text-sm text-[#b42318]">{error}</p>}
+    </section>
+  );
+}
+
 function AIServicesInner() {
   const { snapshot, wsPath, reload } = useWorkspace();
   const params = useSearchParams();
@@ -314,6 +386,7 @@ function AIServicesInner() {
       </section>
 
       <WebSearchCard admin={admin} />
+      <ImageGenerationCard admin={admin} />
 
       {adding && <AddForm kind={adding} onClose={() => setAdding(null)} onSaved={() => { setAdding(null); setNotice({ kind: "ok", text: "Connected." }); load(); reload(); }} />}
 

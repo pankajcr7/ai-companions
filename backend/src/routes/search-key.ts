@@ -7,7 +7,7 @@ import { tavilySearch } from "../harness/web.js";
 import { audit, HttpError, requireMember } from "../http.js";
 import { WsParams } from "./workspaces.js";
 
-const hint = (k: string) => (k.length >= 10 ? `${k.slice(0, 3)}…${k.slice(-4)}` : `…${k.slice(-2)}`);
+export const hint = (k: string) => (k.length >= 10 ? `${k.slice(0, 3)}…${k.slice(-4)}` : `…${k.slice(-2)}`);
 
 export async function searchKeyRoutes(app: FastifyInstance) {
   app.get("/api/workspaces/:id/search-key", async (req) => {

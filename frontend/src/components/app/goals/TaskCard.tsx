@@ -2,6 +2,7 @@
 
 import { ReviewLine } from "./ReviewLine";
 import { ToolActivity } from "../chat/ToolActivity";
+import { AttachmentList } from "../chat/AttachmentList";
 import { useState } from "react";
 import { ThumbsDown, ThumbsUp } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
@@ -58,6 +59,7 @@ export function TaskCard({ task, edits, goalPath, editable, onChanged }: { task:
       </div>
       {task.verdictNote && <p className="mt-1 text-xs text-muted">{task.verdictNote}</p>}
       {task.error && <p className="mt-2 text-xs text-[#b42318]">{task.error}</p>}
+      <AttachmentList items={task.media ?? []} canSave={editable} />
       {open && task.result && (
         <div className="chat-result-reveal mt-2 max-h-96 overflow-auto rounded-[8px] bg-bg p-2.5">
           <RichText text={task.result} />
