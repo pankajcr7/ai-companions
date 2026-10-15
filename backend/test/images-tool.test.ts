@@ -8,7 +8,7 @@ import { fakeServer, json, type FakeRequest } from "./fake-provider.js";
 const png = (w: number, h: number) => sharp({ create: { width: w, height: h, channels: 3, background: "#c96" } }).png().toBuffer();
 const PNG = await png(8, 8);
 const B64 = PNG.toString("base64");
-const CF_PATH = "POST /accounts/acc123/ai/run/@cf/black-forest-labs/flux-2-klein-4b";
+const CF_PATH = "POST /accounts/acc123/ai/run/@cf/black-forest-labs/flux-2-klein-9b";
 const cf = await fakeServer({});
 const pol = await fakeServer({});
 process.env.TEST_CLOUDFLARE_BASE_URL = cf.url;

@@ -192,7 +192,7 @@ function ImageGenerationCard({ admin }: { admin: boolean }) {
         <>
           <div className="mt-4 border-t border-line pt-3">
             <h3 className="text-sm font-semibold">Cloudflare (free)</h3>
-            <p className="mt-0.5 text-sm text-muted">About 95 free images a day; never bills on the free plan.</p>
+            <p className="mt-0.5 text-sm text-muted">FLUX.2 klein 9B: about 6 free images a day; never bills on the free plan.</p>
             {keys.cloudflare ? connected("cloudflare", keys.cloudflare.hint) : admin ? (
               <form className="mt-2 space-y-2" onSubmit={(e) => { e.preventDefault(); run(async () => { const r = await api<{ hint: string }>(`${path}/cloudflare`, { method: "PUT", body: { accountId, apiToken } }); setKeys((k) => k && { ...k, cloudflare: r }); setAccountId(""); setApiToken(""); }); }}>
                 <p className="text-xs text-muted">In the Cloudflare dashboard, open Workers AI and choose “Use REST API”: copy your Account ID and create an API token.</p>

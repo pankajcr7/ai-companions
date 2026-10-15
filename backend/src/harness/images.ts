@@ -18,7 +18,8 @@ export const MAX_IMAGES = 4;
 export const IMAGE_TIMEOUT_MS = 120_000;
 const SIZES = { square: [1024, 1024], landscape: [1536, 1024], portrait: [1024, 1536] } as const;
 type Size = (typeof SIZES)[keyof typeof SIZES];
-const CF_MODEL = "@cf/black-forest-labs/flux-2-klein-4b";
+// FLUX.2 klein 9B: clearly better than 4B (and at words) but ~9x the free daily allowance: ~6-7 images a day, not ~64.
+const CF_MODEL = "@cf/black-forest-labs/flux-2-klein-9b";
 const POL_STANDARD = "black-forest-labs/flux.2-klein-4b";
 const POL_HIGH = "openai/gpt-image-2";
 // ponytail: fixed prices as of 2026-10; update when the services change them.
