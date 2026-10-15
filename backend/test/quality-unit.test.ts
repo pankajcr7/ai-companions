@@ -15,6 +15,14 @@ test("planning and visual tasks look at a website the owner wants matched", () =
   expect(DESIGN_GUIDE.length).toBeLessThan(2000);
 });
 
+test("an image the owner asks for is made with generate_image, not drawn in code", () => {
+  expect(DESIGN_GUIDE).toContain("When the deliverable is itself an image (a post, ad, poster, banner or illustration), make it with generate_image");
+  expect(DESIGN_GUIDE).toContain("never draw it as SVG or HTML code");
+  expect(DESIGN_GUIDE.length).toBeLessThan(2000);
+  expect(planInstructions("Co", false, true)).toContain("The team can make images with generate_image");
+  expect(planInstructions("Co", false)).not.toContain("generate_image");
+});
+
 test("a not-approved review with no fixes counts as approved", () => {
   const r = Review.parse({ approved: false, fixes: [] });
   expect(r.approved || r.fixes.length === 0).toBe(true);
