@@ -9,7 +9,8 @@ import { loadHead } from "../goals/load.js";
 import { Plan, planProblems } from "../goals/plan.js";
 import { ACTIVE, createGoal } from "../goals/create.js";
 import { BRIEF_PATH } from "../goals/quality.js";
-import { attachmentDTO, copyGoalAttachments } from "../attachments/service.js";
+import { isMobileDesign } from "../goals/mobile.js";
+import { attachmentDTO, copyGoalAttachments, ownAttachments } from "../attachments/service.js";
 import { planGoal } from "../goals/planner.js";
 import { abortGoal, kickGoal } from "../goals/runner.js";
 import { audit, HttpError, perUser, requireMember } from "../http.js";
@@ -104,16 +105,27 @@ export async function goalRoutes(app: FastifyInstance) {
   app.post("/api/workspaces/:id/goals", { config: { rateLimit: { max: 10, timeWindow: "1 minute", keyGenerator: perUser } } }, async (req, reply) => {
     const { id } = WsParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
-    const body = z.object({ text: z.string().trim().min(1).max(4000), projectId: z.string().min(1).max(64).nullish(), parentGoalId: z.string().min(1).max(64).nullish(), newProject: z.boolean().optional() }).parse(req.body);
-    const { id: goalId } = await createGoal({ workspaceId: id, userId: user.id, text: body.text, projectId: body.projectId, parentGoalId: body.parentGoalId, newProject: body.newProject, log: (e) => req.log.error(e) });
+    const body = z.object({ text: z.string().trim().min(1).max(4000), projectId: z.string().min(1).max(64).nullish(), parentGoalId: z.string().min(1).max(64).nullish(), newProject: z.boolean().optional(), attachmentIds: z.array(z.string().min(1).max(64)).max(4).default([]) }).parse(req.body);
+    // The owner's files for this goal (a screenshot to match, from the Mobile App page): theirs, not yet sent anywhere.
+    const atts = await ownAttachments(id, user.id, body.attachmentIds);
+    const { id: goalId } = await createGoal({
+      workspaceId: id,
+      userId: user.id,
+      text: body.text,
+      projectId: body.projectId,
+      parentGoalId: body.parentGoalId,
+      newProject: body.newProject,
+      log: (e) => req.log.error(e),
+      beforePlan: atts.length ? async (gid) => void (await prisma.attachment.updateMany({ where: { id: { in: atts.map((a) => a.id) } }, data: { goalId: gid } })) : undefined,
+    });
     return reply.code(201).send({ id: goalId });
   });
 
   app.get("/api/workspaces/:id/goals", async (req) => {
     const { id } = WsParams.parse(req.params);
     await requireMember(req, id);
-    const goals = await prisma.goal.findMany({ where: { workspaceId: id }, orderBy: { createdAt: "desc" }, take: 30, select: { id: true, text: true, status: true, projectId: true, createdAt: true } });
-    return { goals };
+    const goals = await prisma.goal.findMany({ where: { workspaceId: id }, orderBy: { createdAt: "desc" }, take: 30, select: { id: true, text: true, status: true, projectId: true, parentGoalId: true, createdAt: true } });
+    return { goals: goals.map((g) => ({ ...g, mobile: isMobileDesign(g.text) })) };
   });
 
   app.get("/api/workspaces/:id/goals/:gid", async (req) => {

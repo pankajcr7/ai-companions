@@ -26,7 +26,7 @@ export async function projectRoutes(app: FastifyInstance) {
       });
       return { projects: rows.map((p) => {
         const g = p.goals[0];
-        return { ...projectDTO(p), overview: { cover: projectCover(p.entries), goal: g ? { id: g.id, text: g.text, status: g.status, done: g.tasks.filter((t) => t.status === "done").length, total: g.tasks.length, pendingEdits: g._count.edits, agentIds: [...new Set(g.tasks.map((t) => t.agentId))] } : null } };
+        return { ...projectDTO(p), overview: { cover: projectCover(p.entries), screens: p.entries.filter((e) => /^screens\/[^/]+\.html?$/i.test(e.path)).length, goal: g ? { id: g.id, text: g.text, status: g.status, done: g.tasks.filter((t) => t.status === "done").length, total: g.tasks.length, pendingEdits: g._count.edits, agentIds: [...new Set(g.tasks.map((t) => t.agentId))] } : null } };
       }) };
     }
     const rows = await prisma.project.findMany({ where: { workspaceId: id }, orderBy: { updatedAt: "desc" } });
