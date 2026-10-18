@@ -6,6 +6,7 @@ import { cap, DEP_RESULT_CAP, FILE_BUDGET, pickFiles, RESULT_CAP, type Loaded } 
 import { checkEdit, splitEdits } from "./edits.js";
 import { CallError, completeJson, readiness, type Call } from "./llm.js";
 import { isVisualTask, reviewTask } from "./quality.js";
+import { isMobileDesign } from "./mobile.js";
 import { madeImages } from "../attachments/service.js";
 import { imageTool, loadImageKeys } from "../harness/images.js";
 import { runLoop, ToolError, type ToolUse } from "../harness/loop.js";
@@ -175,8 +176,9 @@ async function runTask(goalId: string, taskId: string) {
         lookUses.push({ name: "look_at_website", label: hostOf(url), ok: false, ms: Date.now() - started, chars: 0 });
       }
     }
-    const visual = !!goal.project || isVisualTask(task);
-    const instructions = taskInstructions(agent, goal.workspace.name, agent.department?.name ?? null, !!goal.project, visual);
+    const mobile = isMobileDesign(goal.text);
+    const visual = !!goal.project || isVisualTask(task) || mobile;
+    const instructions = taskInstructions(agent, goal.workspace.name, agent.department?.name ?? null, !!goal.project, visual, mobile);
     const prompt = taskPrompt(task, goal.text, ctx, deps, files, notes.join(" "), goal.brief && !ctx.shared.includes(goal.brief) ? goal.brief : null);
     const loop = await runLoop({
       actor: agent,
@@ -215,7 +217,7 @@ async function runTask(goalId: string, taskId: string) {
       for (;;) {
         // The latest version of each file this task wrote.
         const written = [...new Map(decided.filter((d) => d.check.status === "pending" || d.check.status === "applied").map((d) => [d.raw.path.toLowerCase(), { path: d.raw.path, content: d.raw.content }])).values()];
-        const r = await reviewTask(nova, goal.workspace.name, { goal: goal.text, task, brief: goal.brief, guide: visual, result, files: written }, signal, stepLog(goal.workspaceId, goalId, taskId, "review"), add);
+        const r = await reviewTask(nova, goal.workspace.name, { goal: goal.text, task, brief: goal.brief, guide: visual, mobile, result, files: written }, signal, stepLog(goal.workspaceId, goalId, taskId, "review"), add);
         if (!r) {
           // The review call itself failed: the task keeps its result rather than failing.
           if (review.rounds === 0) review = null;

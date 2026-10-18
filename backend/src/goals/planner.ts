@@ -5,6 +5,7 @@ import { goalContext, loadHead, stepLog } from "./load.js";
 import { normalizeAssignees, Plan, planProblems } from "./plan.js";
 import { planInstructions, planPrompt, previousGoal } from "./prompts.js";
 import { controllerFor, release } from "./runner.js";
+import { isMobileDesign } from "./mobile.js";
 import { projectTools, webTools } from "../harness/tools.js";
 import { loadSearchKey } from "../harness/web.js";
 
@@ -38,7 +39,7 @@ export async function planGoal(goalId: string): Promise<void> {
     const attached = files.map((a) => `attachments/${a.name} (${a.kind}, ${Math.max(1, Math.round(a.size / 1024))} KB${a.pages ? `, ${a.pages} pages` : ""}${a.kind === "image" ? "" : a.scanned ? ", scanned" : ", text inside"})`).join("\n") || null;
     // A saved image key means tasks get generate_image, so images are planned as made images, not drawn files.
     const canMakeImages = (await prisma.imageKey.count({ where: { workspaceId: goal.workspaceId } })) > 0;
-    const { value, calls } = await completeJson(nova, planInstructions(goal.workspace.name, goal.newProject, canMakeImages), planPrompt(goal.text, entries, ctx, previous, attached), schema, signal, stepLog(goal.workspaceId, goalId, null, "plan"), { tools: planTools, limit: 4 });
+    const { value, calls } = await completeJson(nova, planInstructions(goal.workspace.name, goal.newProject, canMakeImages, isMobileDesign(goal.text)), planPrompt(goal.text, entries, ctx, previous, attached), schema, signal, stepLog(goal.workspaceId, goalId, null, "plan"), { tools: planTools, limit: 4 });
     const inputTokens = calls.reduce((n, c) => n + (c.inputTokens ?? 0), 0);
     const outputTokens = calls.reduce((n, c) => n + (c.outputTokens ?? 0), 0);
     await prisma.$transaction(async (tx) => {
