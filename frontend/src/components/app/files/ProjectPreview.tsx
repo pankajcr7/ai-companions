@@ -11,7 +11,8 @@ import { RichText } from "../chat/RichText";
 import { phoneScreens } from "@/lib/screens";
 import { PhoneScreens } from "./PhoneScreens";
 
-export type PreviewSelection = { projectId: string; title: string; path?: string };
+/** exact: open this file even if the project has phone screens (a file's own Preview button). */
+export type PreviewSelection = { projectId: string; title: string; path?: string; exact?: boolean };
 export const ResultPreviewContext = createContext<{ open: (selection: PreviewSelection) => void; requestChanges: (selection: PreviewSelection) => void } | null>(null);
 export const useResultPreview = () => useContext(ResultPreviewContext);
 
@@ -20,7 +21,7 @@ export function ProjectPreview({ selection, version = "", onClose, onRequestChan
   const [entries, setEntries] = useState<TreeEntry[] | null>(null);
   const [error, setError] = useState("");
   const [picked, setPicked] = useState(selection.path ?? "");
-  const [userPicked, setUserPicked] = useState(false);
+  const [userPicked, setUserPicked] = useState(!!selection.exact);
   const [refresh, setRefresh] = useState(0);
   const base = wsPath(`/projects/${selection.projectId}`);
   useEffect(() => {
@@ -40,7 +41,7 @@ export function ProjectPreview({ selection, version = "", onClose, onRequestChan
     <div className="studio-preview-body">
       {error ? <div className="studio-preview-empty" role="alert"><p>{error}</p><button className="studio-secondary" onClick={() => setRefresh((n) => n + 1)}>Try again</button></div>
         : !entries ? <div className="studio-preview-loading" aria-busy="true" aria-label="Loading preview" />
-        : showScreens ? <PhoneScreens base={base} screens={screens} onAsk={onRequestChanges ? (p) => onRequestChanges(p) : undefined} />
+        : showScreens ? <PhoneScreens key={`${refresh}:${version}`} base={base} screens={screens} onAsk={onRequestChanges ? (p) => onRequestChanges(p) : undefined} />
         : path ? <PreviewContent key={`${base}:${path}:${refresh}:${version}`} base={base} path={path} title={selection.title} />
         : <div className="studio-preview-empty"><FileText size={36} weight="duotone" /><h3>A little space for something great.</h3><p>Your team’s saved files will appear here as they work.</p></div>}
     </div>

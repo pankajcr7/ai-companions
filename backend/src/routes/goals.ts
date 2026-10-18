@@ -124,7 +124,10 @@ export async function goalRoutes(app: FastifyInstance) {
   app.get("/api/workspaces/:id/goals", async (req) => {
     const { id } = WsParams.parse(req.params);
     await requireMember(req, id);
-    const goals = await prisma.goal.findMany({ where: { workspaceId: id }, orderBy: { createdAt: "desc" }, take: 30, select: { id: true, text: true, status: true, projectId: true, parentGoalId: true, createdAt: true } });
+    // ?roots=1: goals that start something (Mobile App's "Your apps"); ?projectId=: one project's goals, newest first.
+    // ponytail: roots capped at 100; page it if a workspace ever has more.
+    const query = z.object({ roots: z.literal("1").optional(), projectId: z.string().min(1).max(64).optional() }).parse(req.query ?? {});
+    const goals = await prisma.goal.findMany({ where: { workspaceId: id, ...(query.roots ? { parentGoalId: null } : {}), ...(query.projectId ? { projectId: query.projectId } : {}) }, orderBy: { createdAt: "desc" }, take: query.roots ? 100 : 30, select: { id: true, text: true, status: true, projectId: true, parentGoalId: true, createdAt: true } });
     return { goals: goals.map((g) => ({ ...g, mobile: isMobileDesign(g.text) })) };
   });
 

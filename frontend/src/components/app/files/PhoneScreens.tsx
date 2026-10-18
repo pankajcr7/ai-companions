@@ -27,11 +27,11 @@ function usePreviewPrefix(base: string, first: string | undefined) {
 
 const src = (prefix: string, path: string) => prefix + path.split("/").map(encodeURIComponent).join("/");
 
-/** A screen in a phone frame. A thumbnail ignores clicks so the button around it gets them; the full-size view is interactive. */
+/** A screen in a phone frame. A thumbnail is inert (no clicks, not in the tab order) so the button around it gets them; the full-size view is interactive. */
 function Phone({ url, title, scale, interactive = false }: { url: string; title: string; scale: number; interactive?: boolean }) {
   return (
-    <div style={{ width: W * scale, height: H * scale }} className="overflow-hidden rounded-[28px] border-[3px] border-[#1f2328] bg-white shadow-sm">
-      <iframe src={url} title={title} loading="lazy" sandbox="allow-scripts allow-forms" referrerPolicy="no-referrer" style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: "top left", border: 0, pointerEvents: interactive ? "auto" : "none" }} />
+    <div inert={!interactive} style={{ width: W * scale, height: H * scale }} className="overflow-hidden rounded-[28px] border-[3px] border-[#1f2328] bg-white shadow-sm">
+      <iframe src={url} title={title} loading="lazy" sandbox="allow-scripts allow-forms" referrerPolicy="no-referrer" style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: "top left", border: 0 }} />
     </div>
   );
 }
@@ -67,7 +67,7 @@ function FullSize({ url, name, onClose }: { url: string; name: string; onClose: 
   const scale = typeof window === "undefined" ? 1 : Math.min(1, (window.innerHeight - 120) / H);
   return (
     // React passes "close" up its tree: stop it here so the gallery dialog around this one stays open.
-    <dialog ref={dialog} aria-label={name} onClose={(e) => { e.stopPropagation(); onClose(); }} className="rounded-[16px] bg-paper p-4 backdrop:bg-black/50">
+    <dialog ref={dialog} aria-label={name} onClose={(e) => { e.stopPropagation(); onClose(); }} className="m-auto rounded-[16px] border border-line bg-paper p-4 text-ink backdrop:bg-black/50">
       <div className="mb-3 flex items-center justify-between gap-4"><h2 className="font-semibold">{name}</h2><button onClick={() => dialog.current?.close()} aria-label="Close" className="studio-icon-button"><X size={18} /></button></div>
       <Phone url={url} title={`${name} screen, full size`} scale={scale} interactive />
     </dialog>
@@ -79,7 +79,7 @@ export function PhoneScreensDialog({ base, screens, onClose }: { base: string; s
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => { dialog.current?.showModal(); }, []);
   return (
-    <dialog ref={dialog} aria-label="Phone screens" onClose={onClose} className="w-[min(1100px,95vw)] rounded-[16px] bg-paper p-0 backdrop:bg-black/50">
+    <dialog ref={dialog} aria-label="Phone screens" onClose={onClose} className="m-auto w-[min(1100px,95vw)] rounded-[16px] border border-line bg-paper p-0 text-ink backdrop:bg-black/50">
       <div className="flex items-center justify-between border-b border-line px-4 py-3"><h2 className="font-semibold">Phone screens</h2><button onClick={() => dialog.current?.close()} aria-label="Close" className="studio-icon-button"><X size={18} /></button></div>
       <PhoneScreens base={base} screens={screens} />
     </dialog>

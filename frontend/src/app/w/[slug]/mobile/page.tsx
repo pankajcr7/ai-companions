@@ -32,7 +32,7 @@ export default function MobileAppPage() {
   const file = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    Promise.all([api<{ goals: GoalRow[] }>(wsPath("/goals")), api<{ projects: ProjectRow[] }>(wsPath("/projects?overview=1"))]).then(([g, p]) => {
+    Promise.all([api<{ goals: GoalRow[] }>(wsPath("/goals?roots=1")), api<{ projects: ProjectRow[] }>(wsPath("/projects?overview=1"))]).then(([g, p]) => {
       const screens = new Map(p.projects.map((x) => [x.id, x.overview?.screens ?? 0]));
       setApps(g.goals.filter((x) => x.mobile && !x.parentGoalId).map((goal) => ({ goal, screens: goal.projectId ? (screens.get(goal.projectId) ?? 0) : null })));
     }, (e: Error) => setError(e.message));
@@ -45,7 +45,7 @@ export default function MobileAppPage() {
       const r = await api<{ id: string }>(wsPath("/goals"), { method: "POST", body: { text: `${APP_PREFIX}${text.trim()}`, newProject: true, attachmentIds: att.ids } });
       router.push(`/w/${snapshot.workspace.slug}/mobile/${r.id}`);
     } catch (e) {
-      setError(e instanceof ApiError && e.status === 409 ? BUSY : (e as Error).message);
+      setError(e instanceof ApiError && e.code === "busy" ? BUSY : (e as Error).message);
       setBusy(false);
     }
   }

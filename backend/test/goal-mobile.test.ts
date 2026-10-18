@@ -50,3 +50,19 @@ test("an ordinary goal gets none of the mobile texts", async () => {
   expect(r.task).not.toContain("MOBILE SCREEN GUIDE");
   expect(r.review).not.toContain("MOBILE SCREEN GUIDE");
 });
+
+test("a follow-up to an app design is planned as changes, not a new app", async () => {
+  const co = await company(app, llm);
+  llm.setScript((s) => (isPlan(s) ? fence({ tasks: [{ agentId: co.others[0].id, title: "Update the Home screen", instructions: "i", deliverable: "d", criteria: ["c"], dependsOn: [] }] }) : "ok"));
+  const pid = (await co.req("POST", `/api/workspaces/${co.id}/projects`, { name: "Trail" })).json().id as string;
+  const get = (gid: string) => async () => (await co.req("GET", `/api/workspaces/${co.id}/goals/${gid}`)).json().goal;
+  const first = (await co.req("POST", `/api/workspaces/${co.id}/goals`, { text: "Design a mobile app: trails", projectId: pid })).json().id as string;
+  expect(await waitFor(get(first), (g) => g.status !== "planning")).toMatchObject({ status: "awaiting_approval" });
+  await co.req("POST", `/api/workspaces/${co.id}/goals/${first}/cancel`);
+  const sent = llm.requests.length;
+  const next = (await co.req("POST", `/api/workspaces/${co.id}/goals`, { text: "Mobile app design changes: bigger title on the Home screen", projectId: pid, parentGoalId: first })).json().id as string;
+  expect(await waitFor(get(next), (g) => g.status !== "planning")).toMatchObject({ status: "awaiting_approval" });
+  const plan = llm.requests.slice(sent).filter((q) => q.path === "/v1/chat/completions" && isPlan(systemOf(q))).map(systemOf).join("\n");
+  expect(plan).toContain("MOBILE APP CHANGES:");
+  expect(plan).not.toContain("MOBILE APP DESIGN:");
+});

@@ -2,7 +2,7 @@ import { expect, type Page, test } from "@playwright/test";
 import { newCompany } from "./setup";
 
 const headers = { origin: "http://localhost:3100" };
-const screen = (title: string) => `<!doctype html><html><head><title>${title}</title><meta name="viewport" content="width=390, initial-scale=1"></head><body><h1>${title} screen</h1></body></html>`;
+const screen = (title: string) => `<!doctype html><html><head><title>${title}</title><meta name="viewport" content="width=390, initial-scale=1"></head><body><h1>${title} screen</h1><button>Go</button></body></html>`;
 
 async function project(page: Page, id: string, name: string, files: [string, string][]) {
   const res = await page.request.post(`/api/workspaces/${id}/projects`, { headers, data: { name } });
@@ -25,6 +25,14 @@ test("a project with app screens shows them in phone frames; a plain site doesn'
   await page.getByRole("button", { name: "Phone screens" }).click();
   const gallery = page.getByRole("dialog", { name: "Phone screens" });
   await expect(gallery.getByRole("figure")).toHaveCount(2);
+  // Centred, not stuck in the top-left corner.
+  const box = (await gallery.boundingBox())!;
+  expect(box.x).toBeGreaterThan(20);
+  expect(box.y).toBeGreaterThan(20);
+  // Tab goes from one thumbnail to the next, not into the screen inside it.
+  await gallery.getByRole("button", { name: "Open Home full size" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(gallery.getByRole("button", { name: "Open Profile full size" })).toBeFocused();
   await expect(gallery.getByRole("figure").nth(0)).toContainText("Home");
   await expect(gallery.getByRole("figure").nth(1)).toContainText("Profile");
   await expect(gallery.locator('iframe[title="Home screen"]')).toHaveAttribute("loading", "lazy");
@@ -40,12 +48,16 @@ test("a project with app screens shows them in phone frames; a plain site doesn'
 
 test("in chat, the preview opens on the screens and Ask for changes fills the message", async ({ page }) => {
   const c = await newCompany(page, { prefix: "MobileChat", company: "Quiz Club", template: /Just the head agent/ });
-  await project(page, c.id, "Quiz app", [["index.html", "<h1>Site</h1>"], ["screens/01-home.html", screen("Home")]]);
+  const pid = await project(page, c.id, "Quiz app", [["index.html", "<h1>Site</h1>"], ["screens/01-home.html", screen("Home")]]);
   await page.goto(`/w/${c.slug}`);
   await page.getByRole("button", { name: "Preview" }).click();
   const panel = page.getByRole("region", { name: "Work preview" });
   await expect(panel.getByRole("figure")).toHaveCount(1);
   await expect(panel.getByLabel("Preview file")).toContainText("index.html");
+  // A changed screen shows after Refresh.
+  expect((await page.request.put(`/api/workspaces/${c.id}/projects/${pid}/files`, { headers, data: { path: "screens/01-home.html", content: screen("Home v2"), baseRevision: 1 } })).ok()).toBe(true);
+  await panel.getByRole("button", { name: "Refresh preview" }).click();
+  await expect(panel.frameLocator('iframe[title="Home screen"]').getByRole("heading", { name: "Home v2 screen" })).toBeVisible();
   await panel.getByRole("button", { name: "Ask for changes to Home" }).click();
   await expect(page.getByLabel("Message Nova")).toHaveValue(/^Please update screens\/01-home\.html in Quiz app: /);
 });

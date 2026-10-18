@@ -58,6 +58,12 @@ test("the goals list says which goals are app designs and which follow another; 
   const goals = (await co.req("GET", `/api/workspaces/${co.id}/goals`)).json().goals as { id: string; mobile: boolean; parentGoalId: string | null }[];
   expect(goals.find((g) => g.id === first)).toMatchObject({ mobile: true, parentGoalId: null });
   expect(goals.find((g) => g.id === second)).toMatchObject({ mobile: false, parentGoalId: first });
+  // Your apps lists root goals (not capped by the newest goals of every kind); the app page finds a project's newest goal.
+  const roots = (await co.req("GET", `/api/workspaces/${co.id}/goals?roots=1`)).json().goals as { id: string }[];
+  expect(roots.map((g) => g.id)).toContain(first);
+  expect(roots.map((g) => g.id)).not.toContain(second);
+  const onProject = (await co.req("GET", `/api/workspaces/${co.id}/goals?projectId=${pid}`)).json().goals as { id: string }[];
+  expect(onProject.map((g) => g.id)).toEqual([second, first]);
   const projects = (await co.req("GET", `/api/workspaces/${co.id}/projects?overview=1`)).json().projects as { id: string; overview: { screens: number } }[];
   expect(projects.find((p) => p.id === pid)!.overview.screens).toBe(2);
 });

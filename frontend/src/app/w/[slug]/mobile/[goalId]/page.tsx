@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { GoalCard } from "@/components/app/goals/GoalCard";
 import { PhoneScreens } from "@/components/app/files/PhoneScreens";
 import { api, ApiError } from "@/lib/api";
 import { appName, CHANGES_PREFIX, isActive } from "@/lib/mobile";
+import type { GoalDTO } from "@/lib/goals";
 import type { TreeEntry } from "@/lib/projects";
 import { canEdit } from "@/lib/types";
 import { phoneScreens } from "@/lib/screens";
@@ -21,25 +22,27 @@ export default function MobileAppDetail() {
   const editable = canEdit(snapshot.role);
   const [root, setRoot] = useState<GoalRow | null>(null);
   const [current, setCurrent] = useState<GoalRow | null>(null);
-  const [paths, setPaths] = useState<string[]>([]);
+  const [files, setFiles] = useState<{ path: string; revision: number }[]>([]);
   const [ask, setAsk] = useState("");
   const [error, setError] = useState("");
   const [tick, setTick] = useState(0);
+  // The goal card's goal, status and applied-edit count: when it changes, the page loads once more.
+  const [cardState, setCardState] = useState("");
 
   // The app: the given goal, its project, and the newest goal on that project. State is set only after the requests finish.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const goal = (await api<{ goal: GoalRow }>(wsPath(`/goals/${goalId}`))).goal;
-      const all = (await api<{ goals: GoalRow[] }>(wsPath("/goals"))).goals;
-      const files = goal.projectId ? (await api<{ entries: TreeEntry[] }>(wsPath(`/projects/${goal.projectId}/tree`))).entries.filter((e) => e.kind === "file").map((e) => e.path) : [];
+      const newest = goal.projectId ? (await api<{ goals: GoalRow[] }>(wsPath(`/goals?projectId=${goal.projectId}`))).goals[0] : undefined;
+      const tree = goal.projectId ? (await api<{ entries: TreeEntry[] }>(wsPath(`/projects/${goal.projectId}/tree`))).entries.filter((e) => e.kind === "file").map((e) => ({ path: e.path, revision: e.revision })) : [];
       if (cancelled) return;
       setRoot(goal);
-      setCurrent(goal.projectId ? all.find((g) => g.projectId === goal.projectId) ?? goal : goal);
-      setPaths(files);
+      setCurrent(newest ?? goal);
+      setFiles(tree);
     })().catch((e: Error) => { if (!cancelled) setError(e.message); });
     return () => { cancelled = true; };
-  }, [goalId, wsPath, tick]);
+  }, [goalId, wsPath, tick, cardState]);
   // Refresh while the team works on it.
   useEffect(() => {
     if (!current || !isActive(current.status)) return;
@@ -55,19 +58,26 @@ export default function MobileAppDetail() {
       setAsk("");
       setTick((n) => n + 1);
     } catch (e) {
-      setError(e instanceof ApiError && e.status === 409 ? BUSY : (e as Error).message);
+      setError(e instanceof ApiError && e.code === "busy" ? BUSY : (e as Error).message);
     }
   }
 
-  const screens = phoneScreens(paths);
+  const screens = phoneScreens(files.map((f) => f.path));
+  // Remount the gallery when any screen changes, so iframes reload (and get a fresh preview link).
+  const screensVersion = files.filter((f) => screens.some((x) => x.path === f.path)).map((f) => `${f.path}@${f.revision}`).join("|");
+  // Stable, so the goal card doesn't refetch on every render; only this app's newest goal updates the status.
+  const onStatus = useCallback((g: GoalDTO) => {
+    setCurrent((c) => (c && c.id === g.id && c.status !== g.status ? { ...c, status: g.status } : c));
+    setCardState(`${g.id}:${g.status}:${g.edits.filter((e) => e.status === "applied").length}`);
+  }, []);
   if (!root) return <p className="p-6 text-sm text-muted">{error || "Loading…"}</p>;
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-6">
       <Link href={`/w/${snapshot.workspace.slug}/mobile`} className="text-sm text-muted hover:underline">← Mobile App</Link>
       <h1 className="text-xl font-semibold">{appName(root.text)}</h1>
-      {current && <GoalCard key={current.id} goalId={current.id} onStatus={(g) => setCurrent((c) => (c && c.status !== g.status ? { ...c, status: g.status } : c))} />}
+      {current && <GoalCard key={current.id} goalId={current.id} onStatus={onStatus} />}
       <section aria-label="Phone screens" className="rounded-[16px] border border-line bg-paper">
-        {root.projectId && screens.length ? <PhoneScreens base={wsPath(`/projects/${root.projectId}`)} screens={screens} /> : <p className="p-4 text-sm text-muted">Screens will appear here as the team draws them.</p>}
+        {root.projectId && screens.length ? <PhoneScreens key={screensVersion} base={wsPath(`/projects/${root.projectId}`)} screens={screens} /> : <p className="p-4 text-sm text-muted">Screens will appear here as the team draws them.</p>}
       </section>
       {editable && root.projectId && (
         <section aria-label="Ask for changes" className="flex flex-col gap-2">

@@ -23,7 +23,7 @@ Out of scope: editing screens by dragging on a canvas; screen version history; F
 ### 2.1 Starting
 
 1. The chat's starter examples gain "Design a mobile app" with the prompt "Design a mobile app for ". Asking in any wording works the same way: Nova suggests a goal, as for any work.
-2. A goal is a mobile design goal when its text matches `isMobileDesign`: "mobile app", "iOS app", "Android app", "iPhone app", "phone app", "app screens", "app design", "app UI", "app mockups", "mobile design", "mobile screens" or "mobile UI" (any case).
+2. A goal is a mobile design goal when its text matches `isMobileDesign` (owner's choice, 2026-10-18: an app plus design words): a mobile, iOS, Android, iPhone, smartphone or phone app (also "mobile-app", "mobile application") named together with a design word (design, redesign, screens, UI, UX, mockup, wireframe, prototype), or "mobile design / screens / UI / UX / mockups / wireframes / prototypes" (any case). "Web app" never counts. Goals started from the Mobile App page ("Design a mobile app: …", "Mobile app design changes: …") always count. "Make an iOS app" alone is building an app (part 2), not designing one.
 
 ### 2.2 Planning
 
@@ -32,6 +32,7 @@ Out of scope: editing screens by dragging on a canvas; screen version history; F
    - The other tasks draw 3 or 4 screens each, named `screens/NN-name.html` to match the list, and depend on the first task.
    - 6 to 10 screens unless the owner asked for a number; at most 6 tasks in all, as for any goal.
    - The plan's brief is a short summary of the look.
+   - A follow-up to an app design (a goal with a parent, such as Ask for changes) is planned as changes instead: change only the screens the owner names, keep `design/identity.md` and `design/screens.md` unless asked, as few tasks as the change needs.
    - If the owner attached a screenshot, the look matches it ("Match a design"). If the goal names a website, the existing site look covers it.
 
 ### 2.3 Drawing screens
@@ -97,19 +98,19 @@ Owner decision (2026-10-18): a "Mobile App" item in the sidebar, under Chat, ope
 
 15. Heading "Mobile App", the line "Make your app look designed.", a text box labelled "Describe your app, or paste your spec", an **Add screenshot** button (one PNG, JPEG or WebP image, uploaded with the existing attachment upload and shown as a removable chip), and **Design it**.
 16. Example chips fill the box: "Hiking trails" → "A hiking trails app: saved trails, a trail map and a trip log", "Cycle tracker" → "A cycle tracker app: rides, weekly goals and a ride map", "Recipe planner" → "A recipe planner app: weekly meal plan, recipes and a shopping list".
-17. **Design it** (disabled while the box is empty or a screenshot is uploading; hidden for viewers) creates the goal directly: `POST /goals` with `text` "Design a mobile app: <the box>", `newProject: true` and the screenshot's id in `attachmentIds`, then opens `/w/<slug>/mobile/<goal id>`. The team busy (409) shows "Your team is busy with another goal. Try again when it finishes."; any other error shows its message.
-18. **Your apps** lists, newest first, every goal that is a mobile design (the goals list's `mobile` flag) and has no parent goal: its name (the goal text without "Design a mobile app: ", cut at 60 characters), its status in plain words (Planning, Ready to start, Working, Done, Needs a fix) and, when its project exists, the screen count from the projects list. Each links to its app page. With none: "Your app designs will appear here."
+17. **Design it** (disabled while the box is empty or a screenshot is uploading; hidden for viewers) creates the goal directly: `POST /goals` with `text` "Design a mobile app: <the box>", `newProject: true` and the screenshot's id in `attachmentIds`, then opens `/w/<slug>/mobile/<goal id>`. The team busy (409 with code `busy`) shows "Your team is busy with another goal. Try again when it finishes."; any other error, including Nova having no model, shows its own message.
+18. **Your apps** lists, newest first, every goal that is a mobile design (the goals list's `mobile` flag) and has no parent goal (`GET /goals?roots=1`, up to 100): its name (the goal text without "Design a mobile app: ", cut at 60 characters), its status in plain words (Planning, Ready to start, Working, Done, Needs a fix) and, when its project exists, the screen count from the projects list. Each links to its app page. With none: "Your app designs will appear here."
 
 ### 5.3 App page (`/w/<slug>/mobile/<goal id>`)
 
-19. Shows the app's name and, for the newest goal in this app (the given goal, or the newest goal on the same project), the existing goal card: plan, Start, progress.
+19. Shows the app's name and, for the newest goal in this app (the given goal, or the newest goal on the same project from `GET /goals?projectId=`), the existing goal card: plan, Start, progress. When that card's goal changes status or gets edits applied, the page loads its files once more.
 20. Once the app has a project, the phone screens gallery shows its `screens/*.html`, refreshed every 5 seconds while that goal is planning, waiting to start or working, and once otherwise. With no screens yet: "Screens will appear here as the team draws them."
 21. **Ask for changes**: a text box "What should change?" and **Send changes**, shown to members once the app has a project. It creates a follow-up goal: `POST /goals` with `text` "Mobile app design changes: <the box>", the app's `projectId` and `parentGoalId` set to the newest goal. The team busy (409) shows the same message as item 17.
 
 ### 5.4 Backend
 
 22. `POST /goals` accepts `attachmentIds` (at most 4): the caller's own attachments not yet sent with a message, checked like chat attachments, and linked to the new goal before Nova plans it, so they appear in the plan's attached files and are copied into the project at Start.
-23. `GET /goals` adds `parentGoalId` and `mobile` (`isMobileDesign(text)`) to each goal.
+23. `GET /goals` adds `parentGoalId` and `mobile` (`isMobileDesign(text)`) to each goal, and accepts `roots=1` (goals without a parent, up to 100) and `projectId=` (one project's goals, newest first).
 24. The projects list with `overview=1` adds `screens`: the number of `screens/*.html` files.
 
 ### 5.5 Testing (part 1b)
