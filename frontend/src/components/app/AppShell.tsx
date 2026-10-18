@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { ArrowsIn, ArrowsOut, ChatCircle, FolderSimple, GearSix, List, Palette, SignOut, UsersThree, X } from "@phosphor-icons/react";
+import { ArrowsIn, ArrowsOut, ChatCircle, DeviceMobile, FolderSimple, GearSix, List, Palette, SignOut, UsersThree, X } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/lib/workspace";
 import { Logo } from "@/components/landing/ui";
@@ -38,6 +38,7 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const isChat = pathname === base;
   const nav = [
     { href: base, label: "Chat", icon: ChatCircle },
+    { href: `${base}/mobile`, label: "Mobile App", icon: DeviceMobile },
     { href: `${base}/projects`, label: "Projects", icon: FolderSimple },
     { href: `${base}/team`, label: "Team", icon: UsersThree },
   ];
