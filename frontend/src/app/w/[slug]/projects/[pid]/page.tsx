@@ -13,6 +13,8 @@ import { FileTree, type TreeAction } from "@/components/app/files/FileTree";
 import { SummaryBox } from "@/components/app/files/SummaryBox";
 import { HistoryPanel } from "@/components/app/files/HistoryPanel";
 import { PreviewDialog } from "@/components/app/files/PreviewDialog";
+import { PhoneScreensDialog } from "@/components/app/files/PhoneScreens";
+import { phoneScreens } from "@/lib/screens";
 import { UploadDialog } from "@/components/app/files/UploadDialog";
 
 const CodeEditor = dynamic(() => import("@/components/app/files/CodeEditor").then((m) => m.CodeEditor), { ssr: false, loading: () => <div className="h-full animate-pulse bg-bg" /> });
@@ -40,6 +42,8 @@ export default function ProjectWorkspace() {
   const [uploading, setUploading] = useState(false);
   const [pane, setPane] = useState<"tree" | "editor">("tree");
   const [previewing, setPreviewing] = useState(false);
+  const [showingScreens, setShowingScreens] = useState(false);
+  const screens = phoneScreens(entries.filter((e) => e.kind === "file").map((e) => e.path));
   const opened = useRef(false);
   const theme = snapshot.preferences.theme;
   const dark = theme === "dark" || (theme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -162,6 +166,9 @@ export default function ProjectWorkspace() {
         <span className="text-muted">/</span>
         <h1 className="mr-auto truncate font-semibold">{project?.name ?? "Project"}</h1>
         {project && <span className="text-xs text-muted">{project.fileCount} files · {formatBytes(project.totalBytes)}</span>}
+        {screens.length > 0 && (
+          <button onClick={() => setShowingScreens(true)} className="btn-dark rounded-[10px] px-3 py-2 text-sm font-semibold">Phone screens</button>
+        )}
         {entries.some((e) => e.kind === "file" && /\.html?$/i.test(e.path)) && (
           <button onClick={() => setPreviewing(true)} className="btn-dark rounded-[10px] px-3 py-2 text-sm font-semibold">Preview</button>
         )}
@@ -169,6 +176,7 @@ export default function ProjectWorkspace() {
         {canAdmin(snapshot.role) && <button onClick={deleteProject} className="rounded-[10px] px-3 py-2 text-sm font-semibold text-[#b42318] hover:bg-bg">Delete project</button>}
       </div>
       {previewing && <PreviewDialog projectApi={base} title={project?.name ?? "Project"} onClose={() => setPreviewing(false)} />}
+      {showingScreens && <PhoneScreensDialog base={base} screens={screens} onClose={() => setShowingScreens(false)} />}
       {notice && <p role="status" className="bg-bg px-4 py-2 text-sm">{notice}</p>}
       <div className="flex gap-1 border-b border-line p-1 lg:hidden" role="group" aria-label="View">
         {(["tree", "editor"] as const).map((p) => (

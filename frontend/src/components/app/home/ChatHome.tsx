@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { createPortal } from "react-dom";
-import { ArrowUpRight, CaretDown, ChatCircle, Eye, FolderSimple, Globe, PencilLine, Question, UsersThree } from "@phosphor-icons/react";
+import { ArrowUpRight, CaretDown, ChatCircle, DeviceMobile, Eye, FolderSimple, Globe, PencilLine, Question, UsersThree } from "@phosphor-icons/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -28,6 +28,7 @@ const EXAMPLES = [
   { title: "Build a website", prompt: "Build a landing page for my bakery", icon: <Globe size={19} /> },
   { title: "Write content", prompt: "Write a week of Instagram posts", icon: <PencilLine size={19} /> },
   { title: "Research an idea", prompt: "Research three competitors and compare prices", icon: <ChatCircle size={19} /> },
+  { title: "Design a mobile app", prompt: "Design a mobile app for ", icon: <DeviceMobile size={19} /> },
 ];
 
 /** Home: a full-page conversation with Nova. Work requests become plan cards in the chat. */
