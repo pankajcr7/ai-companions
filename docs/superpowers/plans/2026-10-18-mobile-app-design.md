@@ -593,6 +593,482 @@ Expected: build succeeds; tests pass.
 
 On the owner's Mac: in chat, "Design a mobile app for a hiking club" plans "The look and the screen list" first; after Start, `design/identity.md`, `design/screens.md` and `screens/*.html` appear; Phone screens shows them in phone frames.
 
-- [ ] **Step 4: Merge and push**
+Merging and pushing happen in Task 9, after part 1b.
+
+
+---
+
+## Part 1b: the Mobile App page (spec section 5)
+
+### Task 6: Backend support for the page
+
+**Files:**
+- Modify: `backend/src/routes/goals.ts` (`POST /goals` body and `createGoal` call; `GET /goals` select and response)
+- Modify: `backend/src/routes/projects.ts` (overview mapping)
+- Test: `backend/test/mobile-page-api.test.ts`
+
+**Interfaces:**
+- Consumes: `isMobileDesign` (Task 1); `ownAttachments(workspaceId, userId, ids)` from `../attachments/service.js`.
+- Produces: `POST /goals` accepts `attachmentIds?: string[]` (max 4); `GET /goals` items gain `parentGoalId: string | null` and `mobile: boolean`; project overview gains `screens: number`.
+
+- [ ] **Step 1: Write the failing test** — create `backend/test/mobile-page-api.test.ts`:
+
+```ts
+import { afterAll, expect, test, vi } from "vitest";
+import { prisma } from "../src/db.js";
+import { client, makeApp, signUp } from "./helpers.js";
+import { company, fakeLLM, fence, systemOf, userOf, waitFor } from "./goal-helpers.js";
+
+vi.setConfig({ testTimeout: 240_000 });
+const llm = await fakeLLM();
+const app = await makeApp();
+afterAll(async () => {
+  await llm.close();
+  await app.close();
+});
+
+const PNG = Buffer.from("89504e470d0a1a0a0000000d494844520000000100000001", "hex");
+const isPlan = (s: string) => s.includes("Turn the owner's goal into a plan");
+type Co = Awaited<ReturnType<typeof company>>;
+
+async function attach(co: { id: string; cookie: string }, name: string) {
+  const boundary = "----b" + Math.random().toString(16).slice(2);
+  const payload = Buffer.concat([Buffer.from(`--${boundary}\r\ncontent-disposition: form-data; name="file"; filename="${name}"\r\ncontent-type: application/octet-stream\r\n\r\n`), PNG, Buffer.from(`\r\n--${boundary}--\r\n`)]);
+  const res = await app.inject({ method: "POST", url: `/api/workspaces/${co.id}/attachments`, payload, headers: { "content-type": `multipart/form-data; boundary=${boundary}`, cookie: co.cookie, origin: "http://localhost:3000" } });
+  return res.json().id as string;
+}
+const planned = (co: Co) =>
+  llm.setScript((s) => (isPlan(s) ? fence({ projectName: "Trail", tasks: [{ agentId: co.others[0].id, title: "The look and the screen list", instructions: "i", deliverable: "d", criteria: ["c"], dependsOn: [] }] }) : "ok"));
+
+test("a goal made with a screenshot links it before planning; someone else's screenshot is refused", async () => {
+  const co = await company(app, llm);
+  planned(co);
+  const shot = await attach(co, "inspiration.png");
+  const res = await co.req("POST", `/api/workspaces/${co.id}/goals`, { text: "Design a mobile app: hiking trails", newProject: true, attachmentIds: [shot] });
+  expect(res.statusCode).toBe(201);
+  const gid = res.json().id as string;
+  await waitFor(async () => (await co.req("GET", `/api/workspaces/${co.id}/goals/${gid}`)).json().goal, (g) => g.status === "awaiting_approval");
+  expect((await prisma.attachment.findUniqueOrThrow({ where: { id: shot } })).goalId).toBe(gid);
+  const plan = llm.requests.filter((q) => q.path === "/v1/chat/completions" && isPlan(systemOf(q))).at(-1)!;
+  expect(userOf(plan)).toContain("attachments/inspiration.png");
+
+  const other = await signUp(app);
+  const oid = (await client(app, other.cookie)("GET", "/api/me")).json().user.id;
+  await prisma.membership.create({ data: { workspaceId: co.id, userId: oid, role: "member" } });
+  const theirs = await attach({ id: co.id, cookie: other.cookie }, "theirs.png");
+  await co.req("POST", `/api/workspaces/${co.id}/goals/${gid}/cancel`);
+  expect((await co.req("POST", `/api/workspaces/${co.id}/goals`, { text: "Design a mobile app: quiz", newProject: true, attachmentIds: [theirs] })).statusCode).toBe(404);
+});
+
+test("the goals list says which goals are app designs and which follow another; the overview counts screens", async () => {
+  const co = await company(app, llm);
+  planned(co);
+  const pid = (await co.req("POST", `/api/workspaces/${co.id}/projects`, { name: "Trail" })).json().id as string;
+  for (const path of ["screens/01-home.html", "screens/02-map.html", "screens/old/x.html", "index.html", "screens/notes.md"]) {
+    await co.req("PUT", `/api/workspaces/${co.id}/projects/${pid}/files`, { path, content: "<p>x</p>", baseRevision: 0 });
+  }
+  const first = (await co.req("POST", `/api/workspaces/${co.id}/goals`, { text: "Design a mobile app: trails", projectId: pid })).json().id as string;
+  await waitFor(async () => (await co.req("GET", `/api/workspaces/${co.id}/goals/${first}`)).json().goal, (g) => g.status === "awaiting_approval");
+  await co.req("POST", `/api/workspaces/${co.id}/goals/${first}/cancel`);
+  const second = (await co.req("POST", `/api/workspaces/${co.id}/goals`, { text: "Write a welcome note", projectId: pid, parentGoalId: first })).json().id as string;
+  const goals = (await co.req("GET", `/api/workspaces/${co.id}/goals`)).json().goals as { id: string; mobile: boolean; parentGoalId: string | null }[];
+  expect(goals.find((g) => g.id === first)).toMatchObject({ mobile: true, parentGoalId: null });
+  expect(goals.find((g) => g.id === second)).toMatchObject({ mobile: false, parentGoalId: first });
+  const projects = (await co.req("GET", `/api/workspaces/${co.id}/projects?overview=1`)).json().projects as { id: string; overview: { screens: number } }[];
+  expect(projects.find((p) => p.id === pid)!.overview.screens).toBe(2);
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd backend && npx vitest run test/mobile-page-api.test.ts`
+Expected: both tests FAIL (the attachment isn't linked: `goalId` is `null`; `mobile` is undefined; `screens` is undefined).
+
+- [ ] **Step 3: Accept screenshots when creating a goal** — in `backend/src/routes/goals.ts`:
+
+Import `ownAttachments` (add it to the existing `../attachments/service.js` import, or add `import { ownAttachments } from "../attachments/service.js";`) and `import { isMobileDesign } from "../goals/mobile.js";`.
+
+In the `POST /api/workspaces/:id/goals` handler, add `attachmentIds: z.array(z.string().min(1).max(64)).max(4).default([])` to the body schema, and replace the `createGoal` call with:
+
+```ts
+    // The owner's files for this goal (a screenshot to match, from the Mobile App page): theirs, not yet sent anywhere.
+    const atts = await ownAttachments(id, user.id, body.attachmentIds);
+    const { id: goalId } = await createGoal({
+      workspaceId: id,
+      userId: user.id,
+      text: body.text,
+      projectId: body.projectId,
+      parentGoalId: body.parentGoalId,
+      newProject: body.newProject,
+      log: (e) => req.log.error(e),
+      beforePlan: atts.length ? async (gid) => void (await prisma.attachment.updateMany({ where: { id: { in: atts.map((a) => a.id) } }, data: { goalId: gid } })) : undefined,
+    });
+```
+
+- [ ] **Step 4: Say which goals are app designs** — in the `GET /api/workspaces/:id/goals` handler, add `parentGoalId: true` to the `select` and return:
+
+```ts
+    return { goals: goals.map((g) => ({ ...g, mobile: isMobileDesign(g.text) })) };
+```
+
+- [ ] **Step 5: Count screens in the overview** — in `backend/src/routes/projects.ts`, in the overview object add `screens` next to `cover`:
+
+```ts
+overview: { cover: projectCover(p.entries), screens: p.entries.filter((e) => /^screens\/[^/]+\.html?$/i.test(e.path)).length, goal: …unchanged… }
+```
+
+- [ ] **Step 6: Run tests and typecheck**
+
+Run: `cd backend && npx vitest run test/mobile-page-api.test.ts && npm run typecheck`
+Expected: both tests pass; no type errors.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add backend/src/routes/goals.ts backend/src/routes/projects.ts backend/test/mobile-page-api.test.ts
+git commit -m "feat(backend): goals can carry a screenshot; goals list marks app designs and follow-ups; overview counts screens"
+```
+
+### Task 7: Sidebar item and the Mobile App start page
+
+**Files:**
+- Create: `frontend/src/lib/mobile.ts`, `frontend/src/lib/mobile.test.ts`
+- Create: `frontend/src/app/w/[slug]/mobile/page.tsx`
+- Modify: `frontend/src/components/app/AppShell.tsx` (nav list)
+- Test: `frontend/e2e/mobile-page.spec.ts` (first test)
+
+**Interfaces:**
+- Consumes: `POST /goals` with `attachmentIds`, `GET /goals` (`mobile`, `parentGoalId`), overview `screens` (Task 6); `useAttachments(path)` from `@/components/app/chat/AttachmentPicker` (`{ items, add, remove, uploading, ids }`).
+- Produces: `APP_PREFIX = "Design a mobile app: "`, `CHANGES_PREFIX = "Mobile app design changes: "`, `appName(text: string): string`, `appStatus(status: string): string`, `isActive(status: string): boolean` from `@/lib/mobile`.
+
+- [ ] **Step 1: Write the failing unit test** — create `frontend/src/lib/mobile.test.ts`:
+
+```ts
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { appName, appStatus, isActive } from "./mobile.ts";
+
+test("app names drop the request prefix and stay short; statuses read plainly", () => {
+  assert.equal(appName("Design a mobile app: A hiking trails app"), "A hiking trails app");
+  assert.equal(appName("Make an iOS app for my bakery"), "Make an iOS app for my bakery");
+  assert.equal(appName(`Design a mobile app: ${"x".repeat(80)}`), `${"x".repeat(57)}...`);
+  assert.deepEqual(["planning", "awaiting_approval", "running", "reviewing", "done", "failed", "cancelled"].map(appStatus), ["Planning", "Ready to start", "Working", "Working", "Done", "Needs a fix", "Stopped"]);
+  assert.deepEqual(["planning", "awaiting_approval", "running", "reviewing", "done", "failed", "cancelled"].map(isActive), [true, true, true, true, false, false, false]);
+});
+```
+
+- [ ] **Step 2: Write the failing e2e test** — create `frontend/e2e/mobile-page.spec.ts`:
+
+```ts
+import { expect, test } from "@playwright/test";
+import { connectFakeLLM, newCompany } from "./setup";
+
+test("the sidebar's Mobile App starts an app design and lists it", async ({ page }) => {
+  const c = await newCompany(page, { prefix: "MobilePage", company: "Trail Club", template: /Just the head agent/ });
+  await connectFakeLLM(page, c.id);
+  await page.getByRole("link", { name: "Mobile App" }).click();
+  await expect(page).toHaveURL(new RegExp(`/w/${c.slug}/mobile$`));
+  await expect(page.getByRole("heading", { name: "Mobile App" })).toBeVisible();
+  await expect(page.getByText("Your app designs will appear here.")).toBeVisible();
+  await page.getByRole("button", { name: "Hiking trails" }).click();
+  await expect(page.getByLabel("Describe your app, or paste your spec")).toHaveValue("A hiking trails app: saved trails, a trail map and a trip log");
+  await page.getByRole("button", { name: "Design it" }).click();
+  await expect(page).toHaveURL(new RegExp(`/w/${c.slug}/mobile/[^/]+$`));
+  await expect(page.getByRole("heading", { name: "A hiking trails app: saved trails, a trail map and a trip log" })).toBeVisible();
+  await page.getByRole("link", { name: "Mobile App" }).click();
+  await expect(page.getByRole("link", { name: /A hiking trails app/ })).toBeVisible();
+});
+```
+
+- [ ] **Step 3: Run both to verify they fail**
+
+Run: `npm --prefix frontend run test:unit` → FAIL, "Cannot find module … mobile.ts".
+Run: `cd frontend && npx playwright test e2e/mobile-page.spec.ts` → FAIL, no "Mobile App" link.
+
+- [ ] **Step 4: Create `frontend/src/lib/mobile.ts`**
+
+```ts
+export const APP_PREFIX = "Design a mobile app: ";
+export const CHANGES_PREFIX = "Mobile app design changes: ";
+
+/** The app's name: the request without "Design a mobile app: ", at most 60 characters. */
+export function appName(text: string): string {
+  const name = text.startsWith(APP_PREFIX) ? text.slice(APP_PREFIX.length) : text;
+  return name.length > 60 ? `${name.slice(0, 57)}...` : name;
+}
+
+const STATUS: Record<string, string> = { planning: "Planning", awaiting_approval: "Ready to start", running: "Working", reviewing: "Working", done: "Done", failed: "Needs a fix", cancelled: "Stopped" };
+export const appStatus = (status: string) => STATUS[status] ?? status;
+export const isActive = (status: string) => ["planning", "awaiting_approval", "running", "reviewing"].includes(status);
+```
+
+- [ ] **Step 5: Add the sidebar item** — in `frontend/src/components/app/AppShell.tsx`, add `DeviceMobile` to the `@phosphor-icons/react` import and, right after the Chat entry in the nav list, add:
+
+```ts
+    { href: `${base}/mobile`, label: "Mobile App", icon: DeviceMobile },
+```
+
+The nav's active rule (`href === base ? isChat : pathname.startsWith(href)`) already marks it current on `/mobile` and `/mobile/<id>`.
+
+- [ ] **Step 6: Create the start page** — `frontend/src/app/w/[slug]/mobile/page.tsx`:
+
+```tsx
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { DeviceMobile, ImageSquare, PaperPlaneRight, X } from "@phosphor-icons/react";
+import { useAttachments } from "@/components/app/chat/AttachmentPicker";
+import { api, ApiError } from "@/lib/api";
+import { APP_PREFIX, appName, appStatus } from "@/lib/mobile";
+import { canEdit } from "@/lib/types";
+import { useWorkspace } from "@/lib/workspace";
+
+type GoalRow = { id: string; text: string; status: string; projectId: string | null; parentGoalId: string | null; mobile: boolean };
+type ProjectRow = { id: string; overview?: { screens?: number } };
+
+const EXAMPLES = [
+  { label: "Hiking trails", text: "A hiking trails app: saved trails, a trail map and a trip log" },
+  { label: "Cycle tracker", text: "A cycle tracker app: rides, weekly goals and a ride map" },
+  { label: "Recipe planner", text: "A recipe planner app: weekly meal plan, recipes and a shopping list" },
+];
+const BUSY = "Your team is busy with another goal. Try again when it finishes.";
+
+export default function MobileAppPage() {
+  const { snapshot, wsPath } = useWorkspace();
+  const router = useRouter();
+  const editable = canEdit(snapshot.role);
+  const [text, setText] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [apps, setApps] = useState<{ goal: GoalRow; screens: number | null }[] | null>(null);
+  const att = useAttachments(editable ? wsPath("/attachments") : undefined);
+  const file = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    Promise.all([api<{ goals: GoalRow[] }>(wsPath("/goals")), api<{ projects: ProjectRow[] }>(wsPath("/projects?overview=1"))]).then(([g, p]) => {
+      const screens = new Map(p.projects.map((x) => [x.id, x.overview?.screens ?? 0]));
+      setApps(g.goals.filter((x) => x.mobile && !x.parentGoalId).map((goal) => ({ goal, screens: goal.projectId ? (screens.get(goal.projectId) ?? 0) : null })));
+    }, (e: Error) => setError(e.message));
+  }, [wsPath]);
+
+  async function design() {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await api<{ id: string }>(wsPath("/goals"), { method: "POST", body: { text: `${APP_PREFIX}${text.trim()}`, newProject: true, attachmentIds: att.ids } });
+      router.push(`/w/${snapshot.workspace.slug}/mobile/${r.id}`);
+    } catch (e) {
+      setError(e instanceof ApiError && e.status === 409 ? BUSY : (e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
+      <header>
+        <h1 className="text-2xl font-semibold">Mobile App</h1>
+        <p className="mt-1 text-muted">Make your app look designed.</p>
+      </header>
+      {editable && (
+        <section aria-label="Design a new app" className="rounded-[16px] border border-line bg-paper p-4">
+          <label htmlFor="mobile-brief" className="sr-only">Describe your app, or paste your spec</label>
+          <textarea id="mobile-brief" aria-label="Describe your app, or paste your spec" value={text} onChange={(e) => setText(e.target.value)} placeholder="Describe your app, or paste your spec" rows={4} maxLength={3900} className="w-full resize-y rounded-[10px] bg-bg p-3 text-base" />
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input ref={file} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { att.items.forEach((i) => att.remove(i.key)); att.add([f]); } e.target.value = ""; }} />
+            <button onClick={() => file.current?.click()} className="studio-secondary"><ImageSquare size={16} />Add screenshot</button>
+            {att.items.map((i) => <span key={i.key} className="flex items-center gap-1 rounded-full bg-bg px-3 py-1 text-sm">{i.name}{i.status === "uploading" ? " (uploading…)" : i.status === "error" ? ` (${i.error})` : ""}<button aria-label={`Remove ${i.name}`} onClick={() => att.remove(i.key)}><X size={13} /></button></span>)}
+            <button onClick={design} disabled={!text.trim() || att.uploading || busy} className="studio-primary ml-auto"><PaperPlaneRight size={16} />Design it</button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">{EXAMPLES.map((x) => <button key={x.label} onClick={() => setText(x.text)} className="rounded-full border border-line px-3 py-1 text-sm">{x.label}</button>)}</div>
+        </section>
+      )}
+      {error && <p role="alert" className="text-sm text-[#b42318]">{error}</p>}
+      <section aria-label="Your apps">
+        <h2 className="mb-3 font-semibold">Your apps</h2>
+        {!apps ? <p className="text-sm text-muted">Loading…</p> : !apps.length ? <p className="text-sm text-muted">Your app designs will appear here.</p> : (
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {apps.map(({ goal, screens }) => (
+              <li key={goal.id}>
+                <Link href={`/w/${snapshot.workspace.slug}/mobile/${goal.id}`} className="flex items-center gap-3 rounded-[14px] border border-line bg-paper p-3 hover:bg-bg">
+                  <DeviceMobile size={28} />
+                  <span className="min-w-0"><span className="block truncate font-semibold">{appName(goal.text)}</span><span className="text-sm text-muted">{appStatus(goal.status)}{screens ? ` · ${screens} screen${screens === 1 ? "" : "s"}` : ""}</span></span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+```
+
+`canEdit` comes from `@/lib/types` and failed requests throw `ApiError` with the HTTP `status` (`frontend/src/lib/api.ts`); the team being busy is a 409.
+
+- [ ] **Step 7: Run the unit test and the e2e test's first part**
+
+Run: `npm --prefix frontend run test:unit` → PASS.
+Run: `cd frontend && npx playwright test e2e/mobile-page.spec.ts` → still FAILS at the app page heading (Task 8 builds that page); every step before it passes.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add frontend/src/lib/mobile.ts frontend/src/lib/mobile.test.ts "frontend/src/app/w/[slug]/mobile/page.tsx" frontend/src/components/app/AppShell.tsx frontend/e2e/mobile-page.spec.ts
+git commit -m "feat(frontend): Mobile App in the sidebar — describe an app, add a screenshot, Design it; your apps"
+```
+
+### Task 8: The app page
+
+**Files:**
+- Create: `frontend/src/app/w/[slug]/mobile/[goalId]/page.tsx`
+- Modify: `frontend/e2e/mobile-page.spec.ts` (second test)
+
+**Interfaces:**
+- Consumes: `appName`, `isActive`, `CHANGES_PREFIX` (Task 7); the busy message is repeated as a constant (Next.js pages can't export extra values); `GoalCard({ goalId, onStatus })`; `PhoneScreens({ base, screens, onAsk })` and `phoneScreens(paths)` (Tasks 3–4); `GET /goals/:id` (`goal.text`, `goal.projectId`, `goal.status`), `GET /goals` (`projectId`, `parentGoalId`), `GET /projects/:pid/tree`.
+
+- [ ] **Step 1: Add the failing e2e test** — append to `frontend/e2e/mobile-page.spec.ts`:
+
+```ts
+const headers = { origin: "http://localhost:3100" };
+const screen = (title: string) => `<!doctype html><html><head><title>${title}</title></head><body><h1>${title} screen</h1></body></html>`;
+
+test("an app page shows the plan, its phone screens, and Ask for changes makes a follow-up", async ({ page }) => {
+  const c = await newCompany(page, { prefix: "MobileApp", company: "Quiz Club", template: /Just the head agent/ });
+  await connectFakeLLM(page, c.id);
+  const pid = (await (await page.request.post(`/api/workspaces/${c.id}/projects`, { headers, data: { name: "Quiz app" } })).json()).id as string;
+  await page.request.put(`/api/workspaces/${c.id}/projects/${pid}/files`, { headers, data: { path: "screens/01-home.html", content: screen("Home"), baseRevision: 0 } });
+  const gid = (await (await page.request.post(`/api/workspaces/${c.id}/goals`, { headers, data: { text: "Design a mobile app: A quiz app", projectId: pid } })).json()).id as string;
+  await page.goto(`/w/${c.slug}/mobile/${gid}`);
+  await expect(page.getByRole("heading", { name: "A quiz app" })).toBeVisible();
+  await expect(page.getByRole("figure")).toHaveCount(1);
+  await expect(page.getByText(/Ready to start|Planning/).first()).toBeVisible();
+  await page.request.post(`/api/workspaces/${c.id}/goals/${gid}/cancel`, { headers });
+  await page.getByLabel("What should change?").fill("Bigger title on the Home screen");
+  await page.getByRole("button", { name: "Send changes" }).click();
+  await expect.poll(async () => {
+    const goals = (await (await page.request.get(`/api/workspaces/${c.id}/goals`)).json()).goals as { text: string; parentGoalId: string | null }[];
+    return goals.find((g) => g.parentGoalId === gid)?.text ?? "";
+  }).toBe("Mobile app design changes: Bigger title on the Home screen");
+});
+```
+
+- [ ] **Step 2: Run to verify it fails**
+
+Run: `cd frontend && npx playwright test e2e/mobile-page.spec.ts`
+Expected: both tests FAIL at the app page (no heading).
+
+- [ ] **Step 3: Create the app page** — `frontend/src/app/w/[slug]/mobile/[goalId]/page.tsx`:
+
+```tsx
+"use client";
+
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { GoalCard } from "@/components/app/goals/GoalCard";
+import { PhoneScreens } from "@/components/app/files/PhoneScreens";
+import { api, ApiError } from "@/lib/api";
+import { appName, CHANGES_PREFIX, isActive } from "@/lib/mobile";
+import type { TreeEntry } from "@/lib/projects";
+import { canEdit } from "@/lib/types";
+import { phoneScreens } from "@/lib/screens";
+import { useWorkspace } from "@/lib/workspace";
+
+const BUSY = "Your team is busy with another goal. Try again when it finishes.";
+type GoalRow = { id: string; text: string; status: string; projectId: string | null; parentGoalId: string | null; createdAt: string };
+
+export default function MobileAppDetail() {
+  const { goalId } = useParams<{ goalId: string }>();
+  const { snapshot, wsPath } = useWorkspace();
+  const editable = canEdit(snapshot.role);
+  const [root, setRoot] = useState<GoalRow | null>(null);
+  const [current, setCurrent] = useState<GoalRow | null>(null);
+  const [paths, setPaths] = useState<string[]>([]);
+  const [ask, setAsk] = useState("");
+  const [error, setError] = useState("");
+  const [tick, setTick] = useState(0);
+
+  // The app: the given goal, its project, and the newest goal on that project.
+  const load = useCallback(async () => {
+    const goal = (await api<{ goal: GoalRow }>(wsPath(`/goals/${goalId}`))).goal;
+    const all = (await api<{ goals: GoalRow[] }>(wsPath("/goals"))).goals;
+    const newest = goal.projectId ? all.find((g) => g.projectId === goal.projectId) ?? goal : goal;
+    setRoot(goal);
+    setCurrent(newest);
+    if (goal.projectId) setPaths((await api<{ entries: TreeEntry[] }>(wsPath(`/projects/${goal.projectId}/tree`))).entries.filter((e) => e.kind === "file").map((e) => e.path));
+  }, [goalId, wsPath]);
+
+  useEffect(() => { load().catch((e: Error) => setError(e.message)); }, [load, tick]);
+  // Refresh while the team works on it.
+  useEffect(() => {
+    if (!current || !isActive(current.status)) return;
+    const t = setInterval(() => setTick((n) => n + 1), 5000);
+    return () => clearInterval(t);
+  }, [current]);
+
+  async function sendChanges() {
+    if (!root?.projectId || !current) return;
+    setError("");
+    try {
+      await api(wsPath("/goals"), { method: "POST", body: { text: `${CHANGES_PREFIX}${ask.trim()}`, projectId: root.projectId, parentGoalId: current.id } });
+      setAsk("");
+      setTick((n) => n + 1);
+    } catch (e) {
+      setError(e instanceof ApiError && e.status === 409 ? BUSY : (e as Error).message);
+    }
+  }
+
+  const screens = phoneScreens(paths);
+  if (!root) return <p className="p-6 text-sm text-muted">{error || "Loading…"}</p>;
+  return (
+    <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-6">
+      <Link href={`/w/${snapshot.workspace.slug}/mobile`} className="text-sm text-muted hover:underline">← Mobile App</Link>
+      <h1 className="text-xl font-semibold">{appName(root.text)}</h1>
+      {current && <GoalCard key={current.id} goalId={current.id} onStatus={(g) => setCurrent((c) => (c && c.status !== g.status ? { ...c, status: g.status } : c))} />}
+      <section aria-label="Phone screens" className="rounded-[16px] border border-line bg-paper">
+        {root.projectId && screens.length ? <PhoneScreens base={wsPath(`/projects/${root.projectId}`)} screens={screens} /> : <p className="p-4 text-sm text-muted">Screens will appear here as the team draws them.</p>}
+      </section>
+      {editable && root.projectId && (
+        <section aria-label="Ask for changes" className="flex flex-col gap-2">
+          <label htmlFor="mobile-changes" className="font-semibold">What should change?</label>
+          <textarea id="mobile-changes" value={ask} onChange={(e) => setAsk(e.target.value)} rows={3} maxLength={3900} className="rounded-[10px] border border-line bg-paper p-3" />
+          <button onClick={sendChanges} disabled={!ask.trim()} className="studio-primary self-start">Send changes</button>
+        </section>
+      )}
+      {error && <p role="alert" className="text-sm text-[#b42318]">{error}</p>}
+    </div>
+  );
+}
+```
+
+`GoalCard`'s `onStatus` receives the goal DTO (with `status`); `GET /goals/:id` returns `{ goal }` with `text`, `status` and `projectId`.
+
+- [ ] **Step 4: Run the e2e tests, unit tests, typecheck and lint**
+
+Run: `cd frontend && npx playwright test e2e/mobile-page.spec.ts e2e/mobile.spec.ts && npm run test:unit && npx tsc --noEmit && npx eslint "src/app/w/[slug]/mobile" src/lib/mobile.ts src/components/app/AppShell.tsx`
+Expected: 4 e2e tests pass; unit tests pass; no type or lint errors.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add "frontend/src/app/w/[slug]/mobile/[goalId]/page.tsx" frontend/e2e/mobile-page.spec.ts
+git commit -m "feat(frontend): app page — plan card, live phone screens, Ask for changes as a follow-up goal"
+```
+
+### Task 9: Verify everything and ship
+
+- [ ] **Step 1: Backend tests for both parts**
+
+Run: `cd backend && npx vitest run test/mobile-unit.test.ts test/goal-mobile.test.ts test/mobile-page-api.test.ts test/quality-unit.test.ts test/quality-fixes.test.ts test/goal-reference.test.ts test/goals.test.ts test/conversations.test.ts`
+Expected: all pass.
+
+- [ ] **Step 2: Frontend build and browser tests**
+
+Run: `cd frontend && NEXT_DIST_DIR=.next-check npx next build && npx playwright test e2e/mobile.spec.ts e2e/mobile-page.spec.ts e2e/projects.spec.ts e2e/studio.spec.ts e2e/goals.spec.ts`
+Expected: build succeeds; tests pass.
+
+- [ ] **Step 3: Merge and push**
 
 Fast-forward `milestone-1` to `mobile-design` in the main working tree (stop and ask if uncommitted changes there touch the same files), then `git push origin milestone-1 milestone-1:main`.
