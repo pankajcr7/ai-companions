@@ -162,6 +162,28 @@ const sectionsOf = (md: string) =>
     .filter((l) => l.replace(/^#+/, "").trim())
     .slice(0, MAX_SECTIONS);
 
+/** The screenshot half of a look: Jina's picture of the top of the page, downloaded and checked. */
+async function shotOf(url: string, signal: AbortSignal) {
+  const d = await reader(url, true, signal);
+  if (!d.screenshotUrl) throw new ToolError(READER_FAILED);
+  const res = await safeFetch(d.screenshotUrl, { signal });
+  const mime = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  if (!res.ok || !IMAGE_TYPES.includes(mime)) throw new ToolError(READER_FAILED);
+  const { data, cut } = await readBytes(res, MAX_IMAGE_BYTES);
+  if (cut) throw new ToolError(READER_FAILED);
+  return { title: d.title, image: { mime, data: data.toString("base64") } };
+}
+
+/** Only the picture of a public page (one reader request, not two), for Nova's look at a page the team built. */
+export async function pageScreenshot(url: string, signal: AbortSignal): Promise<{ mime: string; data: string }> {
+  try {
+    checkBaseUrl(url);
+  } catch {
+    throw new ToolError("That address isn't allowed: only public web pages can be opened.");
+  }
+  return (await part(signal, (s) => shotOf(url, s))).image;
+}
+
 /** A screenshot and the Markdown of a public page, both from Jina Reader, which renders the page in its own browser. */
 export async function lookAtWebsite(url: string, signal: AbortSignal): Promise<ToolOutput> {
   try {
@@ -175,16 +197,7 @@ export async function lookAtWebsite(url: string, signal: AbortSignal): Promise<T
       if (!d.content?.trim()) throw new ToolError(READER_FAILED);
       return { title: d.title, markdown: d.content };
     }),
-    part(signal, async (s) => {
-      const d = await reader(url, true, s);
-      if (!d.screenshotUrl) throw new ToolError(READER_FAILED);
-      const res = await safeFetch(d.screenshotUrl, { signal: s });
-      const mime = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-      if (!res.ok || !IMAGE_TYPES.includes(mime)) throw new ToolError(READER_FAILED);
-      const { data, cut } = await readBytes(res, MAX_IMAGE_BYTES);
-      if (cut) throw new ToolError(READER_FAILED);
-      return { title: d.title, image: { mime, data: data.toString("base64") } };
-    }),
+    part(signal, (s) => shotOf(url, s)),
   ]);
   if (text.status === "rejected" && shot.status === "rejected") throw text.reason;
   const title = clip((text.status === "fulfilled" && text.value.title) || (shot.status === "fulfilled" && shot.value.title) || "(no title)");

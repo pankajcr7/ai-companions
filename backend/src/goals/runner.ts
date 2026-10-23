@@ -5,17 +5,35 @@ import { HttpError } from "../http.js";
 import { cap, DEP_RESULT_CAP, FILE_BUDGET, pickFiles, RESULT_CAP, type Loaded } from "./context.js";
 import { checkEdit, splitEdits } from "./edits.js";
 import { CallError, completeJson, readiness, type Call } from "./llm.js";
-import { isVisualTask, reviewTask } from "./quality.js";
+import { isCinematic, isVisualTask, reviewTask } from "./quality.js";
 import { isMobileDesign } from "./mobile.js";
 import { madeImages } from "../attachments/service.js";
 import { imageTool, loadImageKeys } from "../harness/images.js";
 import { runLoop, ToolError, type ToolUse } from "../harness/loop.js";
-import { hostOf, lookForGoal, webAddresses } from "../harness/site.js";
+import { hostOf, lookForGoal, pageScreenshot, webAddresses } from "../harness/site.js";
+import { signPreview } from "../files/preview.js";
 import { projectTools, webTools, type Write } from "../harness/tools.js";
 import type { Part } from "../providers/types.js";
 import { loadSearchKey } from "../harness/web.js";
 import { goalContext, loadHead, loadText, stepLog } from "./load.js";
 import { selectInstructions, selectPrompt, summaryInstructions, summaryPrompt, taskInstructions, taskPrompt } from "./prompts.js";
+
+/**
+ * A picture of the page this task saved, through the app's public preview link (the frontend proxies /api to us),
+ * so Nova's check judges what a visitor sees. None without a public https address (local runs) or a saved page.
+ */
+async function builtPageShot(projectId: string, saved: string[], signal: AbortSignal) {
+  const base = process.env.FRONTEND_URL;
+  const page = saved.find((p) => /(^|\/)index\.html?$/i.test(p)) ?? saved.find((p) => /\.html?$/i.test(p));
+  if (!base || !page) return null;
+  const url = `${base.replace(/\/+$/, "")}/api/preview/${signPreview(projectId)}/${page.split("/").map(encodeURIComponent).join("/")}`;
+  try {
+    return await pageScreenshot(url, signal);
+  } catch (e) {
+    if (signal.aborted) throw e;
+    return null;
+  }
+}
 
 // At most this many reference sites are looked at before a task starts.
 const MAX_SITES = 2;
@@ -178,7 +196,8 @@ async function runTask(goalId: string, taskId: string) {
     }
     const mobile = isMobileDesign(goal.text);
     const visual = !!goal.project || isVisualTask(task) || mobile;
-    const instructions = taskInstructions(agent, goal.workspace.name, agent.department?.name ?? null, !!goal.project, visual, mobile);
+    const cinematic = visual && !mobile && isCinematic(`${goal.text}\n${goal.brief ?? ""}`);
+    const instructions = taskInstructions(agent, goal.workspace.name, agent.department?.name ?? null, !!goal.project, visual, mobile, cinematic);
     const prompt = taskPrompt(task, goal.text, ctx, deps, files, notes.join(" "), goal.brief && !ctx.shared.includes(goal.brief) ? goal.brief : null);
     const loop = await runLoop({
       actor: agent,
@@ -217,7 +236,9 @@ async function runTask(goalId: string, taskId: string) {
       for (;;) {
         // The latest version of each file this task wrote.
         const written = [...new Map(decided.filter((d) => d.check.status === "pending" || d.check.status === "applied").map((d) => [d.raw.path.toLowerCase(), { path: d.raw.path, content: d.raw.content }])).values()];
-        const r = await reviewTask(nova, goal.workspace.name, { goal: goal.text, task, brief: goal.brief, guide: visual, mobile, result, files: written }, signal, stepLog(goal.workspaceId, goalId, taskId, "review"), add);
+        // Nova sees the saved page (not a pending suggestion) for websites; phone screens have their own guide.
+        const shot = visual && !mobile && goal.project ? await builtPageShot(goal.project.id, decided.filter((d) => d.check.status === "applied").map((d) => d.check.path), signal) : null;
+        const r = await reviewTask(nova, goal.workspace.name, { goal: goal.text, task, brief: goal.brief, guide: visual, mobile, cinematic, result, files: written }, signal, stepLog(goal.workspaceId, goalId, taskId, "review"), add, shot);
         if (!r) {
           // The review call itself failed: the task keeps its result rather than failing.
           if (review.rounds === 0) review = null;

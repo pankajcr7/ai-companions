@@ -1,5 +1,5 @@
 import { companionIntro } from "../companion.js";
-import { DESIGN_GUIDE } from "./quality.js";
+import { CINEMATIC_GUIDE, DESIGN_GUIDE } from "./quality.js";
 import { MOBILE_CHANGES, MOBILE_GUIDE, MOBILE_PLAN } from "./mobile.js";
 import { cap, filesBlock, type Loaded } from "./context.js";
 import type { GoalContext } from "./load.js";
@@ -47,7 +47,7 @@ export const planInstructions = (company: string, newProject = false, canMakeIma
     newProject
       ? `${NEW_PROJECT_MARK}: add "projectName" (a short name, at most 60 characters) to the JSON, and plan tasks whose companions create the project's files. Files they create are saved into the new project.`
       : "",
-    'When the goal produces something visual (a website, page, app screen, ad, social post, presentation), add "brief" to the JSON: a short design brief in plain words — audience, the feeling it should give, colours, fonts, layout ideas, references, and a "don\'t" list. Leave it out otherwise.',
+    'When the goal produces something visual (a website, page, app screen, ad, social post, presentation), add "brief" to the JSON: a short design brief in plain words — first a design read in one line ("Reading this as: <kind of page> for <audience>, in a <visual language> style, ENERGY n / RHYTHM n / MOTION n", each 1 calm, 2 balanced or 3 bold, from the owner\'s words and brand; MOTION 3 when the owner wants it cinematic), then audience, the feeling it should give, colours, fonts and why they fit, layout ideas, references (1 or 2 current, well-designed real sites in the same category, each by its full https address; the team looks at them before starting, so name only sites you are sure exist, and use web_search if unsure; they set the quality bar and are not to be copied unless the owner asked), and a "don\'t" list. Leave it out otherwise.',
     canMakeImages
       ? "The team can make images with generate_image. When the goal asks for an image (a social post, ad, poster, banner, illustration or photo), plan it as an image made with generate_image and saved in images/, never as an SVG, HTML or design file."
       : "",
@@ -76,7 +76,7 @@ export const selectInstructions = (max: number) =>
 export const selectPrompt = (task: Pick<TaskSpec, "title" | "instructions">, ctx: GoalContext) =>
   (section("SHARED BRIEF AND BRAND", ctx.shared) + section("TASK", `${task.title}\n${task.instructions}`) + section("PROJECT SUMMARY", ctx.summary) + section("PROJECT FILES", ctx.map)).trim();
 
-export const taskInstructions = (agent: { name: string; role: string; workingStyle: string }, company: string, department: string | null, hasProject: boolean, visual = false, mobile = false) =>
+export const taskInstructions = (agent: { name: string; role: string; workingStyle: string }, company: string, department: string | null, hasProject: boolean, visual = false, mobile = false, cinematic = false) =>
   lines(
     companionIntro(agent, company, department),
     `${TASK_MARK} as part of a company goal. Produce exactly the deliverable described and check it against every acceptance criterion before you finish.`,
@@ -87,6 +87,7 @@ export const taskInstructions = (agent: { name: string; role: string; workingSty
     "Write the result itself, ready to use, as short as the deliverable allows.",
     visual ? DESIGN_GUIDE : "",
     mobile ? MOBILE_GUIDE : "",
+    cinematic ? CINEMATIC_GUIDE : "",
   );
 
 export function taskPrompt(task: TaskSpec, goal: string, ctx: GoalContext, deps: { title: string; agentName: string; result: string }[], files: Loaded[], note: string, brief: string | null = null) {

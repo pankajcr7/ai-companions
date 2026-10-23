@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import { SecretError } from "../crypto.js";
 import { clientFor, type ConnectionLike } from "../providers/index.js";
-import { hasMedia, ProviderError, withoutMedia, type ChatTurn, type StreamEvent } from "../providers/types.js";
+import { hasMedia, ProviderError, withoutMedia, type ChatTurn, type Part, type StreamEvent } from "../providers/types.js";
 import { runLoop, type Tool } from "../harness/loop.js";
 import { extractJson } from "./plan.js";
 
@@ -83,7 +83,7 @@ export async function complete(actor: Actor, instructions: string, turns: ChatTu
 }
 
 /** Asks for JSON; one repair turn includes what was wrong; then gives up with "bad_output". With tools, the first attempt may use them. */
-export async function completeJson<T>(actor: Actor, instructions: string, prompt: string, schema: z.ZodType<T>, signal: AbortSignal, log?: StepLog, withTools?: { tools: Tool[]; limit: number }) {
+export async function completeJson<T>(actor: Actor, instructions: string, prompt: string | Part[], schema: z.ZodType<T>, signal: AbortSignal, log?: StepLog, withTools?: { tools: Tool[]; limit: number }) {
   let turns: ChatTurn[] = [{ role: "user", content: prompt }];
   const calls: Call[] = [];
   for (let attempt = 0; attempt < 2; attempt++) {

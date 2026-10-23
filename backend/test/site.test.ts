@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "vitest";
-import { lookAtWebsite, studyWebsite } from "../src/harness/site.js";
+import { lookAtWebsite, pageScreenshot, studyWebsite } from "../src/harness/site.js";
 import { htmlToText, untrusted } from "../src/harness/web.js";
 import { fakeServer } from "./fake-provider.js";
 
@@ -212,4 +212,13 @@ test("look_at_website asks Jina for the live page, not a cached copy", async () 
   await lookAtWebsite("https://shop.example/pricing", signal);
   const sent = jina.requests.slice(n).filter((r) => r.path === "/https://shop.example/pricing");
   expect(sent.map((r) => r.headers["x-no-cache"])).toEqual(["true", "true"]);
+});
+
+test("pageScreenshot asks the reader for the picture only", async () => {
+  const before = jina.requests.length;
+  expect(await pageScreenshot("https://shop.example/pricing", signal)).toEqual({ mime: "image/png", data: PNG.toString("base64") });
+  const sent = jina.requests.slice(before);
+  expect(sent.map((r) => r.path)).toEqual(["/https://shop.example/pricing", "/shot.png"]);
+  expect(sent[0].headers["x-respond-with"]).toBe("screenshot");
+  await expect(pageScreenshot("https://noshot.example/", signal)).rejects.toThrow("Couldn't open that page through the page reader.");
 });
