@@ -15,7 +15,7 @@ const llm = await fakeLLM();
 const app = await makeApp();
 const cf = await fakeServer({
   [`GET /accounts/${ACC}/ai/models/search`]: (_q, res) => json(res, 200, { success: true, result: [] }),
-  [`POST /accounts/${ACC}/ai/run/@cf/black-forest-labs/flux-2-klein-4b`]: (_q, res) => json(res, 200, { success: true, result: { image: PNG.toString("base64") } }),
+  [`POST /accounts/${ACC}/ai/run/@cf/black-forest-labs/flux-2-klein-9b`]: (_q, res) => json(res, 200, { success: true, result: { image: PNG.toString("base64") } }),
 });
 process.env.TEST_CLOUDFLARE_BASE_URL = cf.url;
 afterAll(async () => {
@@ -95,7 +95,7 @@ test("task images land in the goal's project under images/, show on the task car
   let reviewed = false;
   llm.setScript((s, u) => {
     if (isPlan(s)) {
-      planSaw.push(s.includes("generate_image"));
+      planSaw.push(s.includes("- generate_image:"));
       return fence({ projectName: "Shop", tasks: [{ agentId: co.others[0].id, title: "Make the hero pictures", instructions: "i", deliverable: "d", criteria: ["c"], dependsOn: [] }] });
     }
     if (s.includes("Pick the files")) return fence({ read: [] });

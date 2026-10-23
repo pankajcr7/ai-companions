@@ -25,7 +25,7 @@ import { selectInstructions, selectPrompt, summaryInstructions, summaryPrompt, t
 async function builtPageShot(projectId: string, saved: string[], signal: AbortSignal) {
   const base = process.env.FRONTEND_URL;
   const page = saved.find((p) => /(^|\/)index\.html?$/i.test(p)) ?? saved.find((p) => /\.html?$/i.test(p));
-  if (!base || !page) return null;
+  if (!base?.startsWith("https://") || !page) return null;
   const url = `${base.replace(/\/+$/, "")}/api/preview/${signPreview(projectId)}/${page.split("/").map(encodeURIComponent).join("/")}`;
   try {
     return await pageScreenshot(url, signal);

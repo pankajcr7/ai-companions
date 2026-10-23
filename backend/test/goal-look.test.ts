@@ -79,3 +79,11 @@ test("a cinematic goal gives the team and Nova's check the cinematic guide; an o
   expect(plain.tasks[0]).not.toContain("CINEMATIC GUIDE");
   expect(plain[0] as string).not.toContain("CINEMATIC GUIDE");
 });
+
+test("a local (non-https) address takes no screenshot: the reader can't reach it", async () => {
+  process.env.FRONTEND_URL = "http://localhost:3000";
+  const sent = jina.requests.length;
+  const [review] = await build();
+  expect(typeof review).toBe("string");
+  expect(jina.requests.slice(sent).some((r) => r.path.includes("/api/preview/"))).toBe(false);
+});
