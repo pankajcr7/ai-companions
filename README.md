@@ -50,7 +50,7 @@ Open **Projects** in the sidebar to upload a folder, a ZIP, or files, then brows
 
 - Skipped automatically: `node_modules`, `.git`, build output, caches, `.env` files (except `.env.example`), private keys and credential files.
 - Limits: 2,000 files and folders, 50 MB per project, 10 MB per file, 1 MB for files edited in the browser.
-- Files are stored on the server's disk under `backend/data/blobs` (set `FILES_DIR` to change). Nothing uploaded is ever run.
+- File contents are stored in the database (the `Blob` table), so they survive restarts on hosts with a temporary disk. Files saved on disk by older versions (`backend/data/blobs`, or `FILES_DIR`) are still read. Nothing uploaded is ever run.
 
 ## Company goals
 

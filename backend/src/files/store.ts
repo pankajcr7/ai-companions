@@ -1,9 +1,12 @@
-import { createHash, randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { prisma } from "../db.js";
 
-// The only module that touches file storage. Swap for S3/R2 here.
+// The only module that touches file storage. Contents live in the database because the free host's disk is wiped on
+// every restart; files saved on disk before that move are still read from there.
+// ponytail: contents in Postgres (Neon's free plan holds 0.5 GB in all); move to object storage (R2) when projects outgrow it.
 const root = () => process.env.FILES_DIR || fileURLToPath(new URL("../../data/blobs/", import.meta.url));
 
 export const hashOf = (buf: Buffer) => createHash("sha256").update(buf).digest("hex");
@@ -15,21 +18,15 @@ function pathFor(hash: string) {
 
 export async function putBlob(buf: Buffer): Promise<string> {
   const hash = hashOf(buf);
-  const target = pathFor(hash);
-  try {
-    await stat(target);
-    return hash;
-  } catch {
-    // not stored yet
-  }
-  await mkdir(dirname(target), { recursive: true });
-  const tmp = `${target}.${randomBytes(6).toString("hex")}.tmp`;
-  await writeFile(tmp, buf);
-  await rename(tmp, target);
+  await prisma.blob.createMany({ data: [{ hash, data: new Uint8Array(buf) }], skipDuplicates: true });
   return hash;
 }
 
-export const getBlob = async (hash: string) => readFile(pathFor(hash));
+export async function getBlob(hash: string): Promise<Buffer> {
+  const onDisk = pathFor(hash);
+  const row = await prisma.blob.findUnique({ where: { hash } });
+  return row ? Buffer.from(row.data) : readFile(onDisk);
+}
 
 export function isTextContent(buf: Buffer): boolean {
   if (buf.subarray(0, 8192).includes(0)) return false;

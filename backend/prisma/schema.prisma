@@ -352,6 +352,13 @@ model Project {
   @@index([workspaceId])
 }
 
+/// File contents, named by their SHA-256. Kept in the database because the free host's disk is wiped on every restart.
+model Blob {
+  hash      String   @id
+  data      Bytes
+  createdAt DateTime @default(now())
+}
+
 model ProjectEntry {
   id          String         @id @default(cuid())
   projectId   String
