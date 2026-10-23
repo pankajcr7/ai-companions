@@ -82,3 +82,20 @@ test("another user can't see or apply someone's chat suggestion", async () => {
   expect((await other.req("POST", `/api/workspaces/${co.id}/chat-edits/${eid}/apply`)).statusCode).toBeGreaterThanOrEqual(403);
   expect((await other.req("POST", `/api/workspaces/${other.id}/chat-edits/${eid}/apply`)).statusCode).toBe(404);
 });
+
+test("chat about a page gets the design guide, with Nova and with a companion; other chat doesn't", async () => {
+  const { co, base } = await setup();
+  const seen: string[] = [];
+  llm.setScript((s) => (seen.push(s), "ok"));
+  const say = async (url: string, message: string) => {
+    seen.length = 0;
+    await co.req("POST", url, { message });
+    return seen.join("\n");
+  };
+  expect(await say(`${base}/messages`, "Make me a landing page like raycast.com")).toContain("DESIGN GUIDE");
+  const other = `/api/workspaces/${co.id}/conversations/${(await co.req("POST", `/api/workspaces/${co.id}/conversations`)).json().id}`;
+  expect(await say(`${other}/messages`, "What did we decide yesterday?")).not.toContain("DESIGN GUIDE");
+  const mate = `/api/workspaces/${co.id}/agents/${co.others[0].id}/chat`;
+  expect(await say(mate, "Design a hero section for my bakery website")).toContain("DESIGN GUIDE");
+  expect(await say(mate, "Make it bolder")).toContain("DESIGN GUIDE");
+});

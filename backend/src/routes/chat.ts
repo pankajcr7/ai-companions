@@ -4,6 +4,7 @@ import { streamReply, watchClient } from "../chat-stream.js";
 import { companionInstructions, trimTurns } from "../companion.js";
 import { loadRoster } from "../goals/load.js";
 import { headInstructions } from "../goals/prompts.js";
+import { DESIGN_GUIDE, isVisual } from "../goals/quality.js";
 import { prisma } from "../db.js";
 import type { Attachment, ChatEdit, ChatMessage } from "../generated/prisma/client.js";
 import { historyTurns } from "../attachments/parts.js";
@@ -86,9 +87,11 @@ export async function chatRoutes(app: FastifyInstance) {
       const made = madeImages({ workspaceId: id, userId: user.id, files: chatFiles, project: null });
       const image = imageTool(await loadImageKeys(id), made.media, made.source);
       // Nova leads the team, so its chat knows the roster and can hand work to it; other companions just chat.
-      const instructions = agent.isHead
+      const base = agent.isHead
         ? headInstructions(agent, agent.workspace.name, agent.department?.name ?? null, await loadRoster(id))
         : companionInstructions(agent, agent.workspace.name, agent.department?.name ?? null);
+      // Pages written in chat follow the same design rules as the team's work.
+      const instructions = isVisual([...history.slice(-3).map((h) => h.content), message].join("\n")) ? `${base}\n\n${DESIGN_GUIDE}` : base;
       await streamReply(req, reply, watch, {
         actor: { ...agent, model: agent.model, connection: conn },
         tools: [...webTools(await loadSearchKey(id)), ...(chatFiles.length ? attachmentTools(chatFiles) : []), ...(image ? [image] : [])],

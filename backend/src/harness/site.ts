@@ -123,7 +123,8 @@ type ReaderData = { title?: string; content?: string; screenshotUrl?: string; ht
 /** One Jina Reader request: the page's title and Markdown, or (screenshot) a link to its picture. */
 async function reader(url: string, screenshot: boolean, signal: AbortSignal): Promise<ReaderData> {
   // Jina's cache can hold a snapshot that isn't the live page; always ask for the page as it is now.
-  const headers: Record<string, string> = { accept: "application/json", "x-no-cache": "true" };
+  // The browser engine runs the page's scripts, so sites built with JavaScript come back with their text (and it is no slower).
+  const headers: Record<string, string> = { accept: "application/json", "x-no-cache": "true", "x-engine": "browser" };
   if (screenshot) headers["x-respond-with"] = "screenshot";
   if (process.env.JINA_API_KEY) headers.authorization = `Bearer ${process.env.JINA_API_KEY}`;
   const res = await safeFetch(`${process.env.JINA_URL ?? "https://r.jina.ai"}/${url}`, { signal, headers });

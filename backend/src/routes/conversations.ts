@@ -16,6 +16,7 @@ import { createGoal } from "../goals/create.js";
 import { readiness } from "../goals/llm.js";
 import { loadHead, loadRoster } from "../goals/load.js";
 import { conversationGoalsContext, headInstructions } from "../goals/prompts.js";
+import { DESIGN_GUIDE, isVisual } from "../goals/quality.js";
 import { parseSuggestion } from "../goals/suggest.js";
 import { HttpError, perUser, requireMember } from "../http.js";
 import type { ChatTurn } from "../providers/types.js";
@@ -153,6 +154,8 @@ export async function conversationRoutes(app: FastifyInstance) {
     const instructions = [
       headInstructions(nova, workspace.name, null, await loadRoster(id)),
       conversationGoalsContext(goals.map((g) => ({ text: g.text, status: g.status, summary: g.summary, tasks: g.tasks.map((t) => ({ title: t.title, agentName: t.agent.name, status: t.status, result: t.result })) }))),
+      // Pages written in chat follow the same design rules as the team's work.
+      isVisual([...history.slice(-3).map((h) => h.content), message].join("\n")) ? DESIGN_GUIDE : "",
     ]
       .filter(Boolean)
       .join("\n\n");

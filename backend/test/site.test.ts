@@ -222,3 +222,10 @@ test("pageScreenshot asks the reader for the picture only", async () => {
   expect(sent[0].headers["x-respond-with"]).toBe("screenshot");
   await expect(pageScreenshot("https://noshot.example/", signal)).rejects.toThrow("Couldn't open that page through the page reader.");
 });
+
+test("the reader renders pages in a browser, so sites built with JavaScript aren't empty", async () => {
+  const n = jina.requests.length;
+  await lookAtWebsite("https://shop.example/pricing", signal);
+  const sent = jina.requests.slice(n).filter((r) => r.path === "/https://shop.example/pricing");
+  expect(sent.map((r) => r.headers["x-engine"])).toEqual(["browser", "browser"]);
+});

@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { planInstructions, taskInstructions } from "../src/goals/prompts.js";
-import { CINEMATIC_GUIDE, DESIGN_GUIDE, isCinematic, isVisualTask, Review, reviewContent, reviewPrompt } from "../src/goals/quality.js";
+import { CINEMATIC_GUIDE, DESIGN_GUIDE, isCinematic, isVisual, isVisualTask, Review, reviewContent, reviewPrompt } from "../src/goals/quality.js";
 
 test("visual tasks are recognised from their words", () => {
   expect(isVisualTask({ title: "Build the landing page", instructions: "", deliverable: "" })).toBe(true);
@@ -89,4 +89,22 @@ test("cinematic tasks and their check get the cinematic guide", () => {
 test("the look check also asks whether the page looks like a generic AI template", () => {
   const parts = reviewContent({ goal: "g", task: { title: "t", instructions: "i", deliverable: "d", criteria: ["c"] }, brief: null, guide: true, result: "r", files: [] }, { mime: "image/png", data: "AAAA" });
   expect((parts as { text: string }[])[0].text).toContain("generic AI template");
+});
+
+test("'HTML/CSS only' means plain static files, not a page without pictures, fonts or motion", () => {
+  for (const part of ['"HTML/CSS only"', "no framework", "pictures", "Google Fonts", "inline SVG", "animation-timeline: view()"]) expect(DESIGN_GUIDE).toContain(part);
+  expect(DESIGN_GUIDE.length).toBeLessThan(3500);
+});
+
+test("Nova plans visual goals by the design guide and adds no bans the owner didn't ask for", () => {
+  expect(planInstructions("Co", false, true)).toContain(DESIGN_GUIDE);
+  const p = planInstructions("Co", false);
+  expect(p).toContain(DESIGN_GUIDE.split("\nPictures:")[0]);
+  expect(p).not.toContain("generate_image");
+  expect(p).toContain("don't forbid what the design guide relies on");
+});
+
+test("chat messages about something visual are recognised", () => {
+  expect(isVisual("make a landing page like raycast.com")).toBe(true);
+  expect(isVisual("what did we spend last month?")).toBe(false);
 });
