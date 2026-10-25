@@ -155,7 +155,7 @@ export function Footer() {
       </div>
       <div className="flex flex-col justify-between gap-2 px-4 py-6 text-sm text-haze sm:flex-row md:px-12">
         <p>© {new Date().getFullYear()} Agent Company</p>
-        <p>Photos from Unsplash. Robot avatars by DiceBear.</p>
+        <p>Photos from Unsplash. Robot avatars by DiceBear. 3D robot by Quaternius (CC0).</p>
       </div>
     </footer>
   );

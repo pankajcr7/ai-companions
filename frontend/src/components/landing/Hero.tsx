@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { RobotModel } from "./RobotModel";
 import { Corners, DarkButton, LineButton } from "./ui";
 
 const models = [
@@ -26,15 +27,9 @@ export function Hero() {
         ag
       </p>
 
-      <div className="relative z-10 mx-auto -mt-4 w-[clamp(200px,34vw,500px)] md:absolute md:left-1/2 md:top-[4%] md:mt-0 md:-translate-x-1/2">
-        <Image
-          src="/companions/nova.svg"
-          alt=""
-          width={180}
-          height={180}
-          priority
-          className="float h-auto w-full drop-shadow-[0_50px_80px_rgb(166_255_0/0.3)]"
-        />
+      <div className="relative z-10 mx-auto -mt-6 aspect-[3/4] w-[clamp(210px,27vw,400px)] md:absolute md:left-1/2 md:top-[2%] md:mt-0 md:-translate-x-1/2">
+        <div aria-hidden="true" className="absolute inset-x-[15%] bottom-[8%] h-1/3 rounded-full bg-lime/20 blur-3xl" />
+        <RobotModel className="absolute inset-0" />
       </div>
 
       <p
