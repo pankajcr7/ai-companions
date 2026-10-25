@@ -1,9 +1,9 @@
-import { Closing, Footer } from "@/components/landing/Closing";
+import { Control, Faq, FinalCta, Footer } from "@/components/landing/Closing";
 import { Header } from "@/components/landing/Header";
-import { NetworkField } from "@/components/landing/NetworkField";
 import { Hero, Models } from "@/components/landing/Hero";
-import { MeetingShowcase } from "@/components/landing/MeetingShowcase";
+import { NetworkField } from "@/components/landing/NetworkField";
 import { Process } from "@/components/landing/Process";
+import { Showcase } from "@/components/landing/Showcase";
 import { Story } from "@/components/landing/Story";
 import { Team } from "@/components/landing/Team";
 import { UseCases } from "@/components/landing/UseCases";
@@ -22,12 +22,14 @@ export default function Home() {
         </div>
         <main>
           <Models />
+          <Showcase />
           <Story />
           <Process />
-          <Team />
           <UseCases />
-          <MeetingShowcase />
-          <Closing />
+          <Team />
+          <Control />
+          <Faq />
+          <FinalCta />
         </main>
         <Footer />
       </div>

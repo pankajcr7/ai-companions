@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Asterisk, CheckCircle, PaperPlaneTilt, Pause, Play } from "@phosphor-icons/react";
+import { CheckCircle, PaperPlaneTilt, Pause, Play } from "@phosphor-icons/react";
 import { PrimaryButton, Glow, Label } from "./ui";
 
 /** Staggered arrival: rises and sharpens from a blur, in order (see .step-in). */
@@ -21,7 +21,7 @@ function Box({ children, lit = false, className = "", i = 0 }: { children?: Reac
 const steps = [
   {
     title: "Tell",
-    text: "Type one goal in plain words. Your head agent asks only what it really needs to know.",
+    text: "Type one goal in plain words. Nova turns it into clear work and checks anything that is unclear with you.",
     art: (
       <div className="w-full max-w-md space-y-3 text-sm">
         <p style={at(0)} className="step-in ml-auto w-fit max-w-[85%] rounded-[16px] rounded-br-[4px] bg-cream/10 px-4 py-3">
@@ -54,7 +54,7 @@ const steps = [
   },
   {
     title: "Plan",
-    text: "A brief with deliverables and acceptance criteria, a team, and tasks routed through managers.",
+    text: "Nova writes a brief with deliverables and checks for each task, picks the companions, and waits for you to press Start.",
     art: (
       <div className="grid w-full max-w-md grid-cols-3 gap-2.5">
         <span />
@@ -70,39 +70,34 @@ const steps = [
     ),
   },
   {
-    title: "Debate and build",
-    text: "Two scriptwriters pitch alternatives, the editor critiques both, and the content lead decides.",
+    title: "Build and review",
+    text: "Each companion builds its part. Nova checks every result against the brief and sends it back with fixes when it falls short.",
     art: (
       <div className="grid w-full max-w-md grid-cols-2 gap-2.5">
-        <Box>Script A: behind the bar</Box>
-        <Box i={2}>Script B: regulars&apos; stories</Box>
+        <Box>Draft 1 from Tomás</Box>
+        <Box i={2}>Nova: 2 fixes asked</Box>
         <Box lit i={5} className="col-span-2">
-          Decision: B, with the opening shot from A
+          Draft 2 · Checked by Nova ✓
         </Box>
       </div>
     ),
   },
   {
     title: "Deliver",
-    text: "Finished work with the evidence behind it. Anything public waits for your approval.",
+    text: "Finished files you can preview and download, with Nova's summary. Changes to files you already have wait for your OK.",
     art: (
       <div style={at(0)} className="step-in w-full max-w-md rounded-[16px] border border-cream/10 bg-night p-5 text-left">
-        <p className="font-medium">Publish 7 posts to Instagram?</p>
-        <p className="mt-1.5 text-sm text-haze">Requested by the content lead. Version 3, reviewed by QA.</p>
+        <p className="font-medium">Apply 3 changes to your website?</p>
+        <p className="mt-1.5 text-sm text-haze">Suggested by Sana. Checked by Nova.</p>
         <div className="mt-4 flex gap-2">
           <span className="ping-twice inline-flex items-center gap-1.5 rounded-[8px] bg-lime px-3.5 py-2 text-sm font-medium text-night">
-            <CheckCircle size={15} /> Approve
+            <CheckCircle size={15} /> Apply
           </span>
-          <span className="rounded-[8px] border border-cream/20 px-3.5 py-2 text-sm">Request changes</span>
+          <span className="rounded-[8px] border border-cream/20 px-3.5 py-2 text-sm">Skip</span>
         </div>
       </div>
     ),
   },
-];
-
-const words = [
-  ["Plan", "Build", "Review"],
-  ["Debate", "Decide", "Deliver"],
 ];
 
 export function Process() {
@@ -252,21 +247,6 @@ export function Process() {
         </div>
       </section>
 
-      <section aria-hidden="true" className="overflow-hidden border-b border-cream/10 py-4">
-        {words.map((row, r) => (
-          <div key={r} className={`flex w-max ${r === 0 ? "marquee-left" : "marquee-right"}`}>
-            {[...row, ...row, ...row, ...row].map((w, i) => (
-              <span
-                key={i}
-                className={`flex items-center gap-8 px-8 py-3 font-display text-[clamp(52px,7vw,104px)] font-semibold uppercase leading-none tracking-[-0.05em] ${(i + r) % 2 ? "outline-text" : ""}`}
-              >
-                {w}
-                <Asterisk size={40} weight="bold" className={r ? "text-teal" : "text-lime"} />
-              </span>
-            ))}
-          </div>
-        ))}
-      </section>
     </>
   );
 }

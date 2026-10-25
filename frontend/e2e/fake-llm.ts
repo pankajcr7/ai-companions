@@ -42,7 +42,15 @@ function scripted(system: string, user: string): string | null {
     return fence({ tasks: [{ agentId: id, title: "Document the math helper", instructions: "Add a comment above the add helper.", deliverable: "A short note and the edited file", criteria: ["Explains the change"], dependsOn: [] }] });
   }
   if (system.includes("Pick the files you need to read")) return fence({ read: ["sample-app/src/lib/math.ts"] });
-  if (system.includes("Review each task result")) return fence({ summary: "Nova checked the work: the helper is documented.", verdicts: [{ position: 0, verdict: "meets", note: "Clear change." }] });
+  if (system.includes("Review each task result")) {
+    // The bakery goals get summaries that fit them (the landing page's product screenshots show one).
+    const summary = user.includes("Write the launch posts")
+      ? "Three launch posts are ready, each with a clear call to action."
+      : user.includes("landing page for my bakery")
+        ? "The bakery landing page is ready: index.html and style.css, checked against the brief."
+        : "Nova checked the work: the helper is documented.";
+    return fence({ summary, verdicts: [{ position: 0, verdict: "meets", note: "Clear change." }] });
+  }
   if (system.includes("Nova assigned you a task")) return `I documented the add helper.\n\n${fence({ edits: [{ path: "sample-app/src/lib/math.ts", content: MATH_EDIT, note: "Document the helper" }] })}`;
   if (system.includes("Write a summary of this project")) return "A small sample app with a math helper.";
   if (system.includes("You are answering questions about a company goal")) {

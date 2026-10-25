@@ -1,10 +1,10 @@
 import { List } from "@phosphor-icons/react/dist/ssr";
-import { PrimaryButton, Logo } from "./ui";
+import { Logo, PrimaryButton } from "./ui";
 
 const links = [
-  { href: "#about", label: "About" },
-  { href: "#departments", label: "Departments" },
-  { href: "#process", label: "Process" },
+  { href: "#product", label: "See it work" },
+  { href: "#process", label: "How it works" },
+  { href: "#use-cases", label: "Use cases" },
   { href: "#team", label: "Team" },
   { href: "#faq", label: "FAQ" },
 ];
@@ -12,39 +12,41 @@ const links = [
 export function Header() {
   return (
     <header>
-      <a href="#early-access" className="block bg-ink py-2.5 text-center text-xs font-medium uppercase tracking-wide text-paper">
-        Early access is opening in small groups. <span className="text-lime">Join the waitlist</span>
-      </a>
-      {/* Sits on the dusk sky with the hero (see page.tsx). */}
-      <div className="relative flex h-[76px] items-stretch justify-between border-b border-white/15">
-        <a href="#top" aria-label="Agent Company home" className="relative flex items-center border-r border-white/15 px-4 md:px-12">
-          <Logo className="!text-white" />
+      {/* Sits on the night sky with the hero (see page.tsx). */}
+      <div className="relative flex h-[76px] items-stretch justify-between border-b border-cream/10">
+        <a href="#top" aria-label="Agent Company home" className="relative flex items-center border-r border-cream/10 px-4 md:px-12">
+          <Logo className="!text-cream" />
         </a>
-        <nav aria-label="Main" className="hidden items-center gap-9 lg:flex">
+        <nav aria-label="Main" className="hidden items-center gap-8 lg:flex">
           {links.map((l) => (
-            <a key={l.href} href={l.href} className="text-sm font-medium uppercase tracking-wide text-white/80 transition-colors hover:text-white">
+            <a key={l.href} href={l.href} className="text-sm font-medium text-cream/75 transition-colors hover:text-cream">
               {l.label}
             </a>
           ))}
         </nav>
-        <div className="relative flex items-center gap-2 border-l border-white/15 px-4 md:px-8">
-          <a href="/sign-in" className="hidden text-sm font-medium text-white hover:text-white/80 sm:block">Sign in</a>
+        <div className="relative flex items-center gap-3 border-l border-cream/10 px-4 md:px-8">
+          <a href="/sign-in" className="hidden text-sm font-medium text-cream hover:text-cream/80 sm:block">
+            Sign in
+          </a>
           <div className="hidden sm:block">
-            <PrimaryButton href="#early-access" icon={false}>
-              Get early access
+            <PrimaryButton href="/sign-up" icon={false}>
+              Create your team
             </PrimaryButton>
           </div>
           {/* Mobile menu: native disclosure, no JS. */}
           <details className="relative lg:hidden">
-            <summary aria-label="Open menu" className="grid size-11 cursor-pointer place-items-center rounded-[10px] border border-white/30 text-white">
+            <summary aria-label="Open menu" className="grid size-11 cursor-pointer place-items-center rounded-[10px] border border-cream/30 text-cream">
               <List size={20} />
             </summary>
-            <nav aria-label="Mobile" className="absolute right-0 top-14 z-30 w-56 rounded-[12px] border border-line bg-paper p-2 text-ink shadow-xl">
-              {[...links, { href: "#early-access", label: "Get early access" }].map((l) => (
-                <a key={l.href} href={l.href} className="block rounded-[8px] px-3 py-2.5 text-sm font-medium hover:bg-bg">
+            <nav aria-label="Mobile" className="absolute right-0 top-14 z-30 w-60 rounded-[14px] border border-cream/15 bg-deep p-2 text-cream shadow-2xl">
+              {[...links, { href: "/sign-in", label: "Sign in" }].map((l) => (
+                <a key={l.href} href={l.href} className="block rounded-[8px] px-3 py-2.5 text-sm font-medium hover:bg-cream/10">
                   {l.label}
                 </a>
               ))}
+              <a href="/sign-up" className="mt-1 block rounded-[8px] bg-lime px-3 py-2.5 text-center text-sm font-semibold text-night">
+                Create your team
+              </a>
             </nav>
           </details>
         </div>

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { ClipboardText, SealCheck, ShieldCheck, UsersThree } from "@phosphor-icons/react/dist/ssr";
+import { MotionToggle } from "./MotionToggle";
 import { RobotModel } from "./RobotModel";
 import { Corners, PrimaryButton, Label, LineButton } from "./ui";
 
@@ -11,18 +12,16 @@ const models = [
   { file: "deepseek", name: "DeepSeek" },
   { file: "xai", name: "xAI" },
   { file: "ollama", name: "Ollama" },
-  { file: "github", name: "GitHub" },
+  { file: "github", name: "GitHub Models" },
 ];
 
 // A goal's journey as status chips riding an orbit around the robot: brief, team, review, your approval.
 const chips = [
   { label: "Brief written", icon: <ClipboardText size={13} weight="bold" /> },
   { label: "Team assigned", icon: <UsersThree size={13} weight="bold" /> },
-  { label: "Reviewed by QA", icon: <ShieldCheck size={13} weight="bold" /> },
+  { label: "Checked by Nova", icon: <ShieldCheck size={13} weight="bold" /> },
   { label: "Ready for your OK", icon: <SealCheck size={13} weight="bold" /> },
 ];
-
-const facts = ["1 goal to start", "9 departments to staff", "Your own AI models"];
 
 /** Staggered arrival on load: rises and sharpens from a blur, in order (see .step-in). */
 const at = (i: number) => ({ "--i": i }) as React.CSSProperties;
@@ -30,7 +29,7 @@ const at = (i: number) => ({ "--i": i }) as React.CSSProperties;
 /** The dusk hero: headline on the left, the 3D robot on the right, over the team network (see page.tsx). */
 export function Hero() {
   return (
-    <section className="relative flex min-h-[calc(100svh-112px)] flex-col">
+    <section className="relative flex min-h-[calc(100svh-76px)] flex-col">
       {/* A soft dark floor so the words read over the field. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-night via-night/50 to-transparent" />
 
@@ -50,11 +49,11 @@ export function Hero() {
             </span>
           </h1>
           <p style={at(6)} className="step-in mt-7 max-w-[42ch] text-base leading-relaxed text-cream/85 md:text-lg">
-            Give one goal. Your AI companions plan it, debate it, review it, and deliver real work you can see.
+            Give one goal. Your AI companions plan it, build it, check it, and deliver real work you can see.
           </p>
           <div style={at(7)} className="step-in mt-8 flex flex-wrap items-center gap-3">
-            <PrimaryButton href="#early-access">Get early access</PrimaryButton>
-            <LineButton href="#process">See how it works</LineButton>
+            <PrimaryButton href="/sign-up">Create your team</PrimaryButton>
+            <LineButton href="#product">See it work</LineButton>
           </div>
         </div>
 
@@ -64,30 +63,29 @@ export function Hero() {
         </div>
       </div>
 
-      <ul className="relative z-20 grid border-t border-cream/15 text-xs font-medium uppercase tracking-[0.16em] text-cream/80 sm:grid-cols-3">
-        {facts.map((f, i) => (
-          <li key={f} style={at(9 + i)} className="step-in flex items-center gap-3 border-b border-cream/15 px-4 py-4 sm:border-b-0 sm:border-r sm:last:border-r-0 md:px-12">
-            <span className="size-1.5 rounded-full bg-lime" aria-hidden="true" />
-            {f}
-          </li>
-        ))}
-      </ul>
+      {/* One control for every moving thing on the page (WCAG 2.2.2). */}
+      <div className="relative z-20 flex justify-end px-4 pb-6 md:px-12">
+        <MotionToggle />
+      </div>
     </section>
   );
 }
 
 export function Models() {
   return (
-    <section aria-label="Bring your own models" className="relative grid grid-cols-2 border-b border-cream/10 sm:grid-cols-4 lg:grid-cols-[200px_repeat(8,1fr)]">
-      <p className="col-span-full flex items-center border-b border-cream/10 px-4 py-6 text-xs font-medium uppercase leading-relaxed tracking-wide text-haze md:px-12 lg:col-span-1 lg:border-b-0 lg:border-r lg:px-8">
-        {"// Bring your own"}
-        <br className="hidden lg:block" /> models
-      </p>
-      {models.map((m) => (
-        <div key={m.file} className="flex h-28 items-center justify-center border-b border-r border-cream/10 lg:border-b-0">
-          <Image src={`/logos/${m.file}.svg`} alt={m.name} width={44} height={44} className="h-9 w-auto opacity-70 invert" />
-        </div>
-      ))}
+    <section aria-label="Bring your own models" className="relative border-b border-cream/10">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-[220px_repeat(8,1fr)]">
+        <p className="col-span-full flex flex-col justify-center gap-1 border-b border-cream/10 px-4 py-6 md:px-12 lg:col-span-1 lg:border-b-0 lg:border-r lg:px-8">
+          <span className="text-sm font-medium text-cream">Bring your own AI</span>
+          <span className="text-xs leading-relaxed text-haze">These, any OpenAI-compatible service, or your ChatGPT plan.</span>
+        </p>
+        {models.map((m) => (
+          <div key={m.file} className="flex h-28 flex-col items-center justify-center gap-2.5 border-b border-r border-cream/10 lg:border-b-0">
+            <Image src={`/logos/${m.file}.svg`} alt="" width={44} height={44} className="h-8 w-auto opacity-75 invert" />
+            <span className="text-xs text-haze">{m.name}</span>
+          </div>
+        ))}
+      </div>
       <Corners />
     </section>
   );
