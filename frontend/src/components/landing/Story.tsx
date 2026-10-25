@@ -1,11 +1,11 @@
 import Image from "next/image";
-import { Buildings, Gauge, Target } from "@phosphor-icons/react/dist/ssr";
+import { TeamChart } from "./TeamChart";
 import { Corners, Glow, Label, SectionHeading } from "./ui";
 
 const facts = [
-  { icon: Target, value: "1 goal", text: "is all it takes to put your team to work" },
-  { icon: Buildings, value: "9 departments", text: "from engineering to sales, ready to staff" },
-  { icon: Gauge, value: "0 fake progress bars", text: "every status comes from real, recorded work" },
+  { value: "1 goal", text: "is all it takes to put your team to work" },
+  { value: "9 departments", text: "from engineering to sales, ready to staff" },
+  { value: "0 fake progress bars", text: "every status comes from real, recorded work" },
 ];
 
 const departments = [
@@ -18,29 +18,36 @@ const departments = [
 export function Story() {
   return (
     <>
-      <section id="about" className="relative isolate scroll-mt-4 overflow-hidden border-b border-cream/10 px-4 py-24 md:px-12 md:py-32">
+      <section id="about" className="relative isolate grid scroll-mt-4 items-center gap-14 overflow-hidden border-b border-cream/10 px-4 py-24 md:px-12 md:py-32 lg:grid-cols-[1.15fr_0.85fr]">
         <Glow className="-left-60 -top-60" />
-        <Label>Why we built this</Label>
-        <SectionHeading className="reveal mt-6 max-w-4xl">
-          A chatbot answers questions. <span className="text-haze">A company gets work done.</span>
-        </SectionHeading>
-        <p className="mt-6 max-w-[48ch] text-haze">Separate agents with real roles. Each one owns its work and answers to a manager.</p>
-
-        <div className="relative mt-16 grid gap-px overflow-hidden rounded-[20px] border border-cream/10 bg-cream/10 md:grid-cols-3 lg:grid-cols-[1fr_1fr_1fr_1.4fr]">
-          {facts.map(({ icon: Icon, value, text }) => (
-            <div key={value} className="reveal flex flex-col justify-between gap-12 bg-night p-7 md:min-h-[300px]">
-              <Icon size={26} className="text-teal" />
-              <div>
-                <p className="font-wide text-[clamp(26px,2.6vw,38px)] font-medium leading-[1.05] tracking-[-0.03em]">{value}</p>
-                <p className="mt-3 text-sm leading-relaxed text-haze">{text}</p>
+        <div>
+          <Label>Why we built this</Label>
+          <SectionHeading className="reveal mt-6">
+            A chatbot answers questions. <span className="text-haze">A company gets work done.</span>
+          </SectionHeading>
+          <p className="mt-6 max-w-[46ch] text-haze">Separate agents with real roles. Each one owns its work and answers to a manager.</p>
+          <dl className="mt-12 border-t border-cream/10">
+            {facts.map(({ value, text }) => (
+              <div key={value} className="reveal border-b border-cream/10 py-5">
+                <dt className="font-wide text-[clamp(24px,2.4vw,34px)] font-medium leading-[1.05] tracking-[-0.03em]">{value}</dt>
+                <dd className="mt-1.5 text-sm leading-relaxed text-haze">{text}</dd>
               </div>
-            </div>
-          ))}
-          <div className="duotone relative min-h-[280px] md:col-span-3 lg:col-span-1">
-            <Image src="/img/about.jpg" alt="People working together in a bright office" fill sizes="(min-width: 1024px) 34vw, 100vw" className="object-cover" />
-          </div>
+            ))}
+          </dl>
         </div>
-        <Corners />
+
+        <figure className="reveal relative rounded-[24px] border border-cream/10 bg-cream/[0.02] bg-[radial-gradient(rgb(255_241_230/0.07)_1px,transparent_1px)] p-5 [background-size:22px_22px] md:p-8">
+          <TeamChart />
+          <figcaption className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs uppercase tracking-[0.16em] text-haze">
+            <span className="flex items-center gap-2">
+              <span className="size-1.5 rounded-full bg-lime" aria-hidden="true" /> The goal goes down
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="size-1.5 rounded-full bg-teal" aria-hidden="true" /> Reviewed work comes back
+            </span>
+          </figcaption>
+          <Corners />
+        </figure>
       </section>
 
       <section id="departments" className="relative isolate scroll-mt-4 overflow-hidden border-b border-cream/10 px-4 py-24 md:px-12 md:py-32">
