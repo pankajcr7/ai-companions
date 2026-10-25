@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { ClipboardText, SealCheck, ShieldCheck, UsersThree } from "@phosphor-icons/react/dist/ssr";
 import { RobotModel } from "./RobotModel";
 import { Corners, DarkButton, Label, LineButton } from "./ui";
 
@@ -13,12 +14,12 @@ const models = [
   { file: "github", name: "GitHub" },
 ];
 
-// What the team does with a goal, as thin-line tags pointing at the robot.
+// A goal's journey as status chips around the robot, lit one after another: brief, team, review, your approval.
 const tags = [
-  { label: "Plans it", at: "left-0 top-[22%]", side: "left" },
-  { label: "Debates it", at: "right-0 top-[30%]", side: "right" },
-  { label: "Reviews it", at: "left-0 top-[58%]", side: "left" },
-  { label: "Delivers it", at: "right-0 top-[66%]", side: "right" },
+  { label: "Brief written", icon: ClipboardText, at: "left-0 top-[22%]", side: "left" },
+  { label: "Team assigned", icon: UsersThree, at: "right-0 top-[30%]", side: "right" },
+  { label: "Reviewed by QA", icon: ShieldCheck, at: "left-0 top-[58%]", side: "left" },
+  { label: "Ready for your OK", icon: SealCheck, at: "right-0 top-[66%]", side: "right" },
 ] as const;
 
 const facts = ["1 goal to start", "9 departments to staff", "Your own AI models"];
@@ -60,17 +61,23 @@ export function Hero() {
         <div className="rise relative mx-auto aspect-[4/5] w-full max-w-[300px] md:max-w-[520px]" style={{ "--i": 1 } as React.CSSProperties}>
           <div aria-hidden="true" className="absolute inset-x-[20%] bottom-[6%] h-1/4 rounded-full bg-lime/20 blur-3xl" />
           <RobotModel className="absolute inset-0" />
-          {tags.map((t) => (
+          {/* Each chip arrives, draws its line to the robot and pulses its dot, then floats; the chips light in turn (see .tag). */}
+          {tags.map(({ label, icon: Icon, at: place, side }, i) => (
             <span
-              key={t.label}
+              key={label}
               aria-hidden="true"
-              className={`pointer-events-none absolute hidden items-center gap-2 sm:flex ${t.at} ${t.side === "right" ? "flex-row-reverse" : ""}`}
+              className={`pointer-events-none absolute hidden items-center gap-2 sm:flex ${place} ${side === "right" ? "flex-row-reverse" : ""}`}
             >
-              <span className="rounded-full border border-cream/20 bg-night/60 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-cream backdrop-blur-sm">
-                {t.label}
+              <span style={at(8 + i)} className="step-in">
+                <span style={at(i)} className="tag flex items-center gap-2 rounded-full border border-cream/15 bg-night/70 py-1.5 pl-1.5 pr-3.5 backdrop-blur-md">
+                  <span className="grid size-6 place-items-center rounded-full bg-lime/15 text-lime">
+                    <Icon size={13} weight="bold" />
+                  </span>
+                  <span className="whitespace-nowrap text-[11px] font-medium uppercase tracking-[0.14em] text-cream">{label}</span>
+                </span>
               </span>
-              <span className="h-px w-10 bg-cream/40 lg:w-16" />
-              <span className="size-1.5 rounded-full bg-lime" />
+              <span style={at(i)} className="tag-line h-px w-8 bg-cream/40 lg:w-14" />
+              <span style={at(i)} className="tag-dot size-1.5 rounded-full bg-lime" />
             </span>
           ))}
         </div>
