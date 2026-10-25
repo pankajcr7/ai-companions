@@ -41,17 +41,6 @@ export function DarkButton({ href, children, icon = true }: { href: string; chil
   );
 }
 
-export function LightButton({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <a
-      href={href}
-      className="btn-light inline-flex h-12 items-center rounded-[12px] px-5 text-sm font-semibold text-ink transition-transform hover:-translate-y-px active:translate-y-px"
-    >
-      {children}
-    </a>
-  );
-}
-
 /** Small black squares on the corners of a framed block, like blueprint registration marks. */
 export function Corners() {
   const base = "pointer-events-none absolute size-1.5 bg-ink";

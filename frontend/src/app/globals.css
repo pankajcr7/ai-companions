@@ -78,12 +78,22 @@ body {
   box-shadow: 0 4px 0 var(--line);
 }
 
+/* The hero's dusk sky: a warm glow top right over coral fading to plum. The 3D field draws on top when it loads. */
+.dusk {
+  background:
+    radial-gradient(60% 55% at 82% 30%, rgb(248 217 174 / 0.85) 0%, rgb(248 217 174 / 0) 70%),
+    linear-gradient(180deg, #d8694e 0%, #b9533f 38%, #6e2b3b 72%, #22101e 100%);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .marquee-left {
     animation: marquee 38s linear infinite;
   }
   .marquee-right {
     animation: marquee 38s linear infinite reverse;
+  }
+  .float {
+    animation: float 6s ease-in-out infinite alternate;
   }
   .rise {
     animation: rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -101,6 +111,11 @@ body {
 @keyframes marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
+}
+
+@keyframes float {
+  from { transform: translateY(-14px) rotate(-3deg); }
+  to { transform: translateY(10px) rotate(2deg); }
 }
 
 @keyframes rise {
