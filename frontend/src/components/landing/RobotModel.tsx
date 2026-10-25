@@ -98,26 +98,14 @@ function build(THREE: Three) {
   head.add(mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.32, 12), metal, 0, 0.82, 0), mesh(new THREE.SphereGeometry(0.07, 16, 16), light, 0, 1, 0));
   robot.add(head);
 
-  // Hover: a lime ring and a soft glow under the body.
+  // Hover: a lime ring and light under the body (the soft glow around it is CSS, so it is never cut at the canvas edge).
   const ring = mesh(new THREE.TorusGeometry(0.2, 0.03, 8, 40), light, 0, -1.02, 0);
   ring.rotation.x = Math.PI / 2;
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 128;
-  const g = canvas.getContext("2d")!;
-  const fade = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-  fade.addColorStop(0, "rgba(198,255,77,0.9)");
-  fade.addColorStop(1, "rgba(198,255,77,0)");
-  g.fillStyle = fade;
-  g.fillRect(0, 0, 128, 128);
-  const glowTexture = new THREE.CanvasTexture(canvas);
-  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
-  glow.position.y = -1.15;
-  glow.scale.set(1.6, 0.9, 1);
   const thrust = new THREE.PointLight(0xa6ff00, 4, 3);
   thrust.position.y = -1.2;
-  robot.add(ring, glow, thrust);
+  robot.add(ring, thrust);
 
-  return { robot, head, arms, eyes, glowTexture };
+  return { robot, head, arms, eyes };
 }
 
 function start(THREE: Three, host: HTMLDivElement, room: InstanceType<typeof import("three/examples/jsm/environments/RoomEnvironment.js").RoomEnvironment>) {
@@ -146,7 +134,7 @@ function start(THREE: Three, host: HTMLDivElement, room: InstanceType<typeof imp
   rim.position.set(-4, 2, -3);
   scene.add(key, rim);
 
-  const { robot, head, arms, eyes, glowTexture } = build(THREE);
+  const { robot, head, arms, eyes } = build(THREE);
   scene.add(robot);
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
   camera.position.set(0, 0.7, 8);
@@ -231,12 +219,11 @@ function start(THREE: Three, host: HTMLDivElement, room: InstanceType<typeof imp
     document.removeEventListener("visibilitychange", wake);
     scene.traverse((o) => {
       const m = o as import("three").Mesh;
-      if (m.isMesh || (o as import("three").Sprite).isSprite) {
-        m.geometry?.dispose();
+      if (m.isMesh) {
+        m.geometry.dispose();
         (m.material as import("three").Material).dispose();
       }
     });
-    glowTexture.dispose();
     scene.environment?.dispose();
     pmrem.dispose();
     renderer.dispose();

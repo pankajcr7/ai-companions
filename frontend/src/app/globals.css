@@ -92,11 +92,11 @@ body {
   -webkit-text-stroke: 1.5px rgb(255 241 230 / 0.35);
 }
 
-/* The hero's dusk sky: a warm glow top right over coral fading to plum. The 3D field draws on top when it loads. */
+/* The hero's night sky: plum-black with a warm glow low on the horizon. The 3D field draws on top when it loads. */
 .dusk {
   background:
-    radial-gradient(60% 55% at 82% 30%, rgb(248 217 174 / 0.85) 0%, rgb(248 217 174 / 0) 70%),
-    linear-gradient(180deg, #d8694e 0%, #b9533f 38%, #6e2b3b 72%, #22101e 100%);
+    radial-gradient(70% 45% at 70% 45%, rgb(216 105 78 / 0.45) 0%, rgb(216 105 78 / 0) 70%),
+    linear-gradient(180deg, #0d060b 0%, #170a14 30%, #2e1420 48%, #1a0c16 70%, #150a12 100%);
 }
 
 @media (prefers-reduced-motion: no-preference) {

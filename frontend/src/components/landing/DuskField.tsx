@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 type Three = typeof import("three");
 
 /**
- * A field of small pillars under the dusk sky that swell and glow warm around the pointer.
+ * A field of small dark pillars under the night sky that swell and glow lime around the pointer.
  * Three.js loads after the page is shown; without WebGL the sky gradient alone stays.
  */
 export function DuskField() {
@@ -42,13 +42,15 @@ function start(THREE: Three, host: HTMLDivElement) {
   host.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0xb9533f, 10, 28);
+  // The far field fades into the warm horizon of the sky behind it.
+  scene.fog = new THREE.Fog(0x2e1420, 9, 26);
   const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 80);
   camera.position.set(0, 3.2, 12);
   camera.lookAt(0, 0, -4);
-  scene.add(new THREE.HemisphereLight(0xffdcb4, 0x2a0f24, 1.5));
-  const sun = new THREE.DirectionalLight(0xffe4c4, 1.6);
-  sun.position.set(6, 10, 3);
+  scene.add(new THREE.HemisphereLight(0xffc9a8, 0x150a12, 0.8));
+  // Low light from the horizon puts a warm rim on the pillar tops.
+  const sun = new THREE.DirectionalLight(0xff9a70, 1.8);
+  sun.position.set(4, 3, -8);
   scene.add(sun);
 
   // Small, dense studs read as one rippling surface. Phones get fewer to move every frame.
@@ -61,8 +63,8 @@ function start(THREE: Three, host: HTMLDivElement) {
   const field = new THREE.InstancedMesh(geometry, material, cols * rows);
   scene.add(field);
   const spots = Array.from({ length: cols * rows }, (_, i) => ({ x: ((i % cols) - cols / 2) * gap, z: 5 - Math.floor(i / cols) * gap }));
-  const ground = new THREE.Color(0xc55a41);
-  const glow = new THREE.Color(0xffe0b0);
+  const ground = new THREE.Color(0x3b2230);
+  const glow = new THREE.Color(0xa6ff00);
   const colour = new THREE.Color();
   const matrix = new THREE.Matrix4();
 
@@ -91,7 +93,7 @@ function start(THREE: Three, host: HTMLDivElement) {
       const ring = swell * 0.12 * Math.sin(d * 2.2 - t * 3.5) * Math.exp(-d / 2.5);
       const dunes = 0.15 * (1 + Math.sin(s.x * 0.22 + t * 0.25) * Math.cos(s.z * 0.28 - t * 0.18));
       field.setMatrixAt(i, matrix.makeScale(1, 0.1 + dunes + near * 0.9 + ring, 1).setPosition(s.x, 0, s.z));
-      field.setColorAt(i, colour.copy(ground).lerp(glow, near * 0.9).multiplyScalar(1 + near * 0.6));
+      field.setColorAt(i, colour.copy(ground).lerp(glow, near * 0.85).multiplyScalar(1 + near * 1.2));
     });
     field.instanceMatrix.needsUpdate = true;
     if (field.instanceColor) field.instanceColor.needsUpdate = true;
