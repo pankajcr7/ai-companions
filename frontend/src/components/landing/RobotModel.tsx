@@ -38,7 +38,7 @@ export function RobotModel({ className = "", chips = [] }: { className?: string;
           className="orbit-chip pointer-events-none absolute left-0 top-0 hidden items-center gap-2 whitespace-nowrap rounded-full border border-cream/15 bg-night/75 py-1.5 pl-1.5 pr-3.5 backdrop-blur-md will-change-transform sm:flex"
         >
           <span className="orbit-chip-icon grid size-6 place-items-center rounded-full bg-lime/15 text-lime">{c.icon}</span>
-          <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-cream">{c.label}</span>
+          <span className="text-[13px] font-medium text-cream">{c.label}</span>
         </span>
       ))}
     </div>
@@ -188,8 +188,11 @@ function start(THREE: Three, host: HTMLDivElement, room: InstanceType<typeof imp
   };
   let blinkAt = 2.5;
   const clock = new THREE.Clock();
+  // The robot's own clock only runs while motion is on, so "Pause motion" freezes it where it is.
+  let t = 0;
   const draw = () => {
-    const t = still ? 0 : clock.getElapsedTime();
+    const dt = Math.min(clock.getDelta(), 0.1);
+    if (!still && document.documentElement.dataset.motion !== "off") t += dt;
     turn.x += (pointer.x - turn.x) * 0.06;
     turn.y += (pointer.y - turn.y) * 0.06;
     robot.position.y = Math.sin(t * 1.2) * 0.08;

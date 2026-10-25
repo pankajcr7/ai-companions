@@ -4,7 +4,8 @@ export function Logo({ className = "", compact = false }: { className?: string; 
   return (
     <span className={`inline-flex items-center gap-[0.35em] whitespace-nowrap font-display text-xl font-semibold tracking-tight text-ink ${className}`}>
       <svg viewBox="0 0 24 24" className="size-[1.35em]" aria-hidden="true">
-        <rect width="24" height="24" rx="7" fill="var(--ink)" />
+        {/* The square follows the text colour, so the mark stays visible on dark pages too. */}
+        <rect width="24" height="24" rx="7" fill="currentColor" />
         <rect x="5" y="9" width="14" height="6" rx="3" fill="var(--lime)" />
         <circle cx="9.5" cy="12" r="1.3" fill="var(--ink)" />
         <circle cx="14.5" cy="12" r="1.3" fill="var(--ink)" />
@@ -17,24 +18,25 @@ export function Logo({ className = "", compact = false }: { className?: string; 
 export function Label({ children }: { children: React.ReactNode }) {
   return (
     <span className="inline-flex w-fit items-center gap-2.5 text-xs font-medium uppercase tracking-[0.18em] text-haze">
-      <span className="size-1.5 rounded-full bg-lime" aria-hidden="true" />
+      <span className="size-1.5 rounded-full bg-teal" aria-hidden="true" />
       {children}
     </span>
   );
 }
 
-export function DarkButton({ href, children, icon = true }: { href: string; children: React.ReactNode; icon?: boolean }) {
+/** The one main action style on dark pages: solid lime. */
+export function PrimaryButton({ href, children, icon = true }: { href: string; children: React.ReactNode; icon?: boolean }) {
   return (
     <a
       href={href}
-      className="btn-dark inline-flex items-center gap-3 rounded-[12px] py-1.5 pl-1.5 pr-5 text-sm font-semibold text-paper transition-transform hover:-translate-y-px active:translate-y-px"
+      className={`inline-flex h-12 items-center gap-3 rounded-[12px] bg-lime text-sm font-semibold text-night shadow-[0_10px_30px_-12px_rgb(166_255_0/0.7)] transition-transform hover:-translate-y-px active:translate-y-px ${icon ? "pl-1.5 pr-5" : "px-5"}`}
     >
       {icon && (
-        <span className="grid size-9 place-items-center rounded-[9px] bg-lime text-ink">
+        <span className="grid size-9 place-items-center rounded-[9px] bg-night text-lime">
           <ArrowRight size={16} weight="bold" />
         </span>
       )}
-      <span className={icon ? "" : "pl-3.5"}>{children}</span>
+      {children}
     </a>
   );
 }

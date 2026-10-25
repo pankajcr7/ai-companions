@@ -1,5 +1,5 @@
 import { List } from "@phosphor-icons/react/dist/ssr";
-import { DarkButton, Logo } from "./ui";
+import { PrimaryButton, Logo } from "./ui";
 
 const links = [
   { href: "#about", label: "About" },
@@ -30,9 +30,9 @@ export function Header() {
         <div className="relative flex items-center gap-2 border-l border-white/15 px-4 md:px-8">
           <a href="/sign-in" className="hidden text-sm font-medium text-white hover:text-white/80 sm:block">Sign in</a>
           <div className="hidden sm:block">
-            <DarkButton href="#early-access" icon={false}>
+            <PrimaryButton href="#early-access" icon={false}>
               Get early access
-            </DarkButton>
+            </PrimaryButton>
           </div>
           {/* Mobile menu: native disclosure, no JS. */}
           <details className="relative lg:hidden">

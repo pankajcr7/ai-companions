@@ -10,7 +10,8 @@ const REACH = 190; // the pointer's reach
 /**
  * The team as a drifting network behind the hero: dots joined by thin lines when they come close.
  * Near the pointer the links light lime and reach out to it. A plain 2D canvas, so no 3D library is needed;
- * it pauses off screen and holds still for people who turn motion off.
+ * it pauses off screen and when motion is paused, and it is drawn once and held still for people who turn motion off,
+ * on phones and on low-power devices (to save battery).
  */
 export function NetworkField() {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -18,7 +19,9 @@ export function NetworkField() {
     const canvas = ref.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const still =
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches || window.innerWidth < 640 || (navigator.hardwareConcurrency ?? 8) <= 4;
+    const paused = () => document.documentElement.dataset.motion === "off";
     let w = 0;
     let h = 0;
     let dots: Dot[] = [];
@@ -42,7 +45,7 @@ export function NetworkField() {
 
     const draw = () => {
       ctx.clearRect(0, 0, w, h);
-      if (!still) {
+      if (!still && !paused()) {
         for (const d of dots) {
           d.x = (d.x + d.vx + w) % w;
           d.y = (d.y + d.vy + h) % h;

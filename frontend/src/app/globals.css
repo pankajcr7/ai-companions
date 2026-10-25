@@ -51,6 +51,16 @@ body {
   outline: 2px solid var(--ink);
   outline-offset: 3px;
 }
+/* On the dark landing and sign-in pages an ink ring would vanish, so focus shows in lime. */
+.on-dark :focus-visible {
+  outline-color: var(--lime);
+}
+
+/* "Pause motion" (see MotionToggle): every CSS animation holds where it is; the 3D scenes check the same flag. */
+[data-motion="off"] *,
+[data-motion="off"] *::before {
+  animation-play-state: paused !important;
+}
 
 .grid-paper {
   background-image:
@@ -163,10 +173,15 @@ body {
   .caret {
     animation: caret 1s steps(1) infinite;
   }
-  /* A soft light sweeping through gradient text; the gradient's ends match, so the loop is seamless. */
+  /* A soft light sweeping once through gradient text; the gradient's ends match, so it comes to rest looking the same. */
   .shimmer {
     background-size: 200% auto;
-    animation: shimmer 6s linear infinite;
+    animation: shimmer 2.4s ease-in-out 1.2s both;
+  }
+  /* The headline is readable from the first frame and only moves into place (no fade, so it never looks empty). */
+  .lift {
+    animation: lift 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--i, 0) * 110ms);
   }
   /* A line drawing itself in, once, after the words it underlines have landed. */
   .draw {
@@ -205,6 +220,11 @@ body {
 /* No end frame: the line grows to its own width. */
 @keyframes draw {
   from { width: 0; }
+}
+
+@keyframes lift {
+  from { transform: translateY(0.25em); }
+  to { transform: none; }
 }
 
 @keyframes shimmer {

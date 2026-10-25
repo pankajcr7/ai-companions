@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { ClipboardText, SealCheck, ShieldCheck, UsersThree } from "@phosphor-icons/react/dist/ssr";
 import { RobotModel } from "./RobotModel";
-import { Corners, DarkButton, Label, LineButton } from "./ui";
+import { Corners, PrimaryButton, Label, LineButton } from "./ui";
 
 const models = [
   { file: "openai", name: "OpenAI" },
@@ -41,10 +41,10 @@ export function Hero() {
           </span>
           {/* Word by word; "AI team" shimmers through the brand gradient and a lime line draws under it. */}
           <h1 className="mt-6 font-display text-[clamp(56px,7.6vw,128px)] font-medium leading-[0.92] tracking-[-0.05em] text-cream">
-            <span style={at(1)} className="step-in inline-block">Hire</span>{" "}
-            <span style={at(2)} className="step-in inline-block">an</span>
+            <span style={at(1)} className="lift inline-block">Hire</span>{" "}
+            <span style={at(2)} className="lift inline-block">an</span>
             <br />
-            <span style={at(4)} className="step-in relative inline-block font-serif text-[1.12em] font-normal italic tracking-[-0.02em]">
+            <span style={at(4)} className="lift relative inline-block font-serif text-[1.12em] font-normal italic tracking-[-0.02em]">
               <span className="shimmer bg-[linear-gradient(90deg,#7fd8ca,#b8e05a,#a6ff00,#b8e05a,#7fd8ca)] bg-clip-text pb-[0.08em] pr-[0.15em] text-transparent">AI team</span>
               <span aria-hidden="true" className="draw absolute bottom-[0.06em] left-[0.04em] h-[3px] w-[calc(100%-0.25em)] rounded-full bg-lime shadow-[0_0_12px_rgb(166_255_0/0.8)]" />
             </span>
@@ -53,7 +53,7 @@ export function Hero() {
             Give one goal. Your AI companions plan it, debate it, review it, and deliver real work you can see.
           </p>
           <div style={at(7)} className="step-in mt-8 flex flex-wrap items-center gap-3">
-            <DarkButton href="#early-access">Get early access</DarkButton>
+            <PrimaryButton href="#early-access">Get early access</PrimaryButton>
             <LineButton href="#process">See how it works</LineButton>
           </div>
         </div>

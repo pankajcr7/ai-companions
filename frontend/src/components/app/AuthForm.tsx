@@ -41,7 +41,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
 
   const title = mode === "sign-up" ? "Create your account" : "Welcome back";
   return (
-    <main className="grid min-h-[100dvh] bg-night text-cream lg:grid-cols-[1.1fr_0.9fr]">
+    <main className="on-dark grid min-h-[100dvh] bg-night text-cream lg:grid-cols-[1.1fr_0.9fr]">
       <aside className="dusk relative isolate hidden flex-col justify-between overflow-hidden border-r border-cream/10 p-12 lg:flex">
         <div className="absolute inset-0 -z-10">
           <NetworkField />

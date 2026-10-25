@@ -1,6 +1,6 @@
 import Image from "next/image";
-import { Check } from "@phosphor-icons/react/dist/ssr";
-import { Corners, DarkButton, Glow, Label, Logo, SectionHeading } from "./ui";
+import { Check, X } from "@phosphor-icons/react/dist/ssr";
+import { Corners, PrimaryButton, Glow, Label, Logo, SectionHeading } from "./ui";
 
 const compare = {
   them: [
@@ -48,8 +48,9 @@ export function Team() {
             <ul className="mt-8 space-y-4 text-sm text-haze">
               {compare.them.map((t) => (
                 <li key={t} className="flex items-center gap-3">
-                  <span className="grid size-5 shrink-0 place-items-center rounded-full bg-cream/10">
-                    <Check size={11} />
+                  {/* A cross, not a tick: these are what a chatbot lacks. */}
+                  <span className="grid size-5 shrink-0 place-items-center rounded-full bg-cream/10 text-cream/60">
+                    <X size={10} weight="bold" />
                   </span>
                   {t}
                 </li>
@@ -71,7 +72,7 @@ export function Team() {
           </div>
         </div>
         <div className="mt-12 text-center">
-          <DarkButton href="#early-access">Get early access</DarkButton>
+          <PrimaryButton href="#early-access">Get early access</PrimaryButton>
         </div>
         <Corners />
       </section>

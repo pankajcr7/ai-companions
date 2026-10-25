@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Asterisk, CheckCircle, PaperPlaneTilt } from "@phosphor-icons/react";
-import { DarkButton, Glow, Label } from "./ui";
+import { Asterisk, CheckCircle, PaperPlaneTilt, Pause, Play } from "@phosphor-icons/react";
+import { PrimaryButton, Glow, Label } from "./ui";
 
 /** Staggered arrival: rises and sharpens from a blur, in order (see .step-in). */
 const at = (i: number) => ({ "--i": i }) as React.CSSProperties;
@@ -147,13 +147,29 @@ export function Process() {
             </p>
           </div>
           <div className="shrink-0">
-            <DarkButton href="#early-access">Get early access</DarkButton>
+            <PrimaryButton href="#early-access">Get early access</PrimaryButton>
           </div>
         </div>
 
         {/* Hovering pauses the progress line, and with it the move to the next step. */}
         <div className="group/steps mt-14 grid gap-6 lg:grid-cols-[0.85fr_1.15fr] lg:gap-10">
-          <div role="tablist" aria-label="Steps" className="border-t border-cream/10">
+          <div>
+          {/* Tabs: arrow keys, Home and End move between steps; only the active one is in the Tab order. */}
+          <div
+            role="tablist"
+            aria-label="Steps"
+            className="border-t border-cream/10"
+            onKeyDown={(e) => {
+              const last = steps.length - 1;
+              const to = { ArrowDown: active + 1, ArrowRight: active + 1, ArrowUp: active - 1, ArrowLeft: active - 1, Home: 0, End: last }[e.key];
+              if (to === undefined) return;
+              e.preventDefault();
+              const next = (to + steps.length) % steps.length;
+              setActive(next);
+              setAuto(false);
+              document.getElementById(`step-${next}`)?.focus();
+            }}
+          >
             {steps.map((s, i) => {
               const on = i === active;
               return (
@@ -164,6 +180,7 @@ export function Process() {
                   id={`step-${i}`}
                   aria-selected={on}
                   aria-controls="step-panel"
+                  tabIndex={on ? 0 : -1}
                   onClick={() => {
                     setActive(i);
                     setAuto(false);
@@ -175,7 +192,7 @@ export function Process() {
                     <span className="font-display text-[26px] font-medium tracking-[-0.035em] md:text-[34px]">{s.title}</span>
                   </span>
                   {on && (
-                    <span key={active} className="step-in mt-3 block max-w-[44ch] pl-11 text-sm leading-relaxed text-haze">
+                    <span key={active} className="step-in mt-3 block max-w-[44ch] pl-11 text-[15px] leading-relaxed text-haze">
                       {s.text}
                     </span>
                   )}
@@ -192,6 +209,17 @@ export function Process() {
                 </button>
               );
             })}
+          </div>
+          {/* Auto-play can always be paused (and resumed) by hand. */}
+          <button
+            type="button"
+            onClick={() => setAuto(!auto)}
+            aria-pressed={!auto}
+            className="mt-5 inline-flex items-center gap-2 rounded-full border border-cream/20 px-3 py-1.5 text-xs font-medium text-cream/80 transition-colors hover:text-cream"
+          >
+            {auto ? <Pause size={12} weight="fill" /> : <Play size={12} weight="fill" />}
+            {auto ? "Pause steps" : "Play steps"}
+          </button>
           </div>
 
           <div
