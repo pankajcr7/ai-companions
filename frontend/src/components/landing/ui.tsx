@@ -66,7 +66,7 @@ export function Corners() {
 
 export function SectionHeading({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <h2 className={`font-wide text-[clamp(30px,4.2vw,58px)] font-medium leading-[1.05] tracking-[-0.03em] text-cream ${className}`}>{children}</h2>
+    <h2 className={`font-display text-[clamp(30px,4.2vw,58px)] font-medium leading-[1.05] tracking-[-0.03em] text-cream ${className}`}>{children}</h2>
   );
 }
 

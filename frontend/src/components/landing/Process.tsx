@@ -230,7 +230,7 @@ export function Process() {
             {[...row, ...row, ...row, ...row].map((w, i) => (
               <span
                 key={i}
-                className={`flex items-center gap-8 px-8 py-3 font-wide text-[clamp(52px,7vw,104px)] font-semibold uppercase leading-none tracking-[-0.05em] ${(i + r) % 2 ? "outline-text" : ""}`}
+                className={`flex items-center gap-8 px-8 py-3 font-display text-[clamp(52px,7vw,104px)] font-semibold uppercase leading-none tracking-[-0.05em] ${(i + r) % 2 ? "outline-text" : ""}`}
               >
                 {w}
                 <Asterisk size={40} weight="bold" className={r ? "text-teal" : "text-lime"} />

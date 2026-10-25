@@ -48,7 +48,7 @@ export function Closing() {
           <Label>Control</Label>
           <SectionHeading className="mt-6">
             Your team works for you.
-            <br /> <span className="text-haze">You stay the owner.</span>
+            <br /> <span className="font-serif font-normal italic tracking-[-0.01em] text-haze">You stay the owner.</span>
           </SectionHeading>
         </div>
         <div className="grid border-t border-cream/10 sm:grid-cols-2 lg:grid-cols-4">
@@ -57,7 +57,7 @@ export function Closing() {
               <span className="grid size-12 place-items-center rounded-full border border-teal/50 text-teal">
                 <Icon size={22} />
               </span>
-              <h3 className="mt-10 font-wide text-lg font-medium tracking-[-0.02em]">{title}</h3>
+              <h3 className="mt-10 font-display text-lg font-medium tracking-[-0.02em]">{title}</h3>
               <p className="mt-3 text-sm leading-relaxed text-haze">{text}</p>
             </div>
           ))}
@@ -90,7 +90,7 @@ export function Closing() {
       </section>
 
       <section className="dusk relative overflow-hidden pt-24 md:pt-32">
-        <p className="relative z-10 px-4 text-center font-wide text-[clamp(40px,7.4vw,112px)] font-semibold uppercase leading-[0.95] tracking-[-0.05em] text-cream">
+        <p className="relative z-10 px-4 text-center font-display text-[clamp(40px,7.4vw,112px)] font-semibold uppercase leading-[0.95] tracking-[-0.05em] text-cream">
           Start your
           <br /> AI company
         </p>
@@ -120,7 +120,7 @@ export function Closing() {
         <Glow className="-left-40 bottom-0 bg-lime/10" />
         <div className="flex flex-col justify-center gap-6 px-4 py-20 md:px-12">
           <Label>Early access</Label>
-          <p className="max-w-xl font-wide text-3xl font-medium leading-[1.1] tracking-[-0.03em] md:text-5xl">Tell us what you would hand over first.</p>
+          <p className="max-w-xl font-display text-3xl font-medium leading-[1.1] tracking-[-0.03em] md:text-5xl">Tell us what you would hand over first.</p>
           <p className="max-w-[46ch] text-haze">We are opening in small groups and inviting people whose first goal we can deliver well.</p>
         </div>
         <div className="border-t border-cream/10 bg-cream/[0.02] px-4 py-14 md:border-l md:border-t-0 md:px-10">
@@ -132,7 +132,7 @@ export function Closing() {
 }
 
 // The brand name across the footer, in the hero's two colours.
-const footerWord = "block bg-clip-text pb-[0.16em] font-wide font-semibold lowercase leading-[0.85] tracking-[-0.06em] text-transparent text-[clamp(56px,13vw,200px)]";
+const footerWord = "block bg-clip-text pb-[0.16em] font-display font-semibold lowercase leading-[0.85] tracking-[-0.06em] text-transparent text-[clamp(56px,13vw,200px)]";
 
 export function Footer() {
   return (

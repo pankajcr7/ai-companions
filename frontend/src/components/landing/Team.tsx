@@ -42,7 +42,7 @@ export function Team() {
         </div>
         <div className="mx-auto mt-16 grid max-w-4xl gap-5 md:grid-cols-2">
           <div className="rounded-[20px] border border-cream/10 bg-cream/[0.02] p-7 opacity-80">
-            <p className="font-wide text-2xl font-medium tracking-[-0.03em]">
+            <p className="font-display text-2xl font-medium tracking-[-0.03em]">
               One <span className="text-haze">chatbot</span>
             </p>
             <ul className="mt-8 space-y-4 text-sm text-haze">
@@ -100,7 +100,7 @@ export function Team() {
                 <Image src={`/companions/${m.file}.svg`} alt="" width={200} height={200} className="relative w-[58%] -translate-y-[8%]" />
               </div>
               <div className="border-t border-cream/10 px-4 py-4">
-                <p className="font-wide text-base font-medium tracking-[-0.02em]">{m.name}</p>
+                <p className="font-display text-base font-medium tracking-[-0.02em]">{m.name}</p>
                 <p className="mt-1 text-xs text-haze sm:text-sm">{m.role}</p>
               </div>
             </li>
@@ -108,7 +108,7 @@ export function Team() {
           <li className="relative flex flex-col justify-between rounded-[20px] bg-lime p-6 text-night lg:mt-12">
             <div>
               <span className="block size-2.5 rounded-full bg-night" aria-hidden="true" />
-              <p className="mt-5 font-wide text-xl font-medium leading-tight tracking-[-0.03em]">Design your own companion</p>
+              <p className="mt-5 font-display text-xl font-medium leading-tight tracking-[-0.03em]">Design your own companion</p>
               <p className="mt-3 text-sm text-night/70">Pick a name, look, role, voice, and AI model.</p>
             </div>
             <a href="#early-access" className="mt-6 inline-flex items-center justify-center rounded-[10px] bg-night py-2.5 text-sm font-semibold text-cream hover:bg-night/85">

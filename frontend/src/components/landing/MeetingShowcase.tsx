@@ -35,14 +35,14 @@ export function MeetingShowcase() {
       <div className="duotone relative min-h-[320px]">
         <Image src="/img/meeting.jpg" alt="A person working on a laptop" fill sizes="(min-width: 768px) 60vw, 100vw" className="object-cover" />
         <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-night/80 to-transparent" />
-        <p className="absolute bottom-8 left-4 max-w-md font-wide text-[clamp(28px,3vw,44px)] font-medium leading-[1.05] tracking-[-0.03em] md:left-12">
+        <p className="absolute bottom-8 left-4 max-w-md font-display text-[clamp(28px,3vw,44px)] font-medium leading-[1.05] tracking-[-0.03em] md:left-12">
           How your team decides
         </p>
       </div>
       <div className="flex flex-col justify-end border-cream/10 bg-gradient-to-b from-deep to-night md:border-l">
         <div className="p-7" aria-live="polite">
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-haze">Example meeting</p>
-          <p className="mt-4 font-wide text-xl font-medium leading-snug tracking-[-0.02em]">{m.question}</p>
+          <p className="mt-4 font-display text-xl font-medium leading-snug tracking-[-0.02em]">{m.question}</p>
           <ul className="mt-6 space-y-2.5 text-sm text-cream/80">
             {m.proposals.map((p) => (
               <li key={p} className="flex gap-3">

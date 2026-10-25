@@ -52,10 +52,10 @@ export function UseCases() {
                 aria-controls={`case-${i}`}
                 className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-5 px-4 py-8 text-left md:grid-cols-[25%_1fr_auto] md:px-12"
               >
-                <span aria-hidden="true" className={`font-wide text-3xl font-semibold leading-none tracking-[-0.05em] md:text-5xl ${isOpen ? "text-teal" : "outline-text"}`}>
+                <span aria-hidden="true" className={`font-display text-3xl font-semibold leading-none tracking-[-0.05em] md:text-5xl ${isOpen ? "text-teal" : "outline-text"}`}>
                   0{i + 1}
                 </span>
-                <span className="font-wide text-lg font-medium tracking-[-0.03em] md:text-3xl">{c.title}</span>
+                <span className="font-display text-lg font-medium tracking-[-0.03em] md:text-3xl">{c.title}</span>
                 <span className={`grid size-9 place-items-center rounded-full transition-colors ${isOpen ? "bg-lime text-night" : "border border-cream/20 text-cream"}`}>
                   {isOpen ? <Minus size={14} weight="bold" /> : <Plus size={14} weight="bold" />}
                 </span>

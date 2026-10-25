@@ -55,10 +55,12 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           <RobotModel className="absolute inset-0" />
         </div>
         <div className="relative">
-          <p className="font-wide text-[clamp(40px,4.4vw,72px)] font-semibold uppercase leading-[0.9] tracking-[-0.05em]">
+          <p className="font-display text-[clamp(44px,4.8vw,80px)] font-medium leading-[0.92] tracking-[-0.05em]">
             Hire an
             <br />
-            <span className="bg-gradient-to-r from-[#7fd8ca] via-[#b8e05a] to-lime bg-clip-text pb-[0.08em] text-transparent">AI team</span>
+            <span className="font-serif text-[1.12em] font-normal italic tracking-[-0.02em]">
+              <span className="bg-gradient-to-r from-[#7fd8ca] via-[#b8e05a] to-lime bg-clip-text pb-[0.08em] pr-[0.15em] text-transparent">AI team</span>
+            </span>
           </p>
           <p className="mt-5 max-w-[40ch] text-cream/80">Give one goal. Your AI companions plan it, debate it, review it, and deliver real work you can see.</p>
         </div>
@@ -73,7 +75,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           </Link>
           <div className="relative rounded-[24px] border border-cream/10 bg-cream/[0.03] p-7 backdrop-blur-sm sm:p-9">
             <Label>{mode === "sign-up" ? "New account" : "Sign in"}</Label>
-            <h1 className="mt-5 font-wide text-3xl font-medium tracking-[-0.03em] sm:text-4xl">{title}</h1>
+            <h1 className="mt-5 font-display text-3xl font-medium tracking-[-0.03em] sm:text-4xl">{title}</h1>
             <form onSubmit={submit} className="mt-8 space-y-5">
               {mode === "sign-up" && (
                 <label className="block text-sm font-medium text-cream/85">

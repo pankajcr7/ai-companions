@@ -23,13 +23,13 @@ export function Story() {
         <div>
           <Label>Why we built this</Label>
           <SectionHeading className="reveal mt-6">
-            A chatbot answers questions. <span className="text-haze">A company gets work done.</span>
+            A chatbot answers questions. <span className="font-serif font-normal italic tracking-[-0.01em] text-haze">A company gets work done.</span>
           </SectionHeading>
           <p className="mt-6 max-w-[46ch] text-haze">Separate agents with real roles. Each one owns its work and answers to a manager.</p>
           <dl className="mt-12 border-t border-cream/10">
             {facts.map(({ value, text }) => (
               <div key={value} className="reveal border-b border-cream/10 py-5">
-                <dt className="font-wide text-[clamp(24px,2.4vw,34px)] font-medium leading-[1.05] tracking-[-0.03em]">{value}</dt>
+                <dt className="font-display text-[clamp(24px,2.4vw,34px)] font-medium leading-[1.05] tracking-[-0.03em]">{value}</dt>
                 <dd className="mt-1.5 text-sm leading-relaxed text-haze">{text}</dd>
               </div>
             ))}
@@ -68,8 +68,8 @@ export function Story() {
               key={d.name}
               className={`reveal relative flex min-h-[360px] flex-col justify-between overflow-hidden rounded-[20px] border border-cream/10 bg-gradient-to-b from-deep to-night p-6 lg:min-h-[440px] ${i % 2 ? "lg:mt-12" : ""}`}
             >
-              <p className="font-wide text-sm font-medium uppercase tracking-[0.12em]">{d.name}</p>
-              <p aria-hidden="true" className="outline-text select-none font-wide text-[clamp(96px,10vw,150px)] font-semibold leading-none tracking-[-0.06em]">
+              <p className="font-display text-sm font-medium uppercase tracking-[0.12em]">{d.name}</p>
+              <p aria-hidden="true" className="outline-text select-none font-display text-[clamp(96px,10vw,150px)] font-semibold leading-none tracking-[-0.06em]">
                 0{i + 1}
               </p>
               <ul className="space-y-2 text-sm text-haze">
@@ -88,7 +88,7 @@ export function Story() {
       <section className="relative isolate overflow-hidden border-b border-cream/10 px-4 py-28 text-center md:py-40">
         <Glow className="left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
         <Label>How it thinks</Label>
-        <p className="reveal mx-auto mt-8 max-w-5xl font-wide text-[clamp(26px,3.6vw,52px)] font-medium leading-[1.18] tracking-[-0.03em]">
+        <p className="reveal mx-auto mt-8 max-w-5xl font-display text-[clamp(26px,3.6vw,52px)] font-medium leading-[1.18] tracking-[-0.03em]">
           Every goal starts{" "}
           <span className="duotone relative inline-block h-[0.95em] w-[1.9em] translate-y-[0.12em] overflow-hidden rounded-full align-baseline">
             <Image src="/img/vision.jpg" alt="" fill sizes="160px" className="object-cover" />

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Instrument_Serif, Space_Grotesk, Unbounded, Urbanist } from "next/font/google";
+import { Instrument_Serif, Space_Grotesk, Urbanist } from "next/font/google";
 import "./globals.css";
 
 const urbanist = Urbanist({
@@ -9,12 +9,6 @@ const urbanist = Urbanist({
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
-  subsets: ["latin"],
-});
-
-// The landing page's wide display face.
-const unbounded = Unbounded({
-  variable: "--font-unbounded",
   subsets: ["latin"],
 });
 
@@ -34,7 +28,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${urbanist.variable} ${spaceGrotesk.variable} ${unbounded.variable} ${instrument.variable} h-full antialiased`}>
+    <html lang="en" className={`${urbanist.variable} ${spaceGrotesk.variable} ${instrument.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">{children}</body>
     </html>
   );

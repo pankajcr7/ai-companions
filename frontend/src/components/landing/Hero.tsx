@@ -23,6 +23,9 @@ const tags = [
 
 const facts = ["1 goal to start", "9 departments to staff", "Your own AI models"];
 
+/** Staggered arrival on load: rises and sharpens from a blur, in order (see .step-in). */
+const at = (i: number) => ({ "--i": i }) as React.CSSProperties;
+
 /** The dusk hero: headline on the left, the 3D robot on the right, over the team network (see page.tsx). */
 export function Hero() {
   return (
@@ -31,17 +34,24 @@ export function Hero() {
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-night via-night/50 to-transparent" />
 
       <div className="relative grid flex-1 items-center gap-6 px-4 pb-10 pt-10 md:grid-cols-[1.1fr_0.9fr] md:px-12 md:pt-6">
-        <div className="rise relative z-20">
-          <Label>AI companions that work as a team</Label>
-          <h1 className="mt-6 font-wide text-[clamp(52px,7vw,118px)] font-semibold uppercase leading-[0.9] tracking-[-0.05em] text-cream">
-            Hire an
+        <div className="relative z-20">
+          <span style={at(0)} className="step-in block">
+            <Label>AI companions that work as a team</Label>
+          </span>
+          {/* Word by word; "AI team" shimmers through the brand gradient and a lime line draws under it. */}
+          <h1 className="mt-6 font-display text-[clamp(56px,7.6vw,128px)] font-medium leading-[0.92] tracking-[-0.05em] text-cream">
+            <span style={at(1)} className="step-in inline-block">Hire</span>{" "}
+            <span style={at(2)} className="step-in inline-block">an</span>
             <br />
-            <span className="bg-gradient-to-r from-[#7fd8ca] via-[#b8e05a] to-lime bg-clip-text pb-[0.08em] text-transparent">AI team</span>
+            <span style={at(4)} className="step-in relative inline-block font-serif text-[1.12em] font-normal italic tracking-[-0.02em]">
+              <span className="shimmer bg-[linear-gradient(90deg,#7fd8ca,#b8e05a,#a6ff00,#b8e05a,#7fd8ca)] bg-clip-text pb-[0.08em] pr-[0.15em] text-transparent">AI team</span>
+              <span aria-hidden="true" className="draw absolute bottom-[0.06em] left-[0.04em] h-[3px] w-[calc(100%-0.25em)] rounded-full bg-lime shadow-[0_0_12px_rgb(166_255_0/0.8)]" />
+            </span>
           </h1>
-          <p className="mt-7 max-w-[42ch] text-base leading-relaxed text-cream/85 md:text-lg">
+          <p style={at(6)} className="step-in mt-7 max-w-[42ch] text-base leading-relaxed text-cream/85 md:text-lg">
             Give one goal. Your AI companions plan it, debate it, review it, and deliver real work you can see.
           </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
+          <div style={at(7)} className="step-in mt-8 flex flex-wrap items-center gap-3">
             <DarkButton href="#early-access">Get early access</DarkButton>
             <LineButton href="#process">See how it works</LineButton>
           </div>
@@ -67,8 +77,8 @@ export function Hero() {
       </div>
 
       <ul className="relative z-20 grid border-t border-cream/15 text-xs font-medium uppercase tracking-[0.16em] text-cream/80 sm:grid-cols-3">
-        {facts.map((f) => (
-          <li key={f} className="flex items-center gap-3 border-b border-cream/15 px-4 py-4 sm:border-b-0 sm:border-r sm:last:border-r-0 md:px-12">
+        {facts.map((f, i) => (
+          <li key={f} style={at(9 + i)} className="step-in flex items-center gap-3 border-b border-cream/15 px-4 py-4 sm:border-b-0 sm:border-r sm:last:border-r-0 md:px-12">
             <span className="size-1.5 rounded-full bg-lime" aria-hidden="true" />
             {f}
           </li>
