@@ -61,7 +61,7 @@ export function EarlyAccessForm() {
         <button
           type="submit"
           disabled={state.kind === "sending"}
-          className="btn-dark w-full rounded-[12px] py-3.5 text-sm font-semibold text-paper transition-transform active:translate-y-px disabled:opacity-70"
+          className="w-full rounded-[12px] bg-lime py-3.5 text-sm font-semibold text-night transition-transform hover:-translate-y-px active:translate-y-px disabled:opacity-70"
         >
           {state.kind === "sending" ? "Joining..." : "Get early access"}
         </button>

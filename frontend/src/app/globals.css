@@ -22,6 +22,14 @@
   --color-dark: var(--dark);
   --font-sans: var(--font-urbanist);
   --font-display: var(--font-space-grotesk);
+  /* The landing page's dusk theme. */
+  --color-night: #150a12;
+  --color-plum: #2a1220;
+  --color-cream: #fff1e6;
+  --color-haze: #d6b4a8;
+  --color-coral: #d8694e;
+  --color-teal: #4fb3a9;
+  --font-wide: var(--font-unbounded);
 }
 
 /* Radius system: buttons and cards 10-12px, chips 2px, photos square. */
@@ -52,10 +60,6 @@ body {
   background-size: 62px 62px;
 }
 
-.hatch {
-  background-image: repeating-linear-gradient(135deg, var(--line) 0 1px, transparent 1px 10px);
-}
-
 /* Dark "3D" button from the reference: gradient face, hard bottom edge, soft drop shadow. */
 .btn-dark {
   /* The face is always dark, so its text is always light, in either theme. */
@@ -74,8 +78,18 @@ body {
     0 14px 26px -12px rgb(11 13 16 / 0.25);
 }
 
-.card-lift {
-  box-shadow: 0 4px 0 var(--line);
+/* Photos tinted to the dusk palette: the picture's light and shade over a coral-to-plum wash. */
+.duotone {
+  background: linear-gradient(160deg, #e48a62 0%, #a8453f 45%, #3b1529 100%);
+}
+.duotone img {
+  mix-blend-mode: luminosity;
+  opacity: 0.8;
+}
+
+.outline-text {
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgb(255 241 230 / 0.35);
 }
 
 /* The hero's dusk sky: a warm glow top right over coral fading to plum. The 3D field draws on top when it loads. */

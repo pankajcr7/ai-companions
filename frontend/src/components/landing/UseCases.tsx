@@ -35,34 +35,36 @@ const cases = [
 export function UseCases() {
   const [open, setOpen] = useState(0);
   return (
-    <section className="relative border-b border-line bg-paper">
-      <div className="px-4 py-20 md:px-12 md:py-28 md:pl-[25%]">
+    <section className="relative border-b border-cream/10">
+      <div className="px-4 py-24 md:px-12 md:py-32 md:pl-[25%]">
         <Label>Use cases</Label>
-        <SectionHeading className="mt-5">What you can hand over</SectionHeading>
+        <SectionHeading className="mt-6">What you can hand over</SectionHeading>
       </div>
-      <ul className="border-t border-line">
+      <ul className="border-t border-cream/10">
         {cases.map((c, i) => {
           const isOpen = open === i;
           return (
-            <li key={c.title} className="border-b border-line last:border-b-0">
+            <li key={c.title} className={`border-b border-cream/10 transition-colors last:border-b-0 ${isOpen ? "bg-cream/[0.03]" : ""}`}>
               <button
                 type="button"
                 onClick={() => setOpen(isOpen ? -1 : i)}
                 aria-expanded={isOpen}
                 aria-controls={`case-${i}`}
-                className="grid w-full grid-cols-[1fr_auto] items-start gap-4 px-4 py-8 text-left md:grid-cols-[25%_1fr_auto] md:px-12"
+                className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-5 px-4 py-8 text-left md:grid-cols-[25%_1fr_auto] md:px-12"
               >
-                <span className="hidden pt-1 text-xs font-medium uppercase tracking-wide text-muted md:block">{c.teams}</span>
-                <span className="text-xl font-medium md:text-2xl">{c.title}</span>
-                <span className="grid size-8 place-items-center rounded-[6px] bg-ink text-lime">
+                <span aria-hidden="true" className={`font-wide text-3xl font-semibold leading-none tracking-[-0.05em] md:text-5xl ${isOpen ? "text-teal" : "outline-text"}`}>
+                  0{i + 1}
+                </span>
+                <span className="font-wide text-lg font-medium tracking-[-0.03em] md:text-3xl">{c.title}</span>
+                <span className={`grid size-9 place-items-center rounded-full transition-colors ${isOpen ? "bg-lime text-night" : "border border-cream/20 text-cream"}`}>
                   {isOpen ? <Minus size={14} weight="bold" /> : <Plus size={14} weight="bold" />}
                 </span>
               </button>
               <div id={`case-${i}`} hidden={!isOpen} className="grid gap-6 px-4 pb-10 md:grid-cols-[25%_1fr_auto] md:px-12">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted md:hidden">{c.teams}</span>
-                <p className="max-w-[52ch] text-muted md:col-start-2">{c.text}</p>
-                <div className="relative aspect-[4/3] w-full overflow-hidden md:col-start-3 md:row-start-1 md:w-[300px] md:-translate-y-16">
-                  <Image src={c.image} alt="" fill sizes="(min-width: 768px) 300px, 100vw" className="object-cover" />
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-haze md:col-start-2">{c.teams}</p>
+                <p className="max-w-[52ch] text-haze md:col-start-2">{c.text}</p>
+                <div className="duotone relative aspect-[4/3] w-full overflow-hidden rounded-[16px] md:col-start-3 md:row-span-2 md:row-start-1 md:w-[320px]">
+                  <Image src={c.image} alt="" fill sizes="(min-width: 768px) 320px, 100vw" className="object-cover" />
                 </div>
               </div>
             </li>

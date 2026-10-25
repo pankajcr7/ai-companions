@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { HandPalm, Key, Plus, Receipt, SealCheck } from "@phosphor-icons/react/dist/ssr";
 import { EarlyAccessForm } from "./EarlyAccessForm";
-import { Corners, Hatch, Label, Logo, Pixels, SectionHeading } from "./ui";
+import { Corners, Glow, Label, SectionHeading } from "./ui";
 
 const controls = [
   { icon: Receipt, title: "A quote first", text: "See the estimated cost and time for a goal before anything runs." },
@@ -33,117 +33,130 @@ const faqs = [
   },
 ];
 
+// The closing scene's pillars step down to the robot in the middle, like the field in the hero.
+const pillars = Array.from({ length: 28 }, (_, i) => {
+  const d = Math.abs(i - 13.5) / 13.5;
+  return { height: Math.round(14 + 86 * d ** 1.4), lit: d < 0.15 };
+});
+
 export function Closing() {
   return (
     <>
-      <section className="relative border-b border-line">
-        <Pixels className="right-0 top-0 hidden h-[372px] w-[434px] md:block" color="bg-paper" blocks={[[0, 0, 4, 2], [4, 0, 3, 2], [3, 2, 2, 2], [5, 4, 2, 2]]} />
-        <div className="relative px-4 py-20 md:px-12 md:py-28">
+      <section className="relative isolate overflow-hidden border-b border-cream/10">
+        <Glow className="-right-60 -top-60" />
+        <div className="px-4 py-24 md:px-12 md:py-32">
           <Label>Control</Label>
-          <SectionHeading className="mt-5">
+          <SectionHeading className="mt-6">
             Your team works for you.
-            <br /> You stay the owner.
+            <br /> <span className="text-haze">You stay the owner.</span>
           </SectionHeading>
         </div>
-        <div className="relative grid border-t border-line sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid border-t border-cream/10 sm:grid-cols-2 lg:grid-cols-4">
           {controls.map(({ icon: Icon, title, text }) => (
-            <div key={title} className="border-b border-line p-6 py-10 sm:[&:nth-child(odd)]:border-r md:px-12 lg:border-b-0 lg:border-r lg:last:border-r-0">
-              <span className="btn-dark grid size-12 place-items-center rounded-[10px] text-lime">
+            <div key={title} className="border-b border-cream/10 p-6 py-10 sm:[&:nth-child(odd)]:border-r md:px-12 lg:border-b-0 lg:border-r lg:last:border-r-0">
+              <span className="grid size-12 place-items-center rounded-full border border-teal/50 text-teal">
                 <Icon size={22} />
               </span>
-              <h3 className="mt-10 text-xl font-semibold">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted">{text}</p>
+              <h3 className="mt-10 font-wide text-lg font-medium tracking-[-0.02em]">{title}</h3>
+              <p className="mt-3 text-sm leading-relaxed text-haze">{text}</p>
             </div>
           ))}
         </div>
         <Corners />
       </section>
-      <Hatch />
 
-      <section id="faq" className="grid-paper relative scroll-mt-4 border-b border-line bg-paper px-4 py-20 md:py-28">
-        <div className="text-center">
-          <Label>FAQ</Label>
-          <SectionHeading className="mt-5">Questions</SectionHeading>
-        </div>
-        <div className="mx-auto mt-12 max-w-3xl space-y-4">
-          {faqs.map(({ q, a }) => (
-            <details key={q} className="group card-lift rounded-[12px] bg-bg">
-              <summary className="flex cursor-pointer items-center justify-between gap-4 px-6 py-5 font-medium">
-                {q}
-                <span className="grid size-7 shrink-0 place-items-center rounded-[6px] bg-ink text-lime transition-transform group-open:rotate-45">
-                  <Plus size={13} weight="bold" />
-                </span>
-              </summary>
-              <p className="px-6 pb-6 text-sm leading-relaxed text-muted">{a}</p>
-            </details>
-          ))}
+      <section id="faq" className="relative isolate scroll-mt-4 overflow-hidden border-b border-cream/10 px-4 py-24 md:px-12 md:py-32">
+        <Glow className="-left-72 top-1/3 bg-teal/15" />
+        <div className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr]">
+          <div>
+            <Label>FAQ</Label>
+            <SectionHeading className="mt-6">Questions</SectionHeading>
+          </div>
+          <div className="space-y-3">
+            {faqs.map(({ q, a }) => (
+              <details key={q} className="group rounded-[16px] border border-cream/10 bg-cream/[0.03] open:border-cream/20">
+                <summary className="flex cursor-pointer items-center justify-between gap-4 px-6 py-5 font-medium">
+                  {q}
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full border border-cream/20 transition group-open:rotate-45 group-open:border-lime group-open:bg-lime group-open:text-night">
+                    <Plus size={13} weight="bold" />
+                  </span>
+                </summary>
+                <p className="px-6 pb-6 text-sm leading-relaxed text-haze">{a}</p>
+              </details>
+            ))}
+          </div>
         </div>
         <Corners />
       </section>
-      <Hatch />
 
-      <section className="grid-paper relative overflow-hidden pt-24 md:pt-32">
-        <p className="relative z-10 bg-gradient-to-b from-ink/70 to-ink bg-clip-text px-4 text-center font-display text-[clamp(48px,8.4vw,128px)] font-medium uppercase leading-[0.95] tracking-[-0.04em] text-transparent">
+      <section className="dusk relative overflow-hidden pt-24 md:pt-32">
+        <p className="relative z-10 px-4 text-center font-wide text-[clamp(40px,7.4vw,112px)] font-semibold uppercase leading-[0.95] tracking-[-0.05em] text-cream">
           Start your
           <br /> AI company
         </p>
-        <div className="relative mt-10 h-[300px]">
-          {/* Lime staircase, stepping down to the centre. */}
-          <div aria-hidden="true" className="absolute inset-0 grid grid-cols-6 items-end">
-            {[100, 66, 33, 16, 66, 100].map((h, i) => (
-              <span key={i} className="bg-lime" style={{ height: `${h}%` }} />
+        <div className="relative mt-12 h-[320px]">
+          <div aria-hidden="true" className="absolute inset-x-0 bottom-0 flex h-full items-end gap-[3px] px-[3px]">
+            {pillars.map((p, i) => (
+              <span
+                key={i}
+                className={`flex-1 rounded-t-[6px] border-t-[3px] bg-gradient-to-b from-coral/90 to-night ${p.lit ? "border-lime" : "border-[#f6c79a]"}`}
+                style={{ height: `${p.height}%` }}
+              />
             ))}
           </div>
-          <span className="absolute left-1/2 top-4 grid size-24 -translate-x-1/2 place-items-center rounded-full bg-paper shadow-xl">
-            <Image src="/companions/nova.svg" alt="" width={64} height={64} />
+          <span className="float absolute bottom-[15%] left-1/2 -ml-14 grid size-28 place-items-center">
+            <Image src="/companions/nova.svg" alt="" width={112} height={112} className="drop-shadow-[0_20px_40px_rgb(166_255_0/0.35)]" />
           </span>
-          <span className="absolute bottom-6 left-4 md:left-12">
-            <Label dark>Real work</Label>
+          <span className="absolute bottom-6 left-4 rounded-full bg-night/70 px-3 py-1.5 md:left-12">
+            <Label>Real work</Label>
           </span>
-          <span className="absolute bottom-6 right-4 md:right-12">
-            <Label dark>Real records</Label>
+          <span className="absolute bottom-6 right-4 rounded-full bg-night/70 px-3 py-1.5 md:right-12">
+            <Label>Real records</Label>
           </span>
         </div>
       </section>
 
-      <section id="early-access" className="relative grid scroll-mt-4 bg-[#05070c] text-paper md:grid-cols-[1fr_440px]">
-        <div className="flex flex-col justify-center gap-6 px-4 py-16 md:px-12">
-          <Label dark>Early access</Label>
-          <p className="max-w-xl text-3xl font-semibold leading-tight md:text-5xl">Tell us what you would hand over first.</p>
-          <p className="max-w-[46ch] text-paper/70">We are opening in small groups and inviting people whose first goal we can deliver well.</p>
+      <section id="early-access" className="relative isolate grid scroll-mt-4 overflow-hidden border-b border-cream/10 md:grid-cols-[1fr_460px]">
+        <Glow className="-left-40 bottom-0 bg-lime/10" />
+        <div className="flex flex-col justify-center gap-6 px-4 py-20 md:px-12">
+          <Label>Early access</Label>
+          <p className="max-w-xl font-wide text-3xl font-medium leading-[1.1] tracking-[-0.03em] md:text-5xl">Tell us what you would hand over first.</p>
+          <p className="max-w-[46ch] text-haze">We are opening in small groups and inviting people whose first goal we can deliver well.</p>
         </div>
-        <div className="border-t border-paper/15 px-4 py-14 md:border-l md:border-t-0 md:px-10">
+        <div className="border-t border-cream/10 bg-cream/[0.02] px-4 py-14 md:border-l md:border-t-0 md:px-10">
           <EarlyAccessForm />
         </div>
       </section>
-
     </>
   );
 }
 
+// The brand name across the footer, in the hero's two colours.
+const footerWord = "block bg-clip-text pb-[0.16em] font-wide font-semibold lowercase leading-[0.85] tracking-[-0.06em] text-transparent text-[clamp(56px,13vw,200px)]";
+
 export function Footer() {
   return (
-    <footer className="relative bg-bg">
-        <nav aria-label="Footer" className="grid grid-cols-2 border-b border-line text-lg font-medium md:grid-cols-4">
-          {[
-            ["#about", "About"],
-            ["#departments", "Departments"],
-            ["#team", "Team"],
-            ["#faq", "FAQ"],
-          ].map(([href, label]) => (
-            <a key={href} href={href} className="border-b border-r border-line px-4 py-8 text-center hover:bg-paper md:border-b-0 md:last:border-r-0">
-              {label}
-            </a>
-          ))}
-        </nav>
-        <div className="relative grid place-items-center overflow-hidden border-b border-line py-20 md:py-32">
-          <Pixels className="left-0 top-0 h-[186px] w-[186px]" color="bg-paper" blocks={[[0, 0, 1, 1], [1.3, 0, 1.7, 1], [1, 1, 1, 1], [0, 2, 1, 1]]} />
-          <Logo className="text-[clamp(40px,10vw,150px)]" />
-        </div>
-        <div className="flex flex-col justify-between gap-2 px-4 py-6 text-sm text-muted sm:flex-row md:px-12">
-          <p>© {new Date().getFullYear()} Agent Company</p>
-          <p>Photos from Unsplash. Robot avatars by DiceBear.</p>
-        </div>
-      </footer>
+    <footer className="relative">
+      <nav aria-label="Footer" className="grid grid-cols-2 border-b border-cream/10 text-base font-medium md:grid-cols-4">
+        {[
+          ["#about", "About"],
+          ["#departments", "Departments"],
+          ["#team", "Team"],
+          ["#faq", "FAQ"],
+        ].map(([href, label]) => (
+          <a key={href} href={href} className="border-b border-r border-cream/10 px-4 py-8 text-center uppercase tracking-[0.12em] text-cream/80 hover:bg-cream/5 hover:text-cream md:border-b-0 md:last:border-r-0">
+            {label}
+          </a>
+        ))}
+      </nav>
+      <div aria-hidden="true" className="relative overflow-hidden border-b border-cream/10 px-4 py-16 md:px-12 md:py-24">
+        <span className={`${footerWord} bg-gradient-to-br from-[#7fd8ca] to-[#2f8f86]`}>agent</span>
+        <span className={`${footerWord} text-right bg-gradient-to-br from-[#f4f1c6] to-[#b8e05a]`}>company</span>
+      </div>
+      <div className="flex flex-col justify-between gap-2 px-4 py-6 text-sm text-haze sm:flex-row md:px-12">
+        <p>© {new Date().getFullYear()} Agent Company</p>
+        <p>Photos from Unsplash. Robot avatars by DiceBear.</p>
+      </div>
+    </footer>
   );
 }

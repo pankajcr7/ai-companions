@@ -10,25 +10,27 @@ import { UseCases } from "@/components/landing/UseCases";
 
 export default function Home() {
   return (
-    <div id="top" className="mx-auto w-full max-w-[1440px] overflow-x-clip border-x border-line">
-      {/* The header and hero share one dusk scene, with the pillar field behind both. */}
-      <div className="dusk relative isolate overflow-hidden">
-        <div className="absolute inset-0 -z-10">
-          <DuskField />
+    <div className="bg-night text-cream">
+      <div id="top" className="mx-auto w-full max-w-[1440px] overflow-x-clip border-x border-cream/10">
+        {/* The header and hero share one dusk scene, with the pillar field behind both. */}
+        <div className="dusk relative isolate overflow-hidden">
+          <div className="absolute inset-0 -z-10">
+            <DuskField />
+          </div>
+          <Header />
+          <Hero />
         </div>
-        <Header />
-        <Hero />
+        <main>
+          <Models />
+          <Story />
+          <Process />
+          <Team />
+          <UseCases />
+          <MeetingShowcase />
+          <Closing />
+        </main>
+        <Footer />
       </div>
-      <main>
-        <Models />
-        <Story />
-        <Process />
-        <Team />
-        <UseCases />
-        <MeetingShowcase />
-        <Closing />
-      </main>
-      <Footer />
     </div>
   );
 }

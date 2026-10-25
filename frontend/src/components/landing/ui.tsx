@@ -14,12 +14,10 @@ export function Logo({ className = "", compact = false }: { className?: string; 
   );
 }
 
-export function Label({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) {
+export function Label({ children }: { children: React.ReactNode }) {
   return (
-    <span
-      className={`inline-flex w-fit items-center gap-2 rounded-[2px] px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide ${dark ? "bg-ink text-paper" : "bg-paper text-ink"}`}
-    >
-      <span className="size-2.5 bg-lime" aria-hidden="true" />
+    <span className="inline-flex w-fit items-center gap-2.5 text-xs font-medium uppercase tracking-[0.18em] text-haze">
+      <span className="size-1.5 rounded-full bg-lime" aria-hidden="true" />
       {children}
     </span>
   );
@@ -41,9 +39,21 @@ export function DarkButton({ href, children, icon = true }: { href: string; chil
   );
 }
 
-/** Small black squares on the corners of a framed block, like blueprint registration marks. */
+/** A quiet button for dark backgrounds: a thin cream outline. */
+export function LineButton({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      className="inline-flex h-12 items-center rounded-[12px] border border-cream/30 px-5 text-sm font-semibold text-cream transition-colors hover:bg-cream/10"
+    >
+      {children}
+    </a>
+  );
+}
+
+/** Small dots on the corners of a framed block, like the nodes where thin lines meet. */
 export function Corners() {
-  const base = "pointer-events-none absolute size-1.5 bg-ink";
+  const base = "pointer-events-none absolute size-[5px] rounded-full bg-cream/50";
   return (
     <span aria-hidden="true">
       <span className={`${base} -left-[3px] -top-[3px]`} />
@@ -54,27 +64,13 @@ export function Corners() {
   );
 }
 
-export function Hatch() {
-  return <div aria-hidden="true" className="hatch relative h-12 border-b border-line"><Corners /></div>;
-}
-
-/** Lime pixel blocks. Each block is [col, row, width, height] on a 62px grid. */
-export function Pixels({ blocks, className = "", color = "bg-lime" }: { blocks: number[][]; className?: string; color?: string }) {
-  return (
-    <div aria-hidden="true" className={`pointer-events-none absolute ${className}`}>
-      {blocks.map(([c, r, w, h], i) => (
-        <span
-          key={i}
-          className={`absolute ${color}`}
-          style={{ left: c * 62, top: r * 62, width: w * 62, height: h * 62 }}
-        />
-      ))}
-    </div>
-  );
-}
-
 export function SectionHeading({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <h2 className={`font-sans text-4xl font-semibold leading-[1.08] tracking-tight text-ink md:text-6xl ${className}`}>{children}</h2>
+    <h2 className={`font-wide text-[clamp(30px,4.2vw,58px)] font-medium leading-[1.05] tracking-[-0.03em] text-cream ${className}`}>{children}</h2>
   );
+}
+
+/** A soft coral glow behind a section, from the dusk sky. */
+export function Glow({ className = "" }: { className?: string }) {
+  return <div aria-hidden="true" className={`pointer-events-none absolute -z-10 size-[560px] rounded-full bg-coral/20 blur-[120px] ${className}`} />;
 }
