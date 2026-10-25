@@ -119,6 +119,22 @@ body {
   pointer-events: none;
 }
 
+/* The chip at the front of the robot's orbit is lit (set by the 3D scene). */
+.orbit-chip {
+  transition: border-color 0.4s, box-shadow 0.4s;
+}
+.orbit-chip[data-lit="true"] {
+  border-color: rgb(166 255 0 / 0.75);
+  box-shadow: 0 0 28px -4px rgb(166 255 0 / 0.6);
+}
+.orbit-chip-icon {
+  transition: background-color 0.4s, color 0.4s;
+}
+.orbit-chip[data-lit="true"] .orbit-chip-icon {
+  background: var(--lime);
+  color: #08110f;
+}
+
 /* Typing dots only exist where they can move; without motion the message simply shows. */
 .typing {
   display: none;
@@ -151,21 +167,6 @@ body {
   .shimmer {
     background-size: 200% auto;
     animation: shimmer 6s linear infinite;
-  }
-  /* The hero's status chips: float out of step with each other, and light lime one after another (every 2s, by --i). */
-  .tag {
-    animation:
-      tag-float 4s ease-in-out infinite alternate,
-      tag-lit 8s ease-in-out infinite;
-    animation-delay: calc(var(--i, 0) * -1.3s), calc(2.2s + var(--i, 0) * 2s);
-  }
-  .tag-line {
-    animation: draw 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: calc(1.6s + var(--i, 0) * 0.2s);
-  }
-  .tag-dot {
-    animation: ping 1.2s ease-out both;
-    animation-delay: calc(2s + var(--i, 0) * 0.2s);
   }
   /* A line drawing itself in, once, after the words it underlines have landed. */
   .draw {
@@ -204,16 +205,6 @@ body {
 /* No end frame: the line grows to its own width. */
 @keyframes draw {
   from { width: 0; }
-}
-
-@keyframes tag-float {
-  from { transform: translateY(-3px); }
-  to { transform: translateY(3px); }
-}
-
-@keyframes tag-lit {
-  0%, 30%, 100% { border-color: rgb(238 244 240 / 0.15); box-shadow: none; }
-  8%, 22% { border-color: rgb(166 255 0 / 0.7); box-shadow: 0 0 24px -4px rgb(166 255 0 / 0.55); }
 }
 
 @keyframes shimmer {

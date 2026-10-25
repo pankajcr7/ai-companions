@@ -4,12 +4,15 @@ import { useEffect, useRef } from "react";
 
 type Three = typeof import("three");
 
+type Chip = { label: string; icon: React.ReactNode };
+
 /**
  * The hero's robot, built in 3D from simple shapes: a glossy white hover-bot with a glass face and lime eyes.
- * It waves hello, blinks, follows the pointer with its head, and hovers. It loads after the page is shown;
- * without WebGL the space stays empty, and it holds still for people who turn motion off.
+ * It waves hello, blinks, follows the pointer with its head, and hovers. Given chips, a lime ring orbits its waist
+ * and the chips ride it: bigger and lit at the front, faded and behind the robot at the back.
+ * It loads after the page is shown; without WebGL the space stays empty, and it holds still for people who turn motion off.
  */
-export function RobotModel({ className = "" }: { className?: string }) {
+export function RobotModel({ className = "", chips = [] }: { className?: string; chips?: Chip[] }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const host = ref.current;
@@ -26,7 +29,20 @@ export function RobotModel({ className = "" }: { className?: string }) {
       stop();
     };
   }, []);
-  return <div ref={ref} aria-hidden="true" className={`opacity-0 transition-opacity duration-1000 ${className}`} />;
+  return (
+    <div ref={ref} aria-hidden="true" className={`opacity-0 transition-opacity duration-1000 ${className}`}>
+      {chips.map((c) => (
+        <span
+          key={c.label}
+          data-chip
+          className="orbit-chip pointer-events-none absolute left-0 top-0 hidden items-center gap-2 whitespace-nowrap rounded-full border border-cream/15 bg-night/75 py-1.5 pl-1.5 pr-3.5 backdrop-blur-md will-change-transform sm:flex"
+        >
+          <span className="orbit-chip-icon grid size-6 place-items-center rounded-full bg-lime/15 text-lime">{c.icon}</span>
+          <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-cream">{c.label}</span>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 /** The robot's parts, so the animation can move them. */
@@ -119,7 +135,8 @@ function start(THREE: Three, host: HTMLDivElement, room: InstanceType<typeof imp
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.domElement.style.cssText = "width:100%;height:100%;display:block";
+  // Above the chips riding the back of the orbit, below the ones at the front.
+  renderer.domElement.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block;z-index:10";
   host.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
@@ -136,6 +153,22 @@ function start(THREE: Three, host: HTMLDivElement, room: InstanceType<typeof imp
 
   const { robot, head, arms, eyes } = build(THREE);
   scene.add(robot);
+
+  // The orbit: a thin lime ring around the waist, tilted toward the camera, with a bead under each chip.
+  const chips = [...host.querySelectorAll<HTMLElement>("[data-chip]")];
+  const R = 1.55;
+  const orbit = new THREE.Group();
+  orbit.rotation.x = 0.28;
+  const lime = { color: 0xa6ff00, transparent: true, toneMapped: false };
+  const band = new THREE.Mesh(new THREE.TorusGeometry(R, 0.006, 6, 160), new THREE.MeshBasicMaterial({ ...lime, opacity: 0.6 }));
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(R, 0.035, 8, 160), new THREE.MeshBasicMaterial({ ...lime, opacity: 0.08, depthWrite: false }));
+  band.rotation.x = halo.rotation.x = Math.PI / 2;
+  const beads = chips.map(() => new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 12), new THREE.MeshBasicMaterial({ ...lime, opacity: 1 })));
+  orbit.add(band, halo, ...beads);
+  if (chips.length) scene.add(orbit);
+  const spot = new THREE.Vector3();
+  let w = 0;
+  let h = 0;
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
   camera.position.set(0, 0.7, 8);
   camera.lookAt(0, 0.62, 0);
@@ -170,11 +203,30 @@ function start(THREE: Three, host: HTMLDivElement, room: InstanceType<typeof imp
     if (t > blinkAt + 0.14) blinkAt = t + 3 + Math.random() * 3;
     const open = t > blinkAt && t < blinkAt + 0.14 ? 0.12 : 1;
     eyes.forEach((e) => (e.scale.y = open));
+
+    // One turn about every 24 seconds; the chip nearest the front is lit.
+    orbit.position.y = -0.3 + robot.position.y;
+    beads.forEach((b, i) => {
+      const a = t * 0.26 + i * (Math.PI / 2) + 0.6;
+      b.position.set(Math.cos(a) * R, 0, Math.sin(a) * R);
+    });
+    orbit.updateMatrixWorld();
+    const depth = beads.map((b) => (spot.copy(b.position).applyMatrix4(orbit.matrixWorld).z / R + 1) / 2);
+    const front = depth.indexOf(Math.max(...depth));
+    chips.forEach((el, i) => {
+      spot.copy(beads[i].position).applyMatrix4(orbit.matrixWorld).project(camera);
+      const k = depth[i];
+      el.style.transform = `translate(${((spot.x + 1) / 2) * w}px, ${((1 - spot.y) / 2) * h}px) translate(-50%, -150%) scale(${0.8 + k * 0.25})`;
+      el.style.opacity = (0.3 + k * 0.7).toFixed(3);
+      el.style.zIndex = k > 0.5 ? "20" : "5";
+      el.dataset.lit = String(i === front);
+    });
     renderer.render(scene, camera);
   };
 
   const resize = () => {
-    const { clientWidth: w, clientHeight: h } = host;
+    w = host.clientWidth;
+    h = host.clientHeight;
     if (!w || !h) return;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;

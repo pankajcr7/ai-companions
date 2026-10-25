@@ -14,13 +14,13 @@ const models = [
   { file: "github", name: "GitHub" },
 ];
 
-// A goal's journey as status chips around the robot, lit one after another: brief, team, review, your approval.
-const tags = [
-  { label: "Brief written", icon: ClipboardText, at: "left-0 top-[22%]", side: "left" },
-  { label: "Team assigned", icon: UsersThree, at: "right-0 top-[30%]", side: "right" },
-  { label: "Reviewed by QA", icon: ShieldCheck, at: "left-0 top-[58%]", side: "left" },
-  { label: "Ready for your OK", icon: SealCheck, at: "right-0 top-[66%]", side: "right" },
-] as const;
+// A goal's journey as status chips riding an orbit around the robot: brief, team, review, your approval.
+const chips = [
+  { label: "Brief written", icon: <ClipboardText size={13} weight="bold" /> },
+  { label: "Team assigned", icon: <UsersThree size={13} weight="bold" /> },
+  { label: "Reviewed by QA", icon: <ShieldCheck size={13} weight="bold" /> },
+  { label: "Ready for your OK", icon: <SealCheck size={13} weight="bold" /> },
+];
 
 const facts = ["1 goal to start", "9 departments to staff", "Your own AI models"];
 
@@ -60,26 +60,7 @@ export function Hero() {
 
         <div className="rise relative mx-auto aspect-[4/5] w-full max-w-[300px] md:max-w-[520px]" style={{ "--i": 1 } as React.CSSProperties}>
           <div aria-hidden="true" className="absolute inset-x-[20%] bottom-[6%] h-1/4 rounded-full bg-lime/20 blur-3xl" />
-          <RobotModel className="absolute inset-0" />
-          {/* Each chip arrives, draws its line to the robot and pulses its dot, then floats; the chips light in turn (see .tag). */}
-          {tags.map(({ label, icon: Icon, at: place, side }, i) => (
-            <span
-              key={label}
-              aria-hidden="true"
-              className={`pointer-events-none absolute hidden items-center gap-2 sm:flex ${place} ${side === "right" ? "flex-row-reverse" : ""}`}
-            >
-              <span style={at(8 + i)} className="step-in">
-                <span style={at(i)} className="tag flex items-center gap-2 rounded-full border border-cream/15 bg-night/70 py-1.5 pl-1.5 pr-3.5 backdrop-blur-md">
-                  <span className="grid size-6 place-items-center rounded-full bg-lime/15 text-lime">
-                    <Icon size={13} weight="bold" />
-                  </span>
-                  <span className="whitespace-nowrap text-[11px] font-medium uppercase tracking-[0.14em] text-cream">{label}</span>
-                </span>
-              </span>
-              <span style={at(i)} className="tag-line h-px w-8 bg-cream/40 lg:w-14" />
-              <span style={at(i)} className="tag-dot size-1.5 rounded-full bg-lime" />
-            </span>
-          ))}
+          <RobotModel className="absolute inset-0" chips={chips} />
         </div>
       </div>
 
