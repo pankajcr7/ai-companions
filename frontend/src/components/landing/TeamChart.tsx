@@ -9,7 +9,7 @@ const leads: Node[] = [
   { x: 392, y: 252, w: 132, h: 38, label: "Content" },
 ];
 const specialists: Node[][] = [
-  [{ x: 52, y: 372, w: 64, h: 30, label: "Frontend" }, { x: 124, y: 372, w: 64, h: 30, label: "QA" }],
+  [{ x: 52, y: 372, w: 64, h: 30, label: "Dev" }, { x: 124, y: 372, w: 64, h: 30, label: "QA" }],
   [{ x: 204, y: 372, w: 64, h: 30, label: "UI" }, { x: 276, y: 372, w: 64, h: 30, label: "Brand" }],
   [{ x: 356, y: 372, w: 64, h: 30, label: "Writer" }, { x: 428, y: 372, w: 64, h: 30, label: "Editor" }],
 ];
@@ -83,9 +83,9 @@ function Pill({ node: n, lit = false, lead = false, small = false }: { node: Nod
         y={n.y}
         textAnchor="middle"
         dominantBaseline="central"
-        fontSize={small ? 12 : lead ? 11.5 : 14}
+        fontSize={small ? 14 : lead ? 12.5 : 16}
         fontWeight={lit || lead ? 600 : 500}
-        letterSpacing={lead ? 1.2 : 0}
+        letterSpacing={lead ? 0.6 : 0}
         fill={lit ? "#08110f" : small ? "#9db3aa" : "#eef4f0"}
       >
         {lead ? n.label.toUpperCase() : n.label}

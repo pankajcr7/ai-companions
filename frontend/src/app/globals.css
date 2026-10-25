@@ -164,7 +164,7 @@ body {
     animation: fade-out 0.2s ease 1.1s forwards;
   }
   .typing span {
-    animation: bounce 0.9s ease-in-out infinite;
+    animation: typing-bounce 0.9s ease-in-out infinite;
     animation-delay: calc(var(--i, 0) * 120ms);
   }
   .after-typing {
@@ -188,7 +188,7 @@ body {
     animation: draw 0.9s cubic-bezier(0.16, 1, 0.3, 1) 1.1s both;
   }
   .ping-twice {
-    animation: ping 1.2s ease-out 0.8s 2;
+    animation: ring-pulse 1.2s ease-out 0.8s 2;
   }
   .marquee-left {
     animation: marquee 38s linear infinite;
@@ -244,7 +244,7 @@ body {
   to { opacity: 0; visibility: hidden; }
 }
 
-@keyframes bounce {
+@keyframes typing-bounce {
   0%, 100% { transform: translateY(0); opacity: 0.5; }
   50% { transform: translateY(-4px); opacity: 1; }
 }
@@ -253,7 +253,8 @@ body {
   50% { opacity: 0; }
 }
 
-@keyframes ping {
+/* Named apart from Tailwind's built-in ping and bounce, which would otherwise replace these. */
+@keyframes ring-pulse {
   from { box-shadow: 0 0 0 0 rgb(166 255 0 / 0.6); }
   to { box-shadow: 0 0 0 14px rgb(166 255 0 / 0); }
 }

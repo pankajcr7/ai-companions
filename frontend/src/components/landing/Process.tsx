@@ -179,6 +179,8 @@ export function Process() {
                   onClick={() => {
                     setActive(i);
                     setAuto(false);
+                    // On narrow screens the screen sits below the list: bring it into view so the change is seen.
+                    if (window.innerWidth < 1024) document.getElementById("step-panel")?.scrollIntoView({ block: "nearest" });
                   }}
                   className={`relative block w-full border-b border-cream/10 py-6 text-left transition-[color,transform] duration-300 ${on ? "" : "text-cream/40 hover:translate-x-1.5 hover:text-cream/80"}`}
                 >
