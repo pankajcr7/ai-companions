@@ -29,6 +29,7 @@
   --color-haze: #9db3aa;
   --color-teal: #4fb3a9;
   --font-wide: var(--font-unbounded);
+  --font-serif: var(--font-instrument);
 }
 
 /* Radius system: buttons and cards 10-12px, chips 2px, photos square. */
@@ -99,7 +100,57 @@ body {
     linear-gradient(180deg, #050b0a 0%, #0a1512 55%, #08110f 100%);
 }
 
+/* A light that travels around a framed panel's edge (inside it, so a panel that clips its content still shows it). */
+@property --beam {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.beam::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(from var(--beam), transparent 0deg, rgb(166 255 0 / 0.9) 30deg, rgb(79 179 169 / 0.5) 60deg, transparent 100deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Typing dots only exist where they can move; without motion the message simply shows. */
+.typing {
+  display: none;
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  .beam::before {
+    animation: beam 7s linear infinite;
+  }
+  /* Content arriving: rises, sharpens from a blur, one after another by --i. */
+  .step-in {
+    animation: step-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--i, 0) * 140ms);
+  }
+  .typing {
+    display: flex;
+    animation: fade-out 0.2s ease 1.1s forwards;
+  }
+  .typing span {
+    animation: bounce 0.9s ease-in-out infinite;
+    animation-delay: calc(var(--i, 0) * 120ms);
+  }
+  .after-typing {
+    animation: step-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) 1.2s both;
+  }
+  .caret {
+    animation: caret 1s steps(1) infinite;
+  }
+  .ping-twice {
+    animation: ping 1.2s ease-out 0.8s 2;
+  }
   .marquee-left {
     animation: marquee 38s linear infinite;
   }
@@ -125,6 +176,33 @@ body {
 @keyframes marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
+}
+
+@keyframes beam {
+  to { --beam: 360deg; }
+}
+
+@keyframes step-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+@keyframes fade-out {
+  to { opacity: 0; visibility: hidden; }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  50% { transform: translateY(-4px); opacity: 1; }
+}
+
+@keyframes caret {
+  50% { opacity: 0; }
+}
+
+@keyframes ping {
+  from { box-shadow: 0 0 0 0 rgb(166 255 0 / 0.6); }
+  to { box-shadow: 0 0 0 14px rgb(166 255 0 / 0); }
 }
 
 @keyframes float {

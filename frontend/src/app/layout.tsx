@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, Unbounded, Urbanist } from "next/font/google";
+import { Instrument_Serif, Space_Grotesk, Unbounded, Urbanist } from "next/font/google";
 import "./globals.css";
 
 const urbanist = Urbanist({
@@ -18,6 +18,14 @@ const unbounded = Unbounded({
   subsets: ["latin"],
 });
 
+// An italic serif for the landing page's accent words.
+const instrument = Instrument_Serif({
+  variable: "--font-instrument",
+  weight: "400",
+  style: ["normal", "italic"],
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: "Agent Company",
   description:
@@ -26,7 +34,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${urbanist.variable} ${spaceGrotesk.variable} ${unbounded.variable} h-full antialiased`}>
+    <html lang="en" className={`${urbanist.variable} ${spaceGrotesk.variable} ${unbounded.variable} ${instrument.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">{children}</body>
     </html>
   );
