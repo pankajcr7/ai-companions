@@ -99,7 +99,7 @@ export function Closing() {
             {pillars.map((p, i) => (
               <span
                 key={i}
-                className={`flex-1 rounded-t-[6px] border-t-[3px] bg-gradient-to-b from-coral/90 to-night ${p.lit ? "border-lime" : "border-[#f6c79a]"}`}
+                className={`flex-1 rounded-t-[6px] border-t-[3px] bg-gradient-to-b from-teal/70 to-night ${p.lit ? "border-lime" : "border-[#a9e3d8]"}`}
                 style={{ height: `${p.height}%` }}
               />
             ))}

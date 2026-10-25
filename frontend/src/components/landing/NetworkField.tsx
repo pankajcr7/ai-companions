@@ -59,7 +59,7 @@ export function NetworkField() {
           if (dist > LINK) continue;
           const fade = 1 - dist / LINK;
           const lit = near((a.x + b.x) / 2, (a.y + b.y) / 2);
-          ctx.strokeStyle = lit > 0 ? `rgba(166,255,0,${fade * (0.15 + lit * 0.55)})` : `rgba(255,241,230,${fade * 0.16})`;
+          ctx.strokeStyle = lit > 0 ? `rgba(166,255,0,${fade * (0.15 + lit * 0.55)})` : `rgba(238,244,240,${fade * 0.16})`;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           ctx.lineTo(b.x, b.y);
@@ -79,7 +79,7 @@ export function NetworkField() {
       for (const d of dots) {
         const lit = near(d.x, d.y);
         const glow = d.kind === "lime" || lit > 0.3;
-        ctx.fillStyle = glow ? "#a6ff00" : d.kind === "teal" ? "rgba(79,179,169,0.85)" : "rgba(255,241,230,0.55)";
+        ctx.fillStyle = glow ? "#a6ff00" : d.kind === "teal" ? "rgba(79,179,169,0.85)" : "rgba(238,244,240,0.55)";
         ctx.shadowColor = glow ? "rgba(166,255,0,0.8)" : "transparent";
         ctx.shadowBlur = glow ? 12 : 0;
         ctx.beginPath();

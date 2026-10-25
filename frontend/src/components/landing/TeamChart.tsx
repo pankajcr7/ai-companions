@@ -39,7 +39,7 @@ export function TeamChart() {
       className="h-auto w-full font-sans"
     >
       {down.map((d) => (
-        <path key={d} d={d} fill="none" stroke="rgb(255 241 230 / 0.22)" strokeWidth="1.2" />
+        <path key={d} d={d} fill="none" stroke="rgb(238 244 240 / 0.22)" strokeWidth="1.2" />
       ))}
 
       {down.map((d, i) => (
@@ -74,8 +74,8 @@ function Pill({ node: n, lit = false, lead = false, small = false }: { node: Nod
         width={n.w}
         height={n.h}
         rx={n.h / 2}
-        fill={lit ? "#a6ff00" : "#150a12"}
-        stroke={lit ? "none" : lead ? "rgb(255 241 230 / 0.35)" : "rgb(255 241 230 / 0.2)"}
+        fill={lit ? "#a6ff00" : "#08110f"}
+        stroke={lit ? "none" : lead ? "rgb(238 244 240 / 0.35)" : "rgb(238 244 240 / 0.2)"}
       />
       {lead && <circle cx={n.x - n.w / 2 + 16} cy={n.y} r="3.5" fill="#4fb3a9" />}
       <text
@@ -86,7 +86,7 @@ function Pill({ node: n, lit = false, lead = false, small = false }: { node: Nod
         fontSize={small ? 12 : lead ? 11.5 : 14}
         fontWeight={lit || lead ? 600 : 500}
         letterSpacing={lead ? 1.2 : 0}
-        fill={lit ? "#150a12" : small ? "#d6b4a8" : "#fff1e6"}
+        fill={lit ? "#08110f" : small ? "#9db3aa" : "#eef4f0"}
       >
         {lead ? n.label.toUpperCase() : n.label}
       </text>

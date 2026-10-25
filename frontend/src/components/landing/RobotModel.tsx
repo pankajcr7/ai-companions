@@ -123,14 +123,14 @@ function start(THREE: Three, host: HTMLDivElement, room: InstanceType<typeof imp
   host.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  // Studio reflections make the shell read as glossy plastic; warm and coral lights sit it in the dusk.
+  // Studio reflections make the shell read as glossy plastic; a teal rim light sits it in the night.
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(room, 0.04).texture;
   scene.environmentIntensity = 0.8;
-  scene.add(new THREE.HemisphereLight(0xffe6d0, 0x2a0f24, 0.7));
-  const key = new THREE.DirectionalLight(0xffe4cc, 2);
+  scene.add(new THREE.HemisphereLight(0xe6f2ee, 0x08110f, 0.7));
+  const key = new THREE.DirectionalLight(0xf2f7f4, 2);
   key.position.set(3, 4, 5);
-  const rim = new THREE.DirectionalLight(0xff7a50, 3);
+  const rim = new THREE.DirectionalLight(0x4fb3a9, 3);
   rim.position.set(-4, 2, -3);
   scene.add(key, rim);
 

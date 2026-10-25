@@ -70,7 +70,7 @@ export function SectionHeading({ children, className = "" }: { children: React.R
   );
 }
 
-/** A soft coral glow behind a section, from the dusk sky. */
+/** A soft teal glow behind a section, like the sky behind the robot. */
 export function Glow({ className = "" }: { className?: string }) {
-  return <div aria-hidden="true" className={`pointer-events-none absolute -z-10 size-[560px] rounded-full bg-coral/20 blur-[120px] ${className}`} />;
+  return <div aria-hidden="true" className={`pointer-events-none absolute -z-10 size-[560px] rounded-full bg-teal/15 blur-[120px] ${className}`} />;
 }

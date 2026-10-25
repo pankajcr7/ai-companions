@@ -36,7 +36,7 @@ export function Story() {
           </dl>
         </div>
 
-        <figure className="reveal relative rounded-[24px] border border-cream/10 bg-cream/[0.02] bg-[radial-gradient(rgb(255_241_230/0.07)_1px,transparent_1px)] p-5 [background-size:22px_22px] md:p-8">
+        <figure className="reveal relative rounded-[24px] border border-cream/10 bg-cream/[0.02] bg-[radial-gradient(rgb(238_244_240/0.07)_1px,transparent_1px)] p-5 [background-size:22px_22px] md:p-8">
           <TeamChart />
           <figcaption className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs uppercase tracking-[0.16em] text-haze">
             <span className="flex items-center gap-2">
@@ -66,7 +66,7 @@ export function Story() {
           {departments.map((d, i) => (
             <article
               key={d.name}
-              className={`reveal relative flex min-h-[360px] flex-col justify-between overflow-hidden rounded-[20px] border border-cream/10 bg-gradient-to-b from-plum to-night p-6 lg:min-h-[440px] ${i % 2 ? "lg:mt-12" : ""}`}
+              className={`reveal relative flex min-h-[360px] flex-col justify-between overflow-hidden rounded-[20px] border border-cream/10 bg-gradient-to-b from-deep to-night p-6 lg:min-h-[440px] ${i % 2 ? "lg:mt-12" : ""}`}
             >
               <p className="font-wide text-sm font-medium uppercase tracking-[0.12em]">{d.name}</p>
               <p aria-hidden="true" className="outline-text select-none font-wide text-[clamp(96px,10vw,150px)] font-semibold leading-none tracking-[-0.06em]">

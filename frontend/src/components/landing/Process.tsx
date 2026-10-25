@@ -160,9 +160,9 @@ export function Process() {
             id="step-panel"
             role="tabpanel"
             aria-labelledby={`step-${active}`}
-            className="relative grid min-h-[360px] place-items-center overflow-hidden rounded-[24px] border border-cream/10 bg-cream/[0.02] bg-[radial-gradient(rgb(255_241_230/0.07)_1px,transparent_1px)] px-5 pb-8 pt-16 [background-size:22px_22px] md:min-h-[440px] md:px-10"
+            className="relative grid min-h-[360px] place-items-center overflow-hidden rounded-[24px] border border-cream/10 bg-cream/[0.02] bg-[radial-gradient(rgb(238_244_240/0.07)_1px,transparent_1px)] px-5 pb-8 pt-16 [background-size:22px_22px] md:min-h-[440px] md:px-10"
           >
-            <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_60%_at_50%_0%,rgb(216_105_78/0.22),transparent)]" />
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_60%_at_50%_0%,rgb(79_179_169/0.18),transparent)]" />
             <p className="absolute left-6 top-5 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-haze">
               <span className="size-1.5 rounded-full bg-lime" aria-hidden="true" />
               Step 0{active + 1} of 04 · {step.title}

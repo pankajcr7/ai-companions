@@ -39,7 +39,7 @@ export function MeetingShowcase() {
           How your team decides
         </p>
       </div>
-      <div className="flex flex-col justify-end border-cream/10 bg-gradient-to-b from-plum to-night md:border-l">
+      <div className="flex flex-col justify-end border-cream/10 bg-gradient-to-b from-deep to-night md:border-l">
         <div className="p-7" aria-live="polite">
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-haze">Example meeting</p>
           <p className="mt-4 font-wide text-xl font-medium leading-snug tracking-[-0.02em]">{m.question}</p>

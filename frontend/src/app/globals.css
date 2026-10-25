@@ -22,12 +22,11 @@
   --color-dark: var(--dark);
   --font-sans: var(--font-urbanist);
   --font-display: var(--font-space-grotesk);
-  /* The landing page's dusk theme. */
-  --color-night: #150a12;
-  --color-plum: #2a1220;
-  --color-cream: #fff1e6;
-  --color-haze: #d6b4a8;
-  --color-coral: #d8694e;
+  /* The landing page's midnight-green theme: one family with the brand's lime and teal. */
+  --color-night: #08110f;
+  --color-deep: #10201c;
+  --color-cream: #eef4f0;
+  --color-haze: #9db3aa;
   --color-teal: #4fb3a9;
   --font-wide: var(--font-unbounded);
 }
@@ -78,9 +77,9 @@ body {
     0 14px 26px -12px rgb(11 13 16 / 0.25);
 }
 
-/* Photos tinted to the dusk palette: the picture's light and shade over a coral-to-plum wash. */
+/* Photos tinted to the page's palette: the picture's light and shade over a teal-to-night wash. */
 .duotone {
-  background: linear-gradient(160deg, #e48a62 0%, #a8453f 45%, #3b1529 100%);
+  background: linear-gradient(160deg, #5fc4b5 0%, #2a7f76 45%, #0a1f1b 100%);
 }
 .duotone img {
   mix-blend-mode: luminosity;
@@ -89,15 +88,15 @@ body {
 
 .outline-text {
   color: transparent;
-  -webkit-text-stroke: 1.5px rgb(255 241 230 / 0.35);
+  -webkit-text-stroke: 1.5px rgb(238 244 240 / 0.35);
 }
 
-/* The hero's night sky: plum-black, a warm glow behind the robot and a faint teal one low on the left. The team network draws on top. */
+/* The hero's night sky: green-black, a teal glow behind the robot and a faint lime one low on the left. The team network draws on top. */
 .dusk {
   background:
-    radial-gradient(55% 55% at 72% 42%, rgb(216 105 78 / 0.3) 0%, rgb(216 105 78 / 0) 70%),
-    radial-gradient(45% 40% at 12% 85%, rgb(79 179 169 / 0.14) 0%, rgb(79 179 169 / 0) 70%),
-    linear-gradient(180deg, #0d060b 0%, #160a13 55%, #150a12 100%);
+    radial-gradient(55% 55% at 72% 42%, rgb(79 179 169 / 0.24) 0%, rgb(79 179 169 / 0) 70%),
+    radial-gradient(45% 40% at 12% 85%, rgb(166 255 0 / 0.07) 0%, rgb(166 255 0 / 0) 70%),
+    linear-gradient(180deg, #050b0a 0%, #0a1512 55%, #08110f 100%);
 }
 
 @media (prefers-reduced-motion: no-preference) {

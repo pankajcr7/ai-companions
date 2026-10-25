@@ -92,10 +92,10 @@ export function Team() {
         </div>
         <ul className="mt-16 grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-5">
           {team.map((m, i) => (
-            <li key={m.file} className={`reveal relative overflow-hidden rounded-[20px] border border-cream/10 bg-gradient-to-b from-plum to-night ${i % 2 ? "lg:mt-12" : ""}`}>
+            <li key={m.file} className={`reveal relative overflow-hidden rounded-[20px] border border-cream/10 bg-gradient-to-b from-deep to-night ${i % 2 ? "lg:mt-12" : ""}`}>
               <div className="relative grid aspect-square place-items-center">
                 {/* The companion stands on a lit pedestal. */}
-                <span aria-hidden="true" className="absolute bottom-[14%] h-[22%] w-[38%] rounded-t-[10px] bg-gradient-to-b from-coral/70 to-transparent" />
+                <span aria-hidden="true" className="absolute bottom-[14%] h-[22%] w-[38%] rounded-t-[10px] bg-gradient-to-b from-teal/60 to-transparent" />
                 <span aria-hidden="true" className="absolute bottom-[34%] h-6 w-[46%] rounded-[50%] bg-lime/25 blur-xl" />
                 <Image src={`/companions/${m.file}.svg`} alt="" width={200} height={200} className="relative w-[58%] -translate-y-[8%]" />
               </div>
