@@ -3,7 +3,7 @@ import { Header } from "@/components/landing/Header";
 import { Hero, Models } from "@/components/landing/Hero";
 import { NetworkField } from "@/components/landing/NetworkField";
 import { Process } from "@/components/landing/Process";
-import { Showcase } from "@/components/landing/Showcase";
+import { TeamAtWork } from "@/components/landing/TeamAtWork";
 import { Story } from "@/components/landing/Story";
 import { Team } from "@/components/landing/Team";
 import { UseCases } from "@/components/landing/UseCases";
@@ -22,7 +22,7 @@ export default function Home() {
         </div>
         <main>
           <Models />
-          <Showcase />
+          <TeamAtWork />
           <Story />
           <Process />
           <UseCases />

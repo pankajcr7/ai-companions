@@ -190,6 +190,23 @@ body {
   .ping-twice {
     animation: ring-pulse 1.2s ease-out 0.8s 2;
   }
+  /* The "team at work" board: a light sweeping along working progress bars, and Nova breathing while she checks. */
+  .bar-live {
+    background-image: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.55), transparent);
+    background-size: 40% 100%;
+    background-repeat: no-repeat;
+    animation: bar-sheen 1.3s linear infinite;
+  }
+  .breathe {
+    animation: breathe 2.4s ease-in-out infinite;
+  }
+  /* A teammate's avatar on the board: work arriving (lime) and work checked (teal). */
+  .pulse-lime {
+    animation: ring-pulse 0.8s ease-out;
+  }
+  .pulse-teal {
+    animation: ring-pulse-teal 0.8s ease-out;
+  }
   .marquee-left {
     animation: marquee 38s linear infinite;
   }
@@ -254,6 +271,21 @@ body {
 }
 
 /* Named apart from Tailwind's built-in ping and bounce, which would otherwise replace these. */
+@keyframes bar-sheen {
+  from { background-position: -60% 0; }
+  to { background-position: 160% 0; }
+}
+
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(166 255 0 / 0); }
+  50% { box-shadow: 0 0 0 8px rgb(166 255 0 / 0.18); }
+}
+
+@keyframes ring-pulse-teal {
+  from { box-shadow: 0 0 0 0 rgb(79 179 169 / 0.7); }
+  to { box-shadow: 0 0 0 14px rgb(79 179 169 / 0); }
+}
+
 @keyframes ring-pulse {
   from { box-shadow: 0 0 0 0 rgb(166 255 0 / 0.6); }
   to { box-shadow: 0 0 0 14px rgb(166 255 0 / 0); }
