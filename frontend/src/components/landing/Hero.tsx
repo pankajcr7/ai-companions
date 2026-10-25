@@ -23,7 +23,7 @@ const tags = [
 
 const facts = ["1 goal to start", "9 departments to staff", "Your own AI models"];
 
-/** The dusk hero: headline on the left, the 3D robot on the right, over the pillar field (see page.tsx). */
+/** The dusk hero: headline on the left, the 3D robot on the right, over the team network (see page.tsx). */
 export function Hero() {
   return (
     <section className="relative flex min-h-[calc(100svh-112px)] flex-col">

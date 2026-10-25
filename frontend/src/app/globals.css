@@ -92,11 +92,12 @@ body {
   -webkit-text-stroke: 1.5px rgb(255 241 230 / 0.35);
 }
 
-/* The hero's night sky: plum-black with a warm glow low on the horizon. The 3D field draws on top when it loads. */
+/* The hero's night sky: plum-black, a warm glow behind the robot and a faint teal one low on the left. The team network draws on top. */
 .dusk {
   background:
-    radial-gradient(70% 45% at 70% 45%, rgb(216 105 78 / 0.45) 0%, rgb(216 105 78 / 0) 70%),
-    linear-gradient(180deg, #0d060b 0%, #170a14 30%, #2e1420 48%, #1a0c16 70%, #150a12 100%);
+    radial-gradient(55% 55% at 72% 42%, rgb(216 105 78 / 0.3) 0%, rgb(216 105 78 / 0) 70%),
+    radial-gradient(45% 40% at 12% 85%, rgb(79 179 169 / 0.14) 0%, rgb(79 179 169 / 0) 70%),
+    linear-gradient(180deg, #0d060b 0%, #160a13 55%, #150a12 100%);
 }
 
 @media (prefers-reduced-motion: no-preference) {

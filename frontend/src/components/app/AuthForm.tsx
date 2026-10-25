@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { GoogleLogo } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
 import { authClient } from "@/lib/auth-client";
-import { DuskField } from "@/components/landing/DuskField";
+import { NetworkField } from "@/components/landing/NetworkField";
 import { RobotModel } from "@/components/landing/RobotModel";
 import { Corners, Glow, Label, Logo } from "@/components/landing/ui";
 
@@ -44,7 +44,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     <main className="grid min-h-[100dvh] bg-night text-cream lg:grid-cols-[1.1fr_0.9fr]">
       <aside className="dusk relative isolate hidden flex-col justify-between overflow-hidden border-r border-cream/10 p-12 lg:flex">
         <div className="absolute inset-0 -z-10">
-          <DuskField />
+          <NetworkField />
         </div>
         <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-2/3 bg-gradient-to-t from-night via-night/50 to-transparent" />
         <Link href="/" aria-label="Agent Company home" className="relative w-fit">
