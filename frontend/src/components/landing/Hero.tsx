@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { RobotModel } from "./RobotModel";
-import { Corners, DarkButton, LineButton } from "./ui";
+import { Corners, DarkButton, Label, LineButton } from "./ui";
 
 const models = [
   { file: "openai", name: "OpenAI" },
@@ -13,47 +13,67 @@ const models = [
   { file: "github", name: "GitHub" },
 ];
 
-// The brand name, split around the robot: "ag" top left, "ent" bottom right.
-const wordmark = "pointer-events-none select-none pb-[0.16em] font-wide font-semibold lowercase leading-[0.8] tracking-[-0.06em] text-[clamp(104px,20vw,300px)] bg-clip-text text-transparent";
+// What the team does with a goal, as thin-line tags pointing at the robot.
+const tags = [
+  { label: "Plans it", at: "left-0 top-[22%]", side: "left" },
+  { label: "Debates it", at: "right-0 top-[30%]", side: "right" },
+  { label: "Reviews it", at: "left-0 top-[58%]", side: "left" },
+  { label: "Delivers it", at: "right-0 top-[66%]", side: "right" },
+] as const;
 
-/** The dusk hero: it sits over the pillar field (see page.tsx), with the robot floating between the two halves of the name. */
+const facts = ["1 goal to start", "9 departments to staff", "Your own AI models"];
+
+/** The dusk hero: headline on the left, the 3D robot on the right, over the pillar field (see page.tsx). */
 export function Hero() {
   return (
-    <section className="relative flex min-h-[calc(100svh-112px)] flex-col px-4 pb-10 pt-6 md:block md:px-12 md:pb-14">
+    <section className="relative flex min-h-[calc(100svh-112px)] flex-col">
       {/* A soft dark floor so the words read over the field. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-night via-night/50 to-transparent" />
 
-      <p aria-hidden="true" className={`rise relative bg-gradient-to-br from-[#7fd8ca] to-[#2f8f86] ${wordmark}`}>
-        ag
-      </p>
+      <div className="relative grid flex-1 items-center gap-6 px-4 pb-10 pt-10 md:grid-cols-[1.1fr_0.9fr] md:px-12 md:pt-6">
+        <div className="rise relative z-20">
+          <Label>AI companions that work as a team</Label>
+          <h1 className="mt-6 font-wide text-[clamp(52px,7vw,118px)] font-semibold uppercase leading-[0.9] tracking-[-0.05em] text-cream">
+            Hire an
+            <br />
+            <span className="bg-gradient-to-r from-[#7fd8ca] via-[#b8e05a] to-lime bg-clip-text pb-[0.08em] text-transparent">AI team</span>
+          </h1>
+          <p className="mt-7 max-w-[42ch] text-base leading-relaxed text-cream/85 md:text-lg">
+            Give one goal. Your AI companions plan it, debate it, review it, and deliver real work you can see.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <DarkButton href="#early-access">Get early access</DarkButton>
+            <LineButton href="#process">See how it works</LineButton>
+          </div>
+        </div>
 
-      <div className="relative z-10 mx-auto -mt-6 aspect-[3/4] w-[clamp(210px,27vw,400px)] md:absolute md:left-1/2 md:top-[2%] md:mt-0 md:-translate-x-1/2">
-        <div aria-hidden="true" className="absolute inset-x-[15%] bottom-[8%] h-1/3 rounded-full bg-lime/20 blur-3xl" />
-        <RobotModel className="absolute inset-0" />
-      </div>
-
-      <p
-        aria-hidden="true"
-        className={`rise relative -mt-6 self-end bg-gradient-to-br from-[#f4f1c6] to-[#b8e05a] md:absolute md:bottom-10 md:right-12 md:mt-0 ${wordmark}`}
-        style={{ "--i": 1 } as React.CSSProperties}
-      >
-        ent
-      </p>
-
-      <div className="rise relative z-20 mt-6 md:absolute md:bottom-14 md:left-12 md:mt-0 md:max-w-[42%]" style={{ "--i": 2 } as React.CSSProperties}>
-        <p className="max-w-[38ch] text-sm leading-relaxed text-cream/85 md:text-base">
-          Give one goal. Your AI companions plan it, debate it, review it, and deliver real work you can see.
-        </p>
-        <h1 className="mt-5 font-wide text-[clamp(32px,3.8vw,58px)] font-medium uppercase leading-[0.95] tracking-[-0.03em] text-cream">
-          Hire an
-          <br />
-          AI team
-        </h1>
-        <div className="mt-7 flex flex-wrap items-center gap-3">
-          <DarkButton href="#early-access">Get early access</DarkButton>
-          <LineButton href="#process">See how it works</LineButton>
+        <div className="rise relative mx-auto aspect-[4/5] w-full max-w-[300px] md:max-w-[520px]" style={{ "--i": 1 } as React.CSSProperties}>
+          <div aria-hidden="true" className="absolute inset-x-[20%] bottom-[6%] h-1/4 rounded-full bg-lime/20 blur-3xl" />
+          <RobotModel className="absolute inset-0" />
+          {tags.map((t) => (
+            <span
+              key={t.label}
+              aria-hidden="true"
+              className={`pointer-events-none absolute hidden items-center gap-2 sm:flex ${t.at} ${t.side === "right" ? "flex-row-reverse" : ""}`}
+            >
+              <span className="rounded-full border border-cream/20 bg-night/60 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-cream backdrop-blur-sm">
+                {t.label}
+              </span>
+              <span className="h-px w-10 bg-cream/40 lg:w-16" />
+              <span className="size-1.5 rounded-full bg-lime" />
+            </span>
+          ))}
         </div>
       </div>
+
+      <ul className="relative z-20 grid border-t border-cream/15 text-xs font-medium uppercase tracking-[0.16em] text-cream/80 sm:grid-cols-3">
+        {facts.map((f) => (
+          <li key={f} className="flex items-center gap-3 border-b border-cream/15 px-4 py-4 sm:border-b-0 sm:border-r sm:last:border-r-0 md:px-12">
+            <span className="size-1.5 rounded-full bg-lime" aria-hidden="true" />
+            {f}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

@@ -4,12 +4,10 @@ import { useEffect, useRef } from "react";
 
 type Three = typeof import("three");
 
-// The model: RobotExpressive by Quaternius (CC0 1.0), served from /public/models.
-const MODEL = "/models/robot.glb";
-
 /**
- * The hero's robot as a live 3D model: glossy white, it waves once, then idles and turns toward the pointer.
- * It loads after the page is shown and fades in; without WebGL the space stays empty.
+ * The hero's robot, built in 3D from simple shapes: a glossy white hover-bot with a glass face and lime eyes.
+ * It waves hello, blinks, follows the pointer with its head, and hovers. It loads after the page is shown;
+ * without WebGL the space stays empty, and it holds still for people who turn motion off.
  */
 export function RobotModel({ className = "" }: { className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -18,10 +16,9 @@ export function RobotModel({ className = "" }: { className?: string }) {
     if (!host) return;
     let stop = () => {};
     let cancelled = false;
-    Promise.all([import("three"), import("three/examples/jsm/loaders/GLTFLoader.js"), import("three/examples/jsm/environments/RoomEnvironment.js")])
-      .then(([THREE, { GLTFLoader }, { RoomEnvironment }]) => {
-        if (cancelled) return;
-        stop = start(THREE, host, new GLTFLoader(), new RoomEnvironment(), () => cancelled);
+    Promise.all([import("three"), import("three/examples/jsm/environments/RoomEnvironment.js")])
+      .then(([THREE, { RoomEnvironment }]) => {
+        if (!cancelled) stop = start(THREE, host, new RoomEnvironment());
       })
       .catch(() => {});
     return () => {
@@ -32,13 +29,98 @@ export function RobotModel({ className = "" }: { className?: string }) {
   return <div ref={ref} aria-hidden="true" className={`opacity-0 transition-opacity duration-1000 ${className}`} />;
 }
 
-function start(
-  THREE: Three,
-  host: HTMLDivElement,
-  loader: InstanceType<typeof import("three/examples/jsm/loaders/GLTFLoader.js").GLTFLoader>,
-  room: InstanceType<typeof import("three/examples/jsm/environments/RoomEnvironment.js").RoomEnvironment>,
-  cancelled: () => boolean,
-) {
+/** The robot's parts, so the animation can move them. */
+function build(THREE: Three) {
+  const shell = new THREE.MeshPhysicalMaterial({ color: 0xf4f1ee, roughness: 0.22, clearcoat: 1, clearcoatRoughness: 0.06 });
+  const glass = new THREE.MeshPhysicalMaterial({ color: 0x07070a, roughness: 0.05, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.02 });
+  const metal = new THREE.MeshStandardMaterial({ color: 0x2c2629, roughness: 0.35, metalness: 0.8 });
+  const light = new THREE.MeshBasicMaterial({ color: 0xc6ff4d, toneMapped: false });
+  const mesh = (geometry: import("three").BufferGeometry, material: import("three").Material, x = 0, y = 0, z = 0) => {
+    const m = new THREE.Mesh(geometry, material);
+    m.position.set(x, y, z);
+    return m;
+  };
+
+  const robot = new THREE.Group();
+
+  // Body: a smooth egg, wide at the shoulders, with a lime light bar on the chest.
+  const profile = [
+    [0, -1],
+    [0.32, -0.95],
+    [0.58, -0.62],
+    [0.71, -0.12],
+    [0.69, 0.25],
+    [0.55, 0.5],
+    [0.26, 0.62],
+    [0, 0.64],
+  ].map(([x, y]) => new THREE.Vector2(x, y));
+  robot.add(mesh(new THREE.LatheGeometry(profile, 64), shell));
+  const bar = mesh(new THREE.CapsuleGeometry(0.03, 0.26, 4, 12), light, 0, 0.12, 0.7);
+  bar.rotation.z = Math.PI / 2;
+  robot.add(bar);
+  robot.add(mesh(new THREE.CylinderGeometry(0.18, 0.2, 0.2, 24), metal, 0, 0.72, 0));
+
+  // Arms float beside the body; each hangs from a pivot at the shoulder.
+  const arm = (side: 1 | -1) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(side * 0.86, 0.32, 0);
+    pivot.add(mesh(new THREE.CapsuleGeometry(0.15, 0.5, 8, 24), shell, 0, -0.4, 0), mesh(new THREE.SphereGeometry(0.09, 16, 16), metal));
+    pivot.rotation.z = side * 0.16;
+    robot.add(pivot);
+    return pivot;
+  };
+  const arms = { left: arm(-1), right: arm(1) };
+
+  // Head: a white helmet with a black glass face pushed through its front, lime eyes and a smile.
+  const head = new THREE.Group();
+  head.position.y = 1.45;
+  const helmet = mesh(new THREE.SphereGeometry(0.75, 64, 48), shell);
+  helmet.scale.set(1.18, 0.92, 1);
+  const face = mesh(new THREE.SphereGeometry(0.75, 64, 48), glass, 0, -0.02, 0.2);
+  face.scale.set(1, 0.68, 0.86);
+  head.add(helmet, face);
+  const eyes = ([-1, 1] as const).map((side) => {
+    const eye = mesh(new THREE.CapsuleGeometry(0.065, 0.1, 6, 16), light, side * 0.26, 0.05, 0.79);
+    eye.rotation.y = side * 0.32;
+    head.add(eye);
+    return eye;
+  });
+  const smile = mesh(new THREE.TorusGeometry(0.09, 0.018, 8, 32, Math.PI), light, 0, -0.17, 0.83);
+  smile.rotation.z = Math.PI;
+  head.add(smile);
+  for (const side of [-1, 1]) {
+    const ear = mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.14, 32), metal, side * 0.9, 0, 0);
+    ear.rotation.z = Math.PI / 2;
+    const ring = mesh(new THREE.TorusGeometry(0.15, 0.022, 8, 32), light, side * 0.975, 0, 0);
+    ring.rotation.y = Math.PI / 2;
+    head.add(ear, ring);
+  }
+  head.add(mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.32, 12), metal, 0, 0.82, 0), mesh(new THREE.SphereGeometry(0.07, 16, 16), light, 0, 1, 0));
+  robot.add(head);
+
+  // Hover: a lime ring and a soft glow under the body.
+  const ring = mesh(new THREE.TorusGeometry(0.2, 0.03, 8, 40), light, 0, -1.02, 0);
+  ring.rotation.x = Math.PI / 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 128;
+  const g = canvas.getContext("2d")!;
+  const fade = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  fade.addColorStop(0, "rgba(198,255,77,0.9)");
+  fade.addColorStop(1, "rgba(198,255,77,0)");
+  g.fillStyle = fade;
+  g.fillRect(0, 0, 128, 128);
+  const glowTexture = new THREE.CanvasTexture(canvas);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+  glow.position.y = -1.15;
+  glow.scale.set(1.6, 0.9, 1);
+  const thrust = new THREE.PointLight(0xa6ff00, 4, 3);
+  thrust.position.y = -1.2;
+  robot.add(ring, glow, thrust);
+
+  return { robot, head, arms, eyes, glowTexture };
+}
+
+function start(THREE: Three, host: HTMLDivElement, room: InstanceType<typeof import("three/examples/jsm/environments/RoomEnvironment.js").RoomEnvironment>) {
   // Still for people who turn motion off.
   const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let renderer: InstanceType<Three["WebGLRenderer"]>;
@@ -49,51 +131,57 @@ function start(
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.1;
   renderer.domElement.style.cssText = "width:100%;height:100%;display:block";
   host.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  // Soft studio reflections make the white shell read as glossy plastic.
+  // Studio reflections make the shell read as glossy plastic; warm and coral lights sit it in the dusk.
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(room, 0.04).texture;
-  const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 100);
-  scene.add(new THREE.HemisphereLight(0xffe6d0, 0x2a0f24, 0.8));
-  const key = new THREE.DirectionalLight(0xffe2c4, 2.2);
-  key.position.set(3, 5, 4);
-  const rim = new THREE.DirectionalLight(0xff8a5c, 3);
-  rim.position.set(-4, 3, -3);
-  const glow = new THREE.PointLight(0xa6ff00, 6, 6);
-  scene.add(key, rim, glow);
+  scene.environmentIntensity = 0.8;
+  scene.add(new THREE.HemisphereLight(0xffe6d0, 0x2a0f24, 0.7));
+  const key = new THREE.DirectionalLight(0xffe4cc, 2);
+  key.position.set(3, 4, 5);
+  const rim = new THREE.DirectionalLight(0xff7a50, 3);
+  rim.position.set(-4, 2, -3);
+  scene.add(key, rim);
 
-  // Shell, joints and face in the brand's dusk look instead of the model's orange.
-  const paint: Record<string, { color: number; roughness: number; metalness: number }> = {
-    Main: { color: 0xf3eee8, roughness: 0.28, metalness: 0.05 },
-    Grey: { color: 0x3a3438, roughness: 0.45, metalness: 0.6 },
-    Black: { color: 0x0b0a0d, roughness: 0.12, metalness: 0.2 },
-  };
+  const { robot, head, arms, eyes, glowTexture } = build(THREE);
+  scene.add(robot);
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+  camera.position.set(0, 0.7, 8);
+  camera.lookAt(0, 0.62, 0);
 
-  let model: import("three").Object3D | null = null;
-  let mixer: import("three").AnimationMixer | null = null;
-  const clock = new THREE.Clock();
   const pointer = { x: 0, y: 0 };
   const turn = { x: 0, y: 0 };
   const onMove = (e: PointerEvent) => {
     const r = host.getBoundingClientRect();
     pointer.x = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / (window.innerWidth / 2)));
-    pointer.y = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / (window.innerHeight / 2)));
+    pointer.y = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height * 0.3)) / (window.innerHeight / 2)));
   };
 
+  // Wave hello in the first few seconds; blink every few seconds.
+  const ease = (a: number, b: number, t: number) => {
+    const k = Math.min(1, Math.max(0, (t - a) / (b - a)));
+    return k * k * (3 - 2 * k);
+  };
+  let blinkAt = 2.5;
+  const clock = new THREE.Clock();
   const draw = () => {
-    const dt = Math.min(clock.getDelta(), 0.1);
-    if (mixer && !still) mixer.update(dt);
-    if (model) {
-      // Ease toward the pointer: the whole robot turns and tilts a little.
-      turn.x += (pointer.x - turn.x) * 0.06;
-      turn.y += (pointer.y - turn.y) * 0.06;
-      model.rotation.y = turn.x * 0.55;
-      model.rotation.x = turn.y * 0.12;
-    }
+    const t = still ? 0 : clock.getElapsedTime();
+    turn.x += (pointer.x - turn.x) * 0.06;
+    turn.y += (pointer.y - turn.y) * 0.06;
+    robot.position.y = Math.sin(t * 1.2) * 0.08;
+    robot.rotation.y = turn.x * 0.22;
+    robot.rotation.z = Math.sin(t * 0.8) * 0.025;
+    head.rotation.y = turn.x * 0.5;
+    head.rotation.x = turn.y * 0.25;
+    const lift = ease(0.3, 0.8, t) * (1 - ease(2.6, 3.2, t));
+    arms.right.rotation.z = 0.16 + lift * (2.3 + 0.3 * Math.sin(t * 9));
+    arms.left.rotation.z = -0.16 - Math.sin(t * 1.2 + 1) * 0.05;
+    if (t > blinkAt + 0.14) blinkAt = t + 3 + Math.random() * 3;
+    const open = t > blinkAt && t < blinkAt + 0.14 ? 0.12 : 1;
+    eyes.forEach((e) => (e.scale.y = open));
     renderer.render(scene, camera);
   };
 
@@ -102,10 +190,13 @@ function start(
     if (!w || !h) return;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
+    // Keep the whole robot in frame whatever the box's shape.
+    camera.position.z = 8 * Math.max(1, 0.78 / camera.aspect);
     camera.updateProjectionMatrix();
     if (still) draw();
   };
 
+  // Runs only while on screen.
   let visible = true;
   let frame = 0;
   const loop = () => {
@@ -113,10 +204,7 @@ function start(
     draw();
   };
   const wake = () => {
-    if (!still && !frame && visible && !document.hidden && model) {
-      clock.getDelta();
-      frame = requestAnimationFrame(loop);
-    }
+    if (!still && !frame && visible && !document.hidden) frame = requestAnimationFrame(loop);
   };
   const seen = new IntersectionObserver(([e]) => {
     visible = e.isIntersecting;
@@ -124,60 +212,15 @@ function start(
   });
   const sized = new ResizeObserver(resize);
 
-  loader.load(MODEL, (gltf) => {
-    if (cancelled()) return;
-    model = gltf.scene;
-    model.traverse((o) => {
-      const mesh = o as import("three").Mesh;
-      if (mesh.isMesh) {
-        const mat = mesh.material as import("three").MeshStandardMaterial;
-        const p = paint[mat.name];
-        if (p) Object.assign(mat, { roughness: p.roughness, metalness: p.metalness }).color.setHex(p.color);
-      }
-    });
-    // Frame the model: centred, with a little room around it.
-    const box = new THREE.Box3().setFromObject(model);
-    const size = box.getSize(new THREE.Vector3());
-    const centre = box.getCenter(new THREE.Vector3());
-    model.position.sub(centre);
-    scene.add(model);
-    const fit = (size.y / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.25;
-    camera.position.set(0, size.y * 0.06, fit);
-    camera.lookAt(0, 0, 0);
-    glow.position.set(0, -size.y * 0.35, size.z * 1.2);
-
-    mixer = new THREE.AnimationMixer(model);
-    const clip = (name: string) => gltf.animations.find((a) => a.name === name);
-    const idleClip = clip("Idle");
-    const waveClip = clip("Wave");
-    const idle = idleClip ? mixer.clipAction(idleClip) : null;
-    idle?.play();
-    if (waveClip && !still) {
-      // Wave hello once, then settle back into the idle loop.
-      const wave = mixer.clipAction(waveClip);
-      wave.setLoop(THREE.LoopOnce, 1);
-      wave.clampWhenFinished = true;
-      setTimeout(() => {
-        if (cancelled() || !mixer) return;
-        idle?.fadeOut(0.3);
-        wave.reset().fadeIn(0.3).play();
-        mixer.addEventListener("finished", () => {
-          wave.fadeOut(0.4);
-          idle?.reset().fadeIn(0.4).play();
-        });
-      }, 600);
-    }
-    resize();
-    draw();
-    host.style.opacity = "1";
-    wake();
-  });
-
+  resize();
+  draw();
+  host.style.opacity = "1";
   seen.observe(host);
   sized.observe(host);
   if (!still) {
     window.addEventListener("pointermove", onMove, { passive: true });
     document.addEventListener("visibilitychange", wake);
+    wake();
   }
 
   return () => {
@@ -186,14 +229,14 @@ function start(
     sized.disconnect();
     window.removeEventListener("pointermove", onMove);
     document.removeEventListener("visibilitychange", wake);
-    mixer?.stopAllAction();
     scene.traverse((o) => {
-      const mesh = o as import("three").Mesh;
-      if (mesh.isMesh) {
-        mesh.geometry.dispose();
-        (mesh.material as import("three").Material).dispose();
+      const m = o as import("three").Mesh;
+      if (m.isMesh || (o as import("three").Sprite).isSprite) {
+        m.geometry?.dispose();
+        (m.material as import("three").Material).dispose();
       }
     });
+    glowTexture.dispose();
     scene.environment?.dispose();
     pmrem.dispose();
     renderer.dispose();
