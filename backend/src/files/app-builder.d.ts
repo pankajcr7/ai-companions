@@ -2,7 +2,7 @@
 export type AppFiles = Record<string, string>;
 export type BuildError = { file: string; line: number; column: number; text: string };
 export type BuiltApp = {
-  kind: "react" | "next";
+  kind: "react" | "next" | "remotion";
   js: string;
   css: string;
   /** The page's starting markup (index.html's body without scripts, or a root element). */

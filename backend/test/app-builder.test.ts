@@ -132,3 +132,19 @@ test("the builder's own text can sit inside the preview page's script tag", asyn
   expect(source.toLowerCase()).not.toContain("</script");
   expect(source).not.toContain("<!--");
 });
+
+test("a Remotion video project previews in Remotion's Player, with its fonts, sharing one Remotion and one React", async () => {
+  const out = await build({
+    "package.json": JSON.stringify({ scripts: { preview: "remotion studio src/index.tsx" }, dependencies: { remotion: "4.0.242", "@remotion/cli": "4.0.242", "@fontsource/manrope": "5.1.0", react: "18.3.1", "react-dom": "18.3.1" } }),
+    "src/index.tsx":
+      'import { AbsoluteFill, Composition, registerRoot, useCurrentFrame } from "remotion";\nimport "@fontsource/manrope/latin-500.css";\nconst Film = () => { const frame = useCurrentFrame(); return <AbsoluteFill>Hello video {frame}</AbsoluteFill>; };\nconst Root = () => <><Composition id="Explainer" component={Film} width={1920} height={1080} fps={30} durationInFrames={900} defaultProps={{}} /></>;\nregisterRoot(Root);',
+  });
+  expect(out.errors).toEqual([]);
+  expect(out.kind).toBe("remotion");
+  expect(out.js).toContain("https://esm.sh/@remotion/player@4.0.242?deps=react@18.3.1,react-dom@18.3.1");
+  expect(out.js).toContain("https://esm.sh/remotion@4.0.242?deps=react@18.3.1,react-dom@18.3.1");
+  expect(out.js).toContain("Hello video");
+  // Package stylesheets come from jsDelivr as files, with the fonts they point to.
+  expect(out.js).toContain("https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.1.0/latin-500.css");
+  expect(out.body).toContain('<div id="root"></div>');
+});

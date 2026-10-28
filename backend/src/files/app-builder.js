@@ -53,12 +53,14 @@ export async function buildApp(esbuild, files, { assetBase }) {
   const paths = Object.keys(files);
   const has = (p) => Object.prototype.hasOwnProperty.call(files, p);
   const next = nextLayout(paths, deps);
-  const kind = next ? "next" : "react";
+  // A Remotion project is a video made with React: it plays in Remotion's Player instead of rendering a page.
+  const kind = next ? "next" : "remotion" in deps ? "remotion" : "react";
 
   // Where npm packages come from: esm.sh at the package.json version, all sharing one copy of React.
   const npmUrl = (spec) => {
     const [name, sub] = splitSpecifier(spec);
-    const v = name === "react" ? react : name === "react-dom" ? reactDom : version(name);
+    // Remotion's own packages ship together, so an unlisted one (the Player) takes remotion's version.
+    const v = name === "react" ? react : name === "react-dom" ? reactDom : version(name) || (name.startsWith("@remotion/") ? version("remotion") : "");
     const at = v ? `@${v}` : "";
     const base = `https://esm.sh/${name}${at}${sub}`;
     if (name === "react") return base;
@@ -103,8 +105,9 @@ export async function buildApp(esbuild, files, { assetBase }) {
     return [...names];
   };
 
-  const virtual = virtualModules({ next, kind, assetBase, react, imported, files });
-  const entry = next ? { virtual: true } : reactEntry(files, has);
+  const virtual = virtualModules({ next, kind, assetBase, imported });
+  if (kind === "remotion") Object.assign(virtual, remotionModules(files, has, npmUrl, assetBase));
+  const entry = next || (kind === "remotion" && virtual.__entry__) ? { virtual: true } : reactEntry(files, has);
   if (!entry) return { kind, js: "", css: "", body: "", head: "", title: "", tailwind: 0, notes: [], errors: [{ file: "", line: 0, column: 0, text: "No starting file found: add src/main.jsx (Vite), src/index.js (Create React App), or app/page.tsx (Next.js)." }] };
   if (typeof entry.virtual === "string") virtual.__entry__ = entry.virtual;
 
@@ -145,6 +148,7 @@ export async function buildApp(esbuild, files, { assetBase }) {
         if (css) return { path: name === "tailwindcss" ? clean : `https://cdn.jsdelivr.net/npm/${clean.replace(name, `${name}${version(name) ? "@" + version(name) : ""}`)}`, external: true };
         if (/\.css$/i.test(clean)) return { path: `css:${clean}`, namespace: "virtual" };
         if (ROUTER_PACKAGES.has(clean)) return { path: `router:${clean}`, namespace: "virtual" };
+        if (kind === "remotion" && clean === "remotion") return { path: "remotion-shim", namespace: "virtual" };
         if (name === "next" || name === "server-only" || name === "client-only" || clean.startsWith("node:") || NODE_BUILTINS.has(name)) return { path: "empty", namespace: "virtual" };
         return { path: npmUrl(clean), external: true };
       });
@@ -166,7 +170,8 @@ export async function buildApp(esbuild, files, { assetBase }) {
       build.onLoad({ filter: /.*/, namespace: "virtual" }, (args) => {
         const p = args.path;
         if (p.startsWith("css:")) {
-          const href = JSON.stringify(npmUrl(p.slice(4)).replace(/\?.*$/, ""));
+          const [name, sub] = splitSpecifier(p.slice(4));
+          const href = JSON.stringify(`https://cdn.jsdelivr.net/npm/${name}${version(name) ? "@" + version(name) : ""}${sub}`);
           return { contents: `const l = document.createElement("link"); l.rel = "stylesheet"; l.href = ${href}; document.head.appendChild(l);`, loader: "js" };
         }
         if (p.startsWith("router:")) {
@@ -213,7 +218,7 @@ export async function buildApp(esbuild, files, { assetBase }) {
     return { kind, js: "", css: "", body: "", head: "", title: "", tailwind, notes: [], errors };
   }
   const out = (ext) => result.outputFiles.find((f) => f.path.endsWith(ext))?.text ?? "";
-  const shell = kind === "next" ? { body: '<div id="__next"></div>', head: "", title: "" } : htmlShell(files["index.html"] ?? files["public/index.html"]);
+  const shell = kind === "next" ? { body: '<div id="__next"></div>', head: "", title: "" } : kind === "remotion" ? { body: '<div id="root"></div>', head: "", title: "Video preview" } : htmlShell(files["index.html"] ?? files["public/index.html"]);
   return { kind, js: out(".js"), css: out(".css"), ...shell, tailwind, notes: next ? serverNotes(files, paths) : [], errors: [] };
 }
 
@@ -284,6 +289,54 @@ function htmlShell(html) {
   const title = /<title[^>]*>([^<]*)<\/title>/i.exec(html)?.[1]?.trim() ?? "";
   const head = [...html.matchAll(/<link\b[^>]*href=["']https?:[^"']+["'][^>]*>/gi)].map((m) => m[0]).join("");
   return { body: body || '<div id="root"></div>', head, title };
+}
+
+/**
+ * Remotion: "remotion" is the real package, except that <Composition> and <Still> are collected instead of
+ * registered, and registerRoot keeps the root; the entry renders that root out of sight and plays its videos in
+ * Remotion's Player. The project's starting file comes from its remotion command in package.json, else src/index.
+ */
+function remotionModules(files, has, npmUrl, assetBase) {
+  const script = Object.values(looseJson(files["package.json"])?.scripts ?? {}).join(" ");
+  const named = /remotion\s+(?:studio|preview|render|still)\s+([^\s]+\.(?:tsx|ts|jsx|js))/.exec(script)?.[1];
+  const entry = [named, ...["src/index", "remotion/index", "src/remotion/index", "index"].flatMap((c) => [".tsx", ".ts", ".jsx", ".js"].map((e) => c + e))].find((c) => c && has(c.replace(/^\.\//, "")));
+  if (!entry) return {};
+  const remotion = JSON.stringify(npmUrl("remotion"));
+  return {
+    "remotion-shim": `
+export * from ${remotion};
+export const __compositions = new Map();
+export function registerRoot(Root) { globalThis.__previewRemotionRoot = Root; }
+export function Composition(props) { __compositions.set(props.id, props); return null; }
+export function Still(props) { __compositions.set(props.id, { ...props, durationInFrames: 1, fps: props.fps ?? 30 }); return null; }
+export function Folder({ children }) { return children ?? null; }
+`,
+    __entry__: `
+import { createElement as h, Fragment, useLayoutEffect, useState } from "react";
+import { createRoot } from "react-dom/client";
+import { Player } from ${JSON.stringify(npmUrl("@remotion/player"))};
+import { __compositions } from "remotion-shim";
+import * as project from "app-file:${entry.replace(/^\.\//, "")}";
+// staticFile("x") reads from public/, as in Remotion Studio.
+window.remotion_staticBase = ${JSON.stringify(assetBase + "public")};
+const Root = globalThis.__previewRemotionRoot ?? project.default ?? project.RemotionRoot ?? null;
+function Video() {
+  const [list, setList] = useState([]);
+  const [pick, setPick] = useState(0);
+  useLayoutEffect(() => setList([...__compositions.values()]), []);
+  const c = list[pick];
+  const stage = !c ? (list.length === 0 && Root ? null : h("p", { style: { padding: "2rem" } }, "No video found: add a <Composition> and call registerRoot().")) : h(Fragment, null,
+    h("div", { style: { display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", justifyContent: "center" } },
+      h("strong", null, "Video preview"),
+      list.length > 1 ? h("select", { value: pick, onChange: (e) => setPick(Number(e.target.value)), "aria-label": "Video", style: { font: "inherit", padding: "4px 8px", borderRadius: "8px" } }, list.map((x, i) => h("option", { key: x.id, value: i }, x.id))) : h("span", null, c.id),
+      h("span", { style: { color: "#9aa1ad", fontSize: "13px" } }, (c.width ?? 1920) + "×" + (c.height ?? 1080) + " · " + ((c.durationInFrames ?? 150) / (c.fps ?? 30)).toFixed(1) + "s")),
+    h(Player, { key: c.id, ...(c.lazyComponent ? { lazyComponent: c.lazyComponent } : { component: c.component }), durationInFrames: c.durationInFrames ?? 150, fps: c.fps ?? 30, compositionWidth: c.width ?? 1920, compositionHeight: c.height ?? 1080, inputProps: c.defaultProps ?? {}, controls: true, loop: true, style: { width: "100%", maxWidth: "calc(78vh * " + (c.width ?? 1920) / (c.height ?? 1080) + ")", borderRadius: "12px", overflow: "hidden", background: "#000" } }));
+  return h("main", { style: { minHeight: "100vh", boxSizing: "border-box", padding: "18px", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", background: "#0b0d10", color: "#eef0f3", fontFamily: "system-ui, sans-serif" } },
+    Root ? h("div", { hidden: true }, h(Root)) : null, stage);
+}
+createRoot(document.getElementById("root")).render(h(Video));
+`,
+  };
 }
 
 /** The small stand-ins for Next.js and the generated entry module. */
@@ -619,7 +672,7 @@ export async function startPreview({ esbuild, wasmURL, files, assetBase }) {
       if (v && v.startsWith("/") && !v.startsWith("//")) el.setAttribute(attr, assetBase + "public" + v);
     }
   };
-  new MutationObserver((list) => list.forEach((m) => (m.type === "attributes" ? fix(m.target) : m.addedNodes.forEach((n) => n.nodeType === 1 && [n, ...n.querySelectorAll("img,video,source")].forEach(fix))))).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["src", "poster"] });
+  new MutationObserver((list) => list.forEach((m) => (m.type === "attributes" ? fix(m.target) : m.addedNodes.forEach((n) => n.nodeType === 1 && [n, ...n.querySelectorAll("img,video,audio,source")].forEach(fix))))).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["src", "poster"] });
   addEventListener("click", (e) => {
     const a = e.target.closest?.("a[href]");
     const href = a?.getAttribute("href");
@@ -640,4 +693,15 @@ export async function startPreview({ esbuild, wasmURL, files, assetBase }) {
   script.textContent = out.js;
   document.body.append(script);
   status?.remove();
+
+  // An app that runs but draws nothing would leave a white page: say so instead.
+  setTimeout(() => {
+    const mount = document.getElementById("root") ?? document.getElementById("__next");
+    if (!mount || mount.childElementCount > 0 || document.querySelector("[role=alert]")) return;
+    const hint = document.createElement("div");
+    hint.setAttribute("role", "status");
+    hint.style.cssText = "max-width:520px;margin:12vh auto;padding:24px;border-radius:14px;background:#f3f4f6;color:#0b0d10;font:15px/1.6 system-ui,sans-serif";
+    hint.innerHTML = "<strong>The app ran, but nothing appeared on the page.</strong><br>It may draw into an element that isn't there, need a server to load its content, or not be a web app. Ask your team to check it.";
+    document.body.append(hint);
+  }, 6000);
 }
