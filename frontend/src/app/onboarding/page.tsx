@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { forgetMe } from "@/lib/me";
 import { Logo } from "@/components/landing/ui";
 
 const templates = [
@@ -27,6 +28,7 @@ export default function Onboarding() {
     setError("");
     try {
       const ws = await api<{ slug: string }>("/api/workspaces", { method: "POST", body: { name: f.get("name"), template: f.get("template") } });
+      forgetMe();
       router.push(`/w/${ws.slug}`);
     } catch (err) {
       setError((err as Error).message);

@@ -28,6 +28,15 @@ export async function workspaceRoutes(app: FastifyInstance) {
     return reply.code(201).send(await createWorkspaceFromTemplate(user.id, body.name, body.template));
   });
 
+  // One request for the workspace behind an address (/w/<slug>), so opening the app doesn't first ask who you are.
+  app.get("/api/workspaces/by-slug/:slug", async (req) => {
+    const { slug } = z.object({ slug: z.string().min(1).max(120) }).parse(req.params);
+    const user = await requireUser(req);
+    const membership = await prisma.membership.findFirst({ where: { userId: user.id, workspace: { slug } }, select: { workspaceId: true, role: true } });
+    if (!membership) throw new HttpError(404, "not_found", "Workspace not found");
+    return snapshot(membership.workspaceId, user.id, membership.role);
+  });
+
   app.get("/api/workspaces/:id", async (req) => {
     const { id } = WsParams.parse(req.params);
     const { user, role } = await requireMember(req, id);

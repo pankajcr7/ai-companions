@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { GoogleLogo } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
 import { authClient } from "@/lib/auth-client";
+import { homeOf, loadMe } from "@/lib/me";
 import { NetworkField } from "@/components/landing/NetworkField";
 import { RobotModel } from "@/components/landing/RobotModel";
 import { Corners, Glow, Label, Logo } from "@/components/landing/ui";
@@ -18,25 +19,40 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // The free server sleeps when nobody uses it; if it is slow to answer, say so instead of looking stuck.
+  const [slow, setSlow] = useState(false);
   const [google, setGoogle] = useState<boolean | null>(null);
 
   useEffect(() => {
-    authClient.getSession().then(({ data }) => data && router.replace("/app"));
+    // Already signed in: go straight to the workspace. These requests also wake the server while the form is filled in.
+    loadMe().then((me) => router.replace(homeOf(me)), () => {});
     api<{ google: boolean }>("/api/auth-config").then((c) => setGoogle(c.google), () => setGoogle(false));
   }, [router]);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
+    setSlow(false);
     setError("");
+    const timer = setTimeout(() => setSlow(true), 4000);
     const f = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
-    const { error } =
-      mode === "sign-up"
-        ? await authClient.signUp.email({ name: f.name, email: f.email, password: f.password })
-        : await authClient.signIn.email({ email: f.email, password: f.password });
-    setBusy(false);
-    if (error) return setError(error.message ?? "That didn't work. Check your details and try again.");
-    router.push("/app");
+    try {
+      const { error } =
+        mode === "sign-up"
+          ? await authClient.signUp.email({ name: f.name, email: f.email, password: f.password })
+          : await authClient.signIn.email({ email: f.email, password: f.password });
+      if (error) {
+        setBusy(false);
+        return setError(error.message ?? "That didn't work. Check your details and try again.");
+      }
+      // Straight to the workspace (or onboarding); the button stays busy until it opens.
+      router.replace(homeOf(await loadMe(true)));
+    } catch {
+      setBusy(false);
+      setError("Can't reach the server right now. Try again in a moment.");
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   const title = mode === "sign-up" ? "Create your account" : "Welcome back";
@@ -109,8 +125,13 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
                 disabled={busy}
                 className="w-full rounded-[12px] bg-lime py-3.5 text-sm font-semibold text-night transition-transform hover:-translate-y-px active:translate-y-px disabled:opacity-70"
               >
-                {busy ? "One moment..." : mode === "sign-up" ? "Create account" : "Sign in"}
+                {busy ? (slow ? "Waking up the server..." : "One moment...") : mode === "sign-up" ? "Create account" : "Sign in"}
               </button>
+              {busy && slow && (
+                <p role="status" className="text-sm text-haze">
+                  The server rests when nobody is using it. The first sign-in after a quiet spell can take up to a minute.
+                </p>
+              )}
             </form>
 
             <div className="my-6 flex items-center gap-4 text-xs uppercase tracking-[0.16em] text-haze">

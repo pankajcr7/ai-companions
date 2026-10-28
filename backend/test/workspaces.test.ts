@@ -70,3 +70,14 @@ test("signed-out create is 401", async () => {
   const res = await app.inject({ method: "POST", url: "/api/workspaces", payload: { name: "X", template: "starter" } });
   expect(res.statusCode).toBe(401);
 });
+
+test("a workspace loads by its address in one request, for its members only", async () => {
+  const a = await owner();
+  const bySlug = await a.req("GET", `/api/workspaces/by-slug/${a.slug}`);
+  expect(bySlug.statusCode).toBe(200);
+  expect(bySlug.json()).toEqual((await a.req("GET", `/api/workspaces/${a.id}`)).json());
+  const b = await owner();
+  expect((await b.req("GET", `/api/workspaces/by-slug/${a.slug}`)).statusCode).toBe(404);
+  expect((await b.req("GET", "/api/workspaces/by-slug/no-such-place")).statusCode).toBe(404);
+  expect((await app.inject({ method: "GET", url: `/api/workspaces/by-slug/${a.slug}` })).statusCode).toBe(401);
+});

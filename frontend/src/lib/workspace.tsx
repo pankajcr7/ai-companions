@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api, ApiError } from "./api";
-import type { Me, Snapshot } from "./types";
+import { homeOf, loadMe } from "./me";
+import type { Snapshot } from "./types";
 
 type Ctx = {
   snapshot: Snapshot;
@@ -28,13 +29,12 @@ export function WorkspaceProvider({ slug, children }: { slug: string; children: 
 
   // Fetch returns what to do; state is applied in the promise callback (no setState inside the effect body).
   const fetchState = useCallback(async (): Promise<{ snapshot?: Snapshot; error?: string; redirect?: string }> => {
+    // One request for the workspace at this address; only when it isn't theirs do we ask where they belong.
     try {
-      const me = await api<Me>("/api/me");
-      const ws = me.workspaces.find((w) => w.slug === slug);
-      if (!ws) return { redirect: me.workspaces[0] ? `/w/${me.workspaces[0].slug}` : "/onboarding" };
-      return { snapshot: await api<Snapshot>(`/api/workspaces/${ws.id}`) };
+      return { snapshot: await api<Snapshot>(`/api/workspaces/by-slug/${encodeURIComponent(slug)}`) };
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) return { redirect: "/sign-in" };
+      if (e instanceof ApiError && e.status === 404) return loadMe(true).then((me) => ({ redirect: homeOf(me) }), () => ({ redirect: "/sign-in" }));
       return { error: (e as Error).message };
     }
   }, [slug]);

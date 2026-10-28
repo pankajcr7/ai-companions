@@ -2,15 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { api, ApiError } from "@/lib/api";
-import type { Me } from "@/lib/types";
+import { ApiError } from "@/lib/api";
+import { homeOf, loadMe } from "@/lib/me";
 
 /** Sends a signed-in user to their first workspace, or to onboarding, or to sign-in. */
 export default function AppEntry() {
   const router = useRouter();
   useEffect(() => {
-    api<Me>("/api/me").then(
-      (me) => router.replace(me.workspaces[0] ? `/w/${me.workspaces[0].slug}` : "/onboarding"),
+    loadMe().then(
+      (me) => router.replace(homeOf(me)),
       (e) => router.replace(e instanceof ApiError && e.status === 401 ? "/sign-in" : "/sign-in?error=1"),
     );
   }, [router]);

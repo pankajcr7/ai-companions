@@ -87,7 +87,7 @@ test("the Team page: office desks, cards by department, organizing, and old link
 test("Settings has Company and AI services tabs; the old providers link keeps its message", async ({ page }) => {
   const co = await newCompany(page, { prefix: "Tabs", company: "Tabs Bakery", template: /Just the head agent/ });
   const nav = page.getByRole("navigation", { name: "App" });
-  await expect(nav.getByRole("link")).toHaveText(["Chat", "Projects", "Team"]);
+  await expect(nav.getByRole("link")).toHaveText(["Chat", "Mobile App", "Projects", "Team"]);
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await expect(page.getByRole("tab", { name: "Company", selected: true })).toBeVisible();
   await page.getByRole("tab", { name: "AI services" }).click();

@@ -6,6 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { ArrowsIn, ArrowsOut, ChatCircle, DeviceMobile, FolderSimple, GearSix, List, Palette, SignOut, UsersThree, X } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/lib/workspace";
+import { forgetMe } from "@/lib/me";
 import { Logo } from "@/components/landing/ui";
 import { StudioPreferences, useStudioPreferences } from "./StudioPreferences";
 import { AppearanceControls } from "./settings/AppearanceControls";
@@ -60,6 +61,7 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
   async function signOut() {
     try {
       await authClient.signOut();
+      forgetMe();
       router.push("/sign-in");
     } catch {
       setError("Couldn't sign out. Please try again.");

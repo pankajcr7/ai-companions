@@ -7,10 +7,12 @@ import { TeamAtWork } from "@/components/landing/TeamAtWork";
 import { Story } from "@/components/landing/Story";
 import { Team } from "@/components/landing/Team";
 import { UseCases } from "@/components/landing/UseCases";
+import { WakeServer } from "@/components/landing/WakeServer";
 
 export default function Home() {
   return (
     <div className="on-dark bg-night text-cream">
+      <WakeServer />
       <div id="top" className="mx-auto w-full max-w-[1440px] overflow-x-clip border-x border-cream/10">
         {/* The header and hero share one night scene, with the team network behind both. */}
         <div className="dusk relative isolate overflow-hidden">
