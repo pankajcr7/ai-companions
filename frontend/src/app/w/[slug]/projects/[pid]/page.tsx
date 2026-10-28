@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DownloadSimple, FilePlus, FolderPlus, UploadSimple } from "@phosphor-icons/react";
 import { api, ApiError } from "@/lib/api";
+import { isAppProject } from "@/lib/app-preview";
 import { formatBytes, type ProjectSummary, type ProjectSummaryInfo, type TreeEntry } from "@/lib/projects";
 import { canAdmin, canEdit } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace";
@@ -169,7 +170,7 @@ export default function ProjectWorkspace() {
         {screens.length > 0 && (
           <button onClick={() => setShowingScreens(true)} className="btn-dark rounded-[10px] px-3 py-2 text-sm font-semibold">Phone screens</button>
         )}
-        {entries.some((e) => e.kind === "file" && /\.html?$/i.test(e.path)) && (
+        {(entries.some((e) => e.kind === "file" && /\.html?$/i.test(e.path)) || isAppProject(entries.filter((e) => e.kind === "file").map((e) => e.path))) && (
           <button onClick={() => setPreviewing(true)} className="btn-dark rounded-[10px] px-3 py-2 text-sm font-semibold">Preview</button>
         )}
         <a href={`${base}/download.zip`} className="btn-light flex items-center gap-1.5 rounded-[10px] px-3 py-2 text-sm font-semibold"><DownloadSimple size={14} /> Download ZIP</a>

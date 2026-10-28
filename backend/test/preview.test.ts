@@ -87,3 +87,46 @@ test("preview picker opens the requested HTML file and rejects non-HTML or missi
   expect((await a.req("POST", endpoint, { path: "../private.html" })).statusCode).toBe(400);
   expect((await a.req("POST", endpoint, { path: "missing.html" })).statusCode).toBe(404);
 });
+
+const reactApp: [string, string][] = [
+  ["package.json", JSON.stringify({ dependencies: { react: "^19.0.0", "react-dom": "^19.0.0" } })],
+  ["index.html", '<div id="root"></div><script type="module" src="/src/main.jsx"></script>'],
+  ["src/main.jsx", 'import { createRoot } from "react-dom/client";\nimport App from "./App";\ncreateRoot(document.getElementById("root")).render(<App />);'],
+  ["src/App.jsx", 'export default function App() { return <p>{"</script><b>not markup</b>"}</p>; }'],
+];
+
+test("a React or Next.js project previews as a live app: one page that builds it in the browser", async () => {
+  const a = await project(reactApp);
+  const res = await a.req("POST", `/api/workspaces/${a.id}/projects/${a.pid}/preview-token`);
+  expect(res.statusCode).toBe(200);
+  // The app wins over its index.html, which can't run without a build.
+  expect(res.json().entry).toBe("__app__");
+  expect(res.json().url).toMatch(/^\/api\/preview\/[^/]+\/__app__$/);
+  const page = await app.inject({ method: "GET", url: res.json().url });
+  expect(page.statusCode).toBe(200);
+  expect(page.headers["content-type"]).toBe("text/html; charset=utf-8");
+  expect(page.headers["content-security-policy"]).toBe("sandbox allow-scripts allow-forms");
+  expect(page.body).toContain("https://cdn.jsdelivr.net/npm/esbuild-wasm@0.28.2/esm/browser.min.js");
+  expect(page.body).toContain("startPreview(");
+  expect(page.body).toContain('"src/App.jsx"');
+  // Project files can't end the page's script early: their "<" is escaped.
+  expect(page.body.match(/<\/script>/gi)).toHaveLength(2);
+  expect(page.body).toContain("\\u003c/script>\\u003cb>not markup");
+});
+
+test("an app in a folder previews from that folder; plain sites and non-apps keep their HTML preview", async () => {
+  const a = await project([["README.md", "# Shop"], ...reactApp.map(([p, c]): [string, string] => [`shop/${p}`, c]), ["shop/node_modules/x/index.js", "module.exports = 1"]]);
+  const res = (await a.req("POST", `/api/workspaces/${a.id}/projects/${a.pid}/preview-token`)).json();
+  expect(res.url).toMatch(/\/shop\/__app__$/);
+  const page = (await app.inject({ method: "GET", url: res.url })).body;
+  expect(page).toContain('"src/main.jsx"');
+  expect(page).not.toContain("shop/src/main.jsx");
+  expect(page).not.toContain("node_modules");
+
+  const site = await project([["package.json", JSON.stringify({ devDependencies: { prettier: "3.0.0" } })], ["index.html", "<h1>Plain</h1>"]]);
+  const endpoint = `/api/workspaces/${site.id}/projects/${site.pid}/preview-token`;
+  expect((await site.req("POST", endpoint)).json().entry).toBe("index.html");
+  const asked = await site.req("POST", endpoint, { path: "__app__" });
+  expect(asked.statusCode).toBe(404);
+  expect(asked.json().error.message).toBe("This project isn't a React or Next.js app.");
+});

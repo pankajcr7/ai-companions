@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { ArrowClockwise, ArrowSquareOut, DownloadSimple, FileText, PencilLine, X } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
+import { APP_PAGE, isAppProject } from "@/lib/app-preview";
 import type { TreeEntry } from "@/lib/projects";
 import { outputKind } from "@/lib/studio";
 import { useWorkspace } from "@/lib/workspace";
@@ -34,10 +35,14 @@ export function ProjectPreview({ selection, version = "", onClose, onRequestChan
   const SCREENS = "__screens__";
   const screens = phoneScreens((entries ?? []).map((e) => e.path));
   const showScreens = screens.length > 0 && (!userPicked || picked === SCREENS);
-  const path = showScreens ? undefined : entries?.some((e) => e.path === picked) ? picked : primary?.path;
+  // A React or Next.js app opens as the live app until a single file is picked.
+  const isApp = isAppProject((entries ?? []).map((e) => e.path));
+  const showApp = !showScreens && isApp && (!userPicked || picked === APP_PAGE);
+  const path = showScreens ? undefined : showApp ? APP_PAGE : entries?.some((e) => e.path === picked) ? picked : primary?.path;
+  const filePath = path === APP_PAGE ? undefined : path;
   return <section className="studio-preview" aria-label="Work preview">
     <header className="studio-preview-header"><div><p className="studio-eyebrow">YOUR WORK, TAKING SHAPE</p><h2>{selection.title}</h2></div><button onClick={onClose} className="studio-icon-button" aria-label="Close preview"><X size={19} /></button></header>
-    <div className="studio-preview-toolbar"><label><span className="sr-only">Preview file</span><select value={showScreens ? SCREENS : (path ?? "")} onChange={(e) => { setPicked(e.target.value); setUserPicked(true); }} disabled={!entries?.length}>{!entries?.length && <option>No files yet</option>}{screens.length > 0 && <option value={SCREENS}>Phone screens ({screens.length})</option>}{entries?.map((e) => <option key={e.path} value={e.path}>{e.path}</option>)}</select></label><button onClick={() => setRefresh((n) => n + 1)} className="studio-icon-button" aria-label="Refresh preview"><ArrowClockwise size={17} /></button></div>
+    <div className="studio-preview-toolbar"><label><span className="sr-only">Preview file</span><select value={showScreens ? SCREENS : (path ?? "")} onChange={(e) => { setPicked(e.target.value); setUserPicked(true); }} disabled={!entries?.length}>{!entries?.length && <option>No files yet</option>}{screens.length > 0 && <option value={SCREENS}>Phone screens ({screens.length})</option>}{isApp && <option value={APP_PAGE}>Live app</option>}{entries?.map((e) => <option key={e.path} value={e.path}>{e.path}</option>)}</select></label><button onClick={() => setRefresh((n) => n + 1)} className="studio-icon-button" aria-label="Refresh preview"><ArrowClockwise size={17} /></button></div>
     <div className="studio-preview-body">
       {error ? <div className="studio-preview-empty" role="alert"><p>{error}</p><button className="studio-secondary" onClick={() => setRefresh((n) => n + 1)}>Try again</button></div>
         : !entries ? <div className="studio-preview-loading" aria-busy="true" aria-label="Loading preview" />
@@ -45,12 +50,12 @@ export function ProjectPreview({ selection, version = "", onClose, onRequestChan
         : path ? <PreviewContent key={`${base}:${path}:${refresh}:${version}`} base={base} path={path} title={selection.title} />
         : <div className="studio-preview-empty"><FileText size={36} weight="duotone" /><h3>A little space for something great.</h3><p>Your team’s saved files will appear here as they work.</p></div>}
     </div>
-    <footer className="studio-preview-footer"><Link href={`/w/${snapshot.workspace.slug}/projects/${selection.projectId}${path ? `?open=${encodeURIComponent(path)}` : ""}`} className="studio-secondary"><ArrowSquareOut size={15} />Open project</Link><a className="studio-secondary" href={path ? `${base}/download?path=${encodeURIComponent(path)}` : `${base}/download.zip`}><DownloadSimple size={15} />Download</a>{onRequestChanges && <button className="studio-primary" onClick={() => onRequestChanges(path)}><PencilLine size={15} />Request changes</button>}</footer>
+    <footer className="studio-preview-footer"><Link href={`/w/${snapshot.workspace.slug}/projects/${selection.projectId}${filePath ? `?open=${encodeURIComponent(filePath)}` : ""}`} className="studio-secondary"><ArrowSquareOut size={15} />Open project</Link><a className="studio-secondary" href={filePath ? `${base}/download?path=${encodeURIComponent(filePath)}` : `${base}/download.zip`}><DownloadSimple size={15} />Download</a>{onRequestChanges && <button className="studio-primary" onClick={() => onRequestChanges(filePath)}><PencilLine size={15} />Request changes</button>}</footer>
   </section>;
 }
 
 function PreviewContent({ base, path, title }: { base: string; path: string; title: string }) {
-  const kind = outputKind(path);
+  const kind = path === APP_PAGE ? "website" : outputKind(path);
   const [content, setContent] = useState<string | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState("");

@@ -1,4 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { credentialsKey } from "../crypto.js";
 
 export const PREVIEW_TTL_MS = 60 * 60 * 1000;
@@ -50,4 +51,46 @@ export function previewEntry(paths: string[]): string | null {
   const html = paths.filter((p) => /\.html?$/i.test(p));
   const pick = (list: string[]) => [...list].sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b))[0] ?? null;
   return pick(html.filter((p) => /(^|\/)index\.html?$/i.test(p))) ?? pick(html);
+}
+
+/** The page that builds a React or Next.js app in the browser; it sits in the app's folder, so its files load relative to it. */
+export const APP_PAGE = "__app__";
+const ESBUILD = "https://cdn.jsdelivr.net/npm/esbuild-wasm@0.28.2";
+/** Build output and installed packages: never part of the source the preview builds. */
+export const NOT_SOURCE = /(^|\/)(node_modules|\.next|\.git|dist|build|out|\.vercel|coverage)\//;
+/** Source the browser build reads; other files (pictures, fonts) are only listed, and load by address. */
+export const APP_SOURCE = /\.(tsx?|jsx?|mjs|cjs|json|css|html?)$/i;
+export const APP_SOURCE_CAP = 5 * 1024 * 1024;
+
+/** The folder ("" or "shop/") of the shallowest package.json that uses React or Next.js, or null. */
+export function appRoot(packages: { path: string; json: string }[]): string | null {
+  const depth = (p: string) => p.split("/").length;
+  for (const pkg of [...packages].sort((a, b) => depth(a.path) - depth(b.path))) {
+    if (NOT_SOURCE.test(pkg.path)) continue;
+    try {
+      const j = JSON.parse(pkg.json) as { dependencies?: object; devDependencies?: object };
+      const deps = { ...j.devDependencies, ...j.dependencies };
+      if ("react" in deps || "next" in deps) return pkg.path.slice(0, -"package.json".length);
+    } catch {
+      // Not valid JSON: not an app we can build.
+    }
+  }
+  return null;
+}
+
+let builder: string | null = null;
+/** The runner page: the project's files as data, and the builder, which loads esbuild-wasm and builds them. */
+export function appPage(files: Record<string, string>): string {
+  builder ??= readFileSync(new URL("./app-builder.js", import.meta.url), "utf8");
+  // "<" escaped, so no file can end the page's script early.
+  const data = JSON.stringify(files).replace(/</g, "\\u003c");
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Preview</title>
+<style>#__preview_status{position:fixed;inset:0;display:grid;place-items:center;background:#fff;color:#5b6270;font:500 15px/1.5 system-ui,sans-serif;text-align:center;padding:24px}</style></head>
+<body><div id="__preview_status">Building your app…<br><small>The first preview takes a few seconds.</small></div>
+<script type="application/json" id="__preview_files">${data}</script>
+<script type="module">
+import * as esbuild from "${ESBUILD}/esm/browser.min.js";
+${builder}
+startPreview({ esbuild, wasmURL: "${ESBUILD}/esbuild.wasm", files: JSON.parse(document.getElementById("__preview_files").textContent), assetBase: new URL("./", location.href).href });
+</script></body></html>`;
 }
