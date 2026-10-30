@@ -2,41 +2,30 @@ import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, Menu, pow
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { APP_URL } from "./config";
-import { type LinkInfo, SyncManager } from "./sync/manager";
+import { Device, deviceId, Folders } from "./device";
 
 const ORIGIN = new URL(APP_URL).origin;
 const OFFLINE_PAGE = path.join(__dirname, "..", "static", "offline.html");
 const OFFLINE_URL = pathToFileURL(OFFLINE_PAGE).href;
-const IDLE_SECONDS = 15 * 60;
+/** The app keeps answering the team while someone used the computer, or the team asked for files, in the last half hour. */
+const AWAKE_MS = 30 * 60_000;
 
 if (process.env.AGENT_COMPANY_DATA) app.setPath("userData", process.env.AGENT_COMPANY_DATA);
 // The user agent Chrome itself sends: Google refuses sign-in from browsers that name themselves embedded.
 app.userAgentFallback = `Mozilla/5.0 (${process.platform === "darwin" ? "Macintosh; Intel Mac OS X 10_15_7" : "Windows NT 10.0; Win64; x64"}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome.split(".")[0]}.0.0.0 Safari/537.36`;
 
 const sameSite = (url: string) => URL.canParse(url) && new URL(url).origin === ORIGIN;
-const signIn = (url: string) => URL.canParse(url) && new URL(url).protocol === "https:" && /(^|\.)google\.com$/.test(new URL(url).hostname);
+const signIn = (url: string) => URL.canParse(url) && new URL(url).origin === "https://accounts.google.com";
+const staysInside = (url: string) => sameSite(url) || signIn(url) || url === OFFLINE_URL;
 const openOutside = (url: string) => {
   if (/^(https?|mailto):/i.test(url)) void shell.openExternal(url);
 };
 
 let win: BrowserWindow | null = null;
+let device = "";
+let lastRequest = 0;
 const picked = new Set<string>();
-
-const manager = new SyncManager({
-  file: path.join(app.getPath("userData"), "sync.json"),
-  baseUrl: APP_URL,
-  cookie: async () => (await session.defaultSession.cookies.get({ url: APP_URL })).map((c) => `${c.name}=${c.value}`).join("; "),
-  trash: (abs) => shell.trashItem(abs),
-  onStatus: (projectId, status) => {
-    if (win && (sameSite(win.webContents.getURL()) || win.webContents.getURL() === OFFLINE_URL)) win.webContents.send("agent:status", projectId, status);
-  },
-});
-
-let lastRound = 0;
-const syncNow = () => {
-  lastRound = Date.now();
-  void manager.syncAll();
-};
+const folders = new Folders(app.getPath("userData"), (abs) => shell.trashItem(abs));
 
 /** Only the site's own top-level pages and the bundled offline page reach the computer. */
 const trusted = (e: IpcMainInvokeEvent) => !!e.senderFrame && e.senderFrame.parent === null && (e.senderFrame.origin === ORIGIN || e.senderFrame.url === OFFLINE_URL);
@@ -52,31 +41,24 @@ const text = (v: unknown, max: number) => {
 };
 
 handle("pickFolder", async () => {
-  const r = await dialog.showOpenDialog(win!, { title: "Pick a folder to sync with this project", properties: ["openDirectory", "createDirectory"] });
+  const r = await dialog.showOpenDialog(win!, { title: "Open a folder as a project", buttonLabel: "Open", properties: ["openDirectory", "createDirectory"] });
   if (r.canceled || !r.filePaths[0]) return null;
   picked.add(r.filePaths[0]);
   return r.filePaths[0];
 });
-handle("link", async (raw) => {
-  const o = (raw ?? {}) as Record<string, unknown>;
-  const info: LinkInfo = { workspaceId: text(o.workspaceId, 64), projectId: text(o.projectId, 64), projectName: text(o.projectName, 200), folder: text(o.folder, 4096) };
-  // A page can only link a folder the owner just picked in the system dialog.
-  if (!picked.has(info.folder)) return { error: "Pick the folder first" };
-  try {
-    return { status: await manager.link(info) };
-  } catch (e) {
-    return { error: (e as Error).message };
-  }
+handle("attach", async (projectId, folder) => {
+  // A page can only attach a folder the owner just picked in the system dialog.
+  if (!picked.has(text(folder, 4096))) throw new Error("Pick the folder first");
+  await folders.attach(text(projectId, 64), folder as string);
 });
-handle("unlink", (id) => manager.unlink(text(id, 64)));
-handle("linkOf", (id) => manager.linkOf(text(id, 64)));
-handle("links", () => manager.links());
-handle("openFolder", async (id) => {
-  const l = manager.linkOf(text(id, 64));
-  if (l) await shell.openPath(l.folder);
+handle("folderOf", (projectId) => folders.folderOf(text(projectId, 64)));
+handle("projectOf", (folder) => folders.projectOf(text(folder, 4096)));
+handle("folders", () => folders.list());
+handle("showFolder", async (projectId) => {
+  const f = folders.folderOf(text(projectId, 64));
+  if (f) await shell.openPath(f);
 });
-handle("confirmDeletes", (id) => manager.confirmDeletes(text(id, 64)));
-handle("restoreDeleted", (id) => manager.restoreDeleted(text(id, 64)));
+handle("forget", (projectId) => folders.forget(text(projectId, 64)));
 handle("retry", () => win?.loadURL(`${APP_URL}/app`));
 
 // Every window: the site and Google sign-in stay inside, everything else opens in the normal browser.
@@ -87,7 +69,12 @@ app.on("web-contents-created", (_e, contents) => {
     return { action: "deny" };
   });
   contents.on("will-navigate", (e, url) => {
-    if (sameSite(url) || signIn(url) || url === OFFLINE_URL) return;
+    if (staysInside(url)) return;
+    e.preventDefault();
+    openOutside(url);
+  });
+  contents.on("will-redirect", (e, url, _inPlace, isMainFrame) => {
+    if (!isMainFrame || staysInside(url)) return;
     e.preventDefault();
     openOutside(url);
   });
@@ -102,14 +89,13 @@ function createWindow() {
     title: "Agent Company",
     backgroundColor: "#08110f",
     show: false,
-    webPreferences: { preload: path.join(__dirname, "preload.js"), additionalArguments: [`--agent-origin=${ORIGIN}`, `--agent-version=${app.getVersion()}`] },
+    webPreferences: { preload: path.join(__dirname, "preload.js"), additionalArguments: [`--agent-origin=${ORIGIN}`, `--agent-version=${app.getVersion()}`, `--agent-device=${device}`] },
   });
   win.once("ready-to-show", () => win?.show());
   win.webContents.on("did-fail-load", (_e, code, _desc, url, isMainFrame) => {
     // -3 is a navigation replaced by another one, not a failure.
     if (isMainFrame && code !== -3 && url !== OFFLINE_URL) void win?.loadFile(OFFLINE_PAGE);
   });
-  win.on("focus", syncNow);
   win.on("closed", () => (win = null));
   void win.loadURL(`${APP_URL}/app`);
 }
@@ -128,17 +114,25 @@ else {
     Menu.setApplicationMenu(
       Menu.buildFromTemplate([...(process.platform === "darwin" ? [{ role: "appMenu" as const }] : []), { role: "fileMenu" }, { role: "editMenu" }, { role: "viewMenu" }, { role: "windowMenu" }]),
     );
-    await manager.load();
+    // No camera, microphone, location or the like for any page; copying to the clipboard and full screen for the site only.
+    const allowed = (permission: string, url: string) => sameSite(url) && (permission === "clipboard-sanitized-write" || permission === "fullscreen");
+    session.defaultSession.setPermissionRequestHandler((_wc, permission, done, details) => done(allowed(permission, details.requestingUrl)));
+    session.defaultSession.setPermissionCheckHandler((_wc, permission, origin) => allowed(permission, origin));
+
+    device = await deviceId(app.getPath("userData"));
+    await folders.load();
     createWindow();
     app.on("activate", () => {
       if (!win) createWindow();
     });
-    syncNow();
-    // Every 10 s while the window is in front, every minute behind; none while nobody's at the computer, so the database can sleep.
-    // Folder changes are sent within seconds regardless (the manager watches the folders).
-    setInterval(() => {
-      if (powerMonitor.getSystemIdleTime() >= IDLE_SECONDS) return;
-      if (Date.now() - lastRound >= (BrowserWindow.getFocusedWindow() ? 10_000 : 60_000)) syncNow();
-    }, 1000);
+    // Answers the team's file requests for the folders opened here, for as long as the app runs.
+    void new Device({
+      baseUrl: APP_URL,
+      id: device,
+      cookie: async () => (await session.defaultSession.cookies.get({ url: APP_URL })).map((c) => `${c.name}=${c.value}`).join("; "),
+      folders,
+      active: () => powerMonitor.getSystemIdleTime() * 1000 < AWAKE_MS || Date.now() - lastRequest < AWAKE_MS,
+      onRequest: () => (lastRequest = Date.now()),
+    }).run();
   });
 }

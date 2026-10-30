@@ -8,23 +8,14 @@ if (allowed) {
   const call = (channel: string, ...args: unknown[]) => ipcRenderer.invoke(`agent:${channel}`, ...args);
   contextBridge.exposeInMainWorld("agentDesktop", {
     version: arg("agent-version"),
+    deviceId: arg("agent-device"),
     pickFolder: () => call("pickFolder"),
-    link: async (o: unknown) => {
-      const r = (await call("link", o)) as { status?: unknown; error?: string };
-      if (r.error) throw new Error(r.error);
-      return r.status;
-    },
-    unlink: (projectId: string) => call("unlink", projectId),
-    linkOf: (projectId: string) => call("linkOf", projectId),
-    links: () => call("links"),
-    openFolder: (projectId: string) => call("openFolder", projectId),
-    confirmDeletes: (projectId: string) => call("confirmDeletes", projectId),
-    restoreDeleted: (projectId: string) => call("restoreDeleted", projectId),
+    attach: (projectId: string, folder: string) => call("attach", projectId, folder),
+    folderOf: (projectId: string) => call("folderOf", projectId),
+    projectOf: (folder: string) => call("projectOf", folder),
+    folders: () => call("folders"),
+    showFolder: (projectId: string) => call("showFolder", projectId),
+    forget: (projectId: string) => call("forget", projectId),
     retry: () => call("retry"),
-    onStatus: (cb: (projectId: string, status: unknown) => void) => {
-      const listener = (_e: unknown, projectId: string, status: unknown) => cb(projectId, status);
-      ipcRenderer.on("agent:status", listener);
-      return () => void ipcRenderer.removeListener("agent:status", listener);
-    },
   });
 }
