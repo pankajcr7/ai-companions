@@ -1,0 +1,17 @@
+{
+  "name": "agent-company-desktop",
+  "productName": "Agent Company",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agent Company for Mac and Windows, with projects synced to folders on this computer.",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
