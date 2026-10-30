@@ -2,13 +2,14 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { exclusionReason, LIMITS, parentDirs } from "../files/rules.js";
-import { loadEntry, loadProject, ProjectParams, recount, requirePath, saveText } from "../files/service.js";
+import { loadEntry, loadProject, ProjectParams, recount, requirePath, saveFile, saveText } from "../files/service.js";
 import { getBlob, isTextContent } from "../files/store.js";
 import { HttpError, perUser, requireMember } from "../http.js";
 
 const Save = z.object({ path: z.string().max(1024), content: z.string(), baseRevision: z.number().int().min(0) });
 const PathBody = z.object({ path: z.string().max(1024) });
 const Move = z.object({ from: z.string().max(1024), to: z.string().max(1024) });
+const RawSave = z.object({ path: z.string().max(1024), baseRevision: z.coerce.number().int().min(0) });
 const Restore = z.object({ path: z.string().max(1024), revisionId: z.string().min(1).max(64) });
 
 async function ensureParents(projectId: string, path: string, userId: string) {
@@ -48,6 +49,20 @@ export async function fileRoutes(app: FastifyInstance) {
     const body = Save.parse(req.body);
     return saveText(project, user.id, body.path, body.content, body.baseRevision);
   });
+
+  // The desktop app's folder sync: any file, the body is the file itself.
+  app.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
+  app.put(
+    "/api/workspaces/:id/projects/:pid/files/raw",
+    { bodyLimit: LIMITS.maxFileBytes, config: { rateLimit: { max: 600, timeWindow: "1 minute", keyGenerator: perUser } } },
+    async (req) => {
+      const { id, pid } = ProjectParams.parse(req.params);
+      const { user } = await requireMember(req, id, "member");
+      const project = await loadProject(id, pid);
+      const q = RawSave.parse(req.query);
+      return saveFile(project, user.id, q.path, Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0), q.baseRevision);
+    },
+  );
 
   app.post("/api/workspaces/:id/projects/:pid/folders", async (req, reply) => {
     const { id, pid } = ProjectParams.parse(req.params);

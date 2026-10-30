@@ -33,7 +33,7 @@ export async function recount(db: Db, projectId: string) {
   await db.project.update({ where: { id: projectId }, data: { fileCount: agg._count, totalBytes: agg._sum.size ?? 0 } });
 }
 
-export const entryDTO = (e: ProjectEntry) => ({ path: e.path, kind: e.kind, size: e.size, isText: e.isText, revision: e.revision, updatedAt: e.updatedAt });
+export const entryDTO = (e: ProjectEntry) => ({ path: e.path, kind: e.kind, size: e.size, isText: e.isText, revision: e.revision, updatedAt: e.updatedAt, hash: e.kind === "file" ? e.blobHash : null });
 export const projectDTO = (p: Project) => ({ id: p.id, name: p.name, fileCount: p.fileCount, totalBytes: p.totalBytes, updatedAt: p.updatedAt });
 
 const INLINE: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", pdf: "application/pdf" };
@@ -160,15 +160,21 @@ async function ensureParents(projectId: string, path: string, userId: string) {
   await prisma.projectEntry.createMany({ data: dirs.map((d) => ({ projectId, path: d, pathLower: d.toLowerCase(), kind: "dir" as const, updatedById: userId })), skipDuplicates: true });
 }
 
-/** Creates a file when baseRevision is 0, otherwise saves only if nobody saved since that revision. */
-export async function saveText(project: Project, userId: string, rawPath: string, content: string, baseRevision: number): Promise<{ revision: number }> {
+/** The editor's save: text only, up to 1 MB. */
+export function saveText(project: Project, userId: string, rawPath: string, content: string, baseRevision: number): Promise<{ revision: number }> {
+  if (Buffer.byteLength(content, "utf8") > LIMITS.maxEditorBytes) throw new HttpError(413, "too_large", "Files edited here can be up to 1 MB");
+  return saveFile(project, userId, rawPath, Buffer.from(content, "utf8"), baseRevision, true);
+}
+
+/** Creates a file when baseRevision is 0, otherwise saves only if nobody saved since that revision. Any content, up to 10 MB. */
+export async function saveFile(project: Project, userId: string, rawPath: string, data: Buffer, baseRevision: number, fromEditor = false): Promise<{ revision: number }> {
   const pid = project.id;
   const path = requirePath(rawPath);
   const excluded = exclusionReason(path, "file");
   if (excluded) throw new HttpError(400, "invalid", `This isn't allowed in projects: ${excluded}`);
-  const data = Buffer.from(content, "utf8");
-  if (data.length > LIMITS.maxEditorBytes) throw new HttpError(413, "too_large", "Files edited here can be up to 1 MB");
-  if (PRIVATE_KEY.test(content)) throw new HttpError(400, "invalid", "This file contains a private key, which isn't allowed in projects");
+  if (data.length > LIMITS.maxFileBytes) throw new HttpError(413, "too_large", "Files can be up to 10 MB");
+  const isText = fromEditor || isTextContent(data);
+  if (isText && PRIVATE_KEY.test(data.toString("utf8"))) throw new HttpError(400, "invalid", "This file contains a private key, which isn't allowed in projects");
   const existing = await prisma.projectEntry.findUnique({ where: { projectId_pathLower: { projectId: pid, pathLower: path.toLowerCase() } } });
   const current = await prisma.project.findUniqueOrThrow({ where: { id: pid } });
   if (current.totalBytes + data.length - (existing?.size ?? 0) > LIMITS.maxTotalBytes) throw new HttpError(413, "too_large", "The project has reached 50 MB");
@@ -180,7 +186,7 @@ export async function saveText(project: Project, userId: string, rawPath: string
     const blobHash = await putBlob(data);
     await ensureParents(pid, path, userId);
     await prisma.$transaction(async (tx) => {
-      const entry = await tx.projectEntry.create({ data: { projectId: pid, path, pathLower: path.toLowerCase(), kind: "file", blobHash, size: data.length, isText: true, revision: 1, updatedById: userId } });
+      const entry = await tx.projectEntry.create({ data: { projectId: pid, path, pathLower: path.toLowerCase(), kind: "file", blobHash, size: data.length, isText, revision: 1, updatedById: userId } });
       await tx.fileRevision.create({ data: { entryId: entry.id, projectId: pid, blobHash, size: data.length, revision: 1, reason: "edit", createdById: userId } });
       await recount(tx, pid);
     });
@@ -188,11 +194,11 @@ export async function saveText(project: Project, userId: string, rawPath: string
   }
 
   if (!existing || existing.kind !== "file") throw new HttpError(404, "not_found", "File not found");
-  if (!existing.isText) throw new HttpError(415, "not_text", "Binary files can't be edited here");
+  if (fromEditor && !existing.isText) throw new HttpError(415, "not_text", "Binary files can't be edited here");
   const blobHash = await putBlob(data);
   const next = baseRevision + 1;
   const updated = await prisma.$transaction(async (tx) => {
-    const r = await tx.projectEntry.updateMany({ where: { id: existing.id, revision: baseRevision }, data: { blobHash, size: data.length, revision: next, updatedById: userId } });
+    const r = await tx.projectEntry.updateMany({ where: { id: existing.id, revision: baseRevision }, data: { blobHash, size: data.length, isText, revision: next, updatedById: userId } });
     if (r.count === 0) return false;
     await tx.fileRevision.create({ data: { entryId: existing.id, projectId: pid, blobHash, size: data.length, revision: next, reason: "edit", createdById: userId } });
     await recount(tx, pid);
