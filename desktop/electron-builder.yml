@@ -1,0 +1,33 @@
+appId: com.agentcompany.desktop
+productName: Agent Company
+copyright: Copyright © 2026 Agent Company
+directories:
+  output: dist-app
+  buildResources: build
+files:
+  - dist/**
+  - static/**
+  - package.json
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # Unsigned for now: ad-hoc signing keeps Apple Silicon from calling the app "damaged".
+  identity: "-"
+  hardenedRuntime: false
+dmg:
+  artifactName: Agent-Company-${version}-${arch}.dmg
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  artifactName: Agent-Company-Setup-${version}.exe
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+publish:
+  provider: github
+  owner: pankajcr7
+  repo: ai-companions
+  releaseType: release
