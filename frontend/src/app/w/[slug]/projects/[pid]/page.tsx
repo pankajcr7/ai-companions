@@ -11,6 +11,7 @@ import { formatBytes, type ProjectSummary, type ProjectSummaryInfo, type TreeEnt
 import { canAdmin, canEdit } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace";
 import { FileTree, type TreeAction } from "@/components/app/files/FileTree";
+import { FolderSync } from "@/components/app/files/FolderSync";
 import { SummaryBox } from "@/components/app/files/SummaryBox";
 import { HistoryPanel } from "@/components/app/files/HistoryPanel";
 import { PreviewDialog } from "@/components/app/files/PreviewDialog";
@@ -176,6 +177,7 @@ export default function ProjectWorkspace() {
         <a href={`${base}/download.zip`} className="btn-light flex items-center gap-1.5 rounded-[10px] px-3 py-2 text-sm font-semibold"><DownloadSimple size={14} /> Download ZIP</a>
         {canAdmin(snapshot.role) && <button onClick={deleteProject} className="rounded-[10px] px-3 py-2 text-sm font-semibold text-[#b42318] hover:bg-bg">Delete project</button>}
       </div>
+      {project && <FolderSync workspaceId={snapshot.workspace.id} projectId={pid} projectName={project.name} editable={editable} onSynced={loadTree} />}
       {previewing && <PreviewDialog projectApi={base} title={project?.name ?? "Project"} onClose={() => setPreviewing(false)} />}
       {showingScreens && <PhoneScreensDialog base={base} screens={screens} onClose={() => setShowingScreens(false)} />}
       {notice && <p role="status" className="bg-bg px-4 py-2 text-sm">{notice}</p>}
