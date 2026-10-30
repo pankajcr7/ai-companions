@@ -1,0 +1,37 @@
+# Builds the desktop app's installers when a desktop version tag is pushed (git tag desktop-v0.1.0 && git push origin desktop-v0.1.0)
+# and attaches them to a GitHub Release. The tag's number must match "version" in desktop/package.json.
+name: Desktop app
+
+on:
+  push:
+    tags: ["desktop-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx electron-builder --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No signing certificate yet: don't look for one.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"

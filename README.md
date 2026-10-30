@@ -64,6 +64,12 @@ To build something new, pick **New project** in the bar's project picker. Nova n
 - Limits: 6 tasks per goal, 3 running at once, one goal in progress per company. Nothing runs until you press Start.
 - Every AI call is logged with its tokens; rate each result with thumbs up or down to help improve the prompts.
 
+## Desktop app
+
+Agent Company for Mac and Windows lives in [`desktop/`](desktop/README.md): the live site in its own window, plus syncing a
+project with a folder on the computer (two-way, works offline). Installers are on the
+[Releases](https://github.com/pankajcr7/ai-companions/releases) page; pushing a `desktop-v<version>` tag builds them.
+
 ## Test
 
 ```

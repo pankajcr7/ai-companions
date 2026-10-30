@@ -31,3 +31,5 @@ publish:
   owner: pankajcr7
   repo: ai-companions
   releaseType: release
+  # Tags look like desktop-v0.1.0, so they never clash with other releases of this repository.
+  tagNamePrefix: desktop-v
