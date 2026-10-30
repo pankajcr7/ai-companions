@@ -13,6 +13,7 @@ import { uploadRoutes } from "./routes/uploads.js";
 import { fileRoutes } from "./routes/files.js";
 import { goalChatRoutes } from "./routes/goal-chat.js";
 import { previewRoutes } from "./routes/preview.js";
+import { desktopRoutes } from "./routes/desktop.js";
 import { searchKeyRoutes } from "./routes/search-key.js";
 import { imageKeyRoutes } from "./routes/image-keys.js";
 import { attachmentRoutes } from "./routes/attachments.js";
@@ -39,6 +40,7 @@ export async function buildApp() {
   await app.register(goalRoutes);
   await app.register(goalChatRoutes);
   await app.register(previewRoutes);
+  await app.register(desktopRoutes);
   await app.register(conversationRoutes);
   await app.register(searchKeyRoutes);
   await app.register(imageKeyRoutes);
