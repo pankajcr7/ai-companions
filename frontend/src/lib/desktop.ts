@@ -10,6 +10,8 @@ export type AgentDesktop = {
   projectOf(folder: string): Promise<string | null>;
   showFolder(projectId: string): Promise<void>;
   forget(projectId: string): Promise<void>;
+  /** File → Open Folder… in the app's menu (from app 0.3.0). */
+  onOpenFolder?(cb: (folder: string) => void): () => void;
 };
 
 export const desktopBridge = (): AgentDesktop | null => (typeof window === "undefined" ? null : ((window as { agentDesktop?: AgentDesktop }).agentDesktop ?? null));

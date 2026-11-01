@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowUpRight, FolderOpen, FolderSimple, MagnifyingGlass, Plus, UploadSimple, X } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
-import { desktopBridge, folderName, noSubscribe } from "@/lib/desktop";
 import { formatBytes, type ProjectSummary } from "@/lib/projects";
 import { friendlyDate, projectState } from "@/lib/studio";
 import { canEdit } from "@/lib/types";
@@ -13,6 +12,7 @@ import { useWorkspace } from "@/lib/workspace";
 import { CompanionAvatar } from "@/components/app/CompanionAvatar";
 import { createEmptyProject, UploadDialog } from "@/components/app/files/UploadDialog";
 import { ProjectCover } from "@/components/app/files/ProjectCover";
+import { useOpenFolder } from "@/components/app/files/OpenFolder";
 import { OutputDialog, type PreviewSelection } from "@/components/app/files/ProjectPreview";
 
 export default function ProjectsPage() {
@@ -28,7 +28,7 @@ export default function ProjectsPage() {
   const [filter, setFilter] = useState("all");
   const [preview, setPreview] = useState<PreviewSelection | null>(null);
   const editable = canEdit(snapshot.role);
-  const desk = useSyncExternalStore(noSubscribe, desktopBridge, () => null);
+  const { desk, open: openAsProject } = useOpenFolder();
   const base = `/w/${snapshot.workspace.slug}/projects`;
   const listPath = wsPath("/projects?overview=1");
   const load = useCallback(() => api<{ projects: ProjectSummary[] }>(listPath).then((r) => setProjects(r.projects)), [listPath]);
@@ -43,7 +43,6 @@ export default function ProjectsPage() {
     try { const { id } = await createEmptyProject(snapshot.workspace.id, name.trim()); router.push(`${base}/${id}`); }
     catch (e) { setError((e as Error).message); setBusy(false); }
   }
-  /** Desktop app: a folder on this computer becomes a project; its files stay in the folder. */
   async function openFolder() {
     if (!desk || busy) return;
     setError("");
@@ -51,12 +50,7 @@ export default function ProjectsPage() {
     if (!folder) return;
     setBusy(true);
     try {
-      const known = await desk.projectOf(folder);
-      const list = projects ?? (await api<{ projects: ProjectSummary[] }>(listPath)).projects;
-      if (known && list.some((p) => p.id === known)) return router.push(`${base}/${known}`);
-      const { id } = await api<{ id: string }>(wsPath("/projects"), { method: "POST", body: { name: folderName(folder), deviceId: desk.deviceId } });
-      await desk.attach(id, folder);
-      router.push(`${base}/${id}`);
+      await openAsProject(folder);
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -64,7 +58,7 @@ export default function ProjectsPage() {
   }
   const shown = projects?.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()) && (filter === "all" || projectState(p.overview).kind === filter));
   return <section className="studio-page" aria-labelledby="projects-title">
-    <header className="studio-page-header"><div><p className="studio-eyebrow"><FolderSimple size={16} />MADE WITH YOUR TEAM</p><h1 id="projects-title">Ideas, brought to life.</h1><p>Your projects, their progress, and everything you’ve made together.</p></div>{editable && <div className="studio-actions">{desk && <button onClick={openFolder} disabled={busy} className="studio-primary"><FolderOpen size={16} />Open folder</button>}<button onClick={() => setUploading(true)} className="studio-secondary"><UploadSimple size={16} />Open project</button><button onClick={() => setCreating((v) => !v)} className={desk ? "studio-secondary" : "studio-primary"}><Plus size={16} />New project</button></div>}</header>
+    <header className="studio-page-header"><div><p className="studio-eyebrow"><FolderSimple size={16} />MADE WITH YOUR TEAM</p><h1 id="projects-title">Ideas, brought to life.</h1><p>Your projects, their progress, and everything you’ve made together.</p></div>{editable && <div className="studio-actions">{desk && <button onClick={openFolder} disabled={busy} className="studio-primary"><FolderOpen size={16} />Open folder</button>}{!desk && <button onClick={() => setUploading(true)} className="studio-secondary"><UploadSimple size={16} />Open project</button>}<button onClick={() => setCreating((v) => !v)} className={desk ? "studio-secondary" : "studio-primary"}><Plus size={16} />New project</button></div>}</header>
     {creating && <form aria-label="New project" className="studio-create-project" onSubmit={(e) => { e.preventDefault(); void newProject(); }}><label>Project name<input autoFocus value={name} maxLength={60} required placeholder="What are we making?" onChange={(e) => setName(e.target.value)} /></label><button disabled={busy || !name.trim()} className="studio-primary">{busy ? "Creating…" : "Create project"}</button><button type="button" onClick={() => setCreating(false)} aria-label="Cancel new project" className="studio-icon-button"><X size={18} /></button></form>}
     {error && <p role="alert" className="studio-error">{error}<button onClick={() => load().then(() => setError("")).catch((e) => setError((e as Error).message))}>Try again</button></p>}
     <div className="studio-project-toolbar"><div role="group" aria-label="Filter projects" className="studio-filter-tabs">{[["all", "All projects"], ["working", "Working"], ["review", "Needs review"], ["done", "Finished"]].map(([value, label]) => <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}{value === "all" && projects && <span>{projects.length}</span>}</button>)}</div><label className="studio-search"><MagnifyingGlass size={17} /><input aria-label="Search projects" placeholder="Find a project…" value={query} onChange={(e) => setQuery(e.target.value)} /></label></div>

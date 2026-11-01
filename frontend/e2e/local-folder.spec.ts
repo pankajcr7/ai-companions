@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { newCompany } from "./setup";
 
-type Stub = { __calls: string[] };
+type Stub = { __calls: string[]; __menu?: (folder: string) => void };
 
 test("in the desktop app a folder opens as a project; in a browser there's no Open folder", async ({ page }) => {
   const c = await newCompany(page, { prefix: "Folder", company: "Folder Bakery", template: /Just the head agent/ });
@@ -28,9 +28,13 @@ test("in the desktop app a folder opens as a project; in a browser there's no Op
       showFolder: async () => void calls.push("show"),
       folders: async () => [],
       forget: async () => {},
+      onOpenFolder: (cb: (folder: string) => void) => ((w.__menu = cb), () => (w.__menu = undefined)),
     };
   });
   await page.reload();
+  // In the app, folders open in place: there's no upload button.
+  await expect(page.getByRole("button", { name: "Open folder" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open project" })).toHaveCount(0);
   await page.getByRole("button", { name: "Open folder" }).click();
   await expect(page.getByRole("heading", { name: "bakery-site" })).toBeVisible();
   const projectUrl = page.url();
@@ -44,6 +48,11 @@ test("in the desktop app a folder opens as a project; in a browser there's no Op
   await page.goto(`/w/${c.slug}/projects`);
   await page.getByRole("button", { name: "Open folder" }).click();
   await expect(page).toHaveURL(projectUrl);
+  // File → Open Folder… in the app's menu works from any page.
+  await page.goto(`/w/${c.slug}`);
+  await expect.poll(() => page.evaluate(() => typeof (window as unknown as Stub).__menu)).toBe("function");
+  await page.evaluate(() => (window as unknown as Stub).__menu!("/Users/me/Sites/menu-site"));
+  await expect(page.getByRole("heading", { name: "menu-site" })).toBeVisible();
   const list = await (await page.request.get(`/api/workspaces/${c.id}/projects`)).json();
-  expect(list.projects.map((p: { name: string; onDevice: string }) => [p.name, p.onDevice])).toEqual([["bakery-site", "device-0000-test"]]);
+  expect(list.projects.map((p: { name: string; onDevice: boolean }) => [p.name, p.onDevice]).sort()).toEqual([["bakery-site", true], ["menu-site", true]]);
 });

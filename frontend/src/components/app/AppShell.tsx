@@ -6,6 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { ArrowsIn, ArrowsOut, ChatCircle, DeviceMobile, FolderSimple, GearSix, List, Palette, SignOut, UsersThree, X } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/lib/workspace";
+import { MenuOpenFolder } from "@/components/app/files/OpenFolder";
 import { forgetMe } from "@/lib/me";
 import { Logo } from "@/components/landing/ui";
 import { StudioPreferences, useStudioPreferences } from "./StudioPreferences";
@@ -121,7 +122,7 @@ function WorkspaceShell({ children }: { children: React.ReactNode }) {
             <Link href={base} aria-label="Agent Company home"><Logo className="!text-base" /></Link>
             <span className="workspace-company-avatar !size-8 !text-xs" aria-hidden="true">{snapshot.workspace.name.slice(0, 1).toUpperCase()}</span>
           </div>
-          <main id="workspace-content" tabIndex={-1} className={`workspace-content ${isChat ? "workspace-content-chat" : ""}`}>{children}</main>
+          <main id="workspace-content" tabIndex={-1} className={`workspace-content ${isChat ? "workspace-content-chat" : ""}`}><MenuOpenFolder />{children}</main>
         </div>
         {appearance && <AppearanceDialog onClose={() => setAppearance(false)} />}
       </div>
