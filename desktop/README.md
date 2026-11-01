@@ -1,7 +1,7 @@
 # Agent Company for Mac and Windows
 
 The desktop app shows the live Agent Company (https://ai-companions-five.vercel.app) in its own window and adds one thing a
-browser can't do: **sync a project with a folder on your computer**.
+browser can't do: **open a folder on your computer as a project**, so your AI team works on its files directly.
 
 ## Install
 
@@ -17,27 +17,27 @@ Open the `.dmg` and drag Agent Company into Applications. The app isn't signed b
 **Windows**: run `Agent-Company-Setup-<version>.exe`. The app isn't signed yet, so Windows may show "Windows protected your PC":
 click **More info**, then **Run anyway**.
 
-## Syncing a folder
+## Opening a folder
 
-Open a project and click **Sync with a folder on this computer**, then pick a folder (empty, or with files you want in
-the project). From then on, while the app is open:
+On the Projects page, click **Open folder** and pick a folder. It becomes a project, and its files stay in the
+folder: nothing is uploaded.
 
-- Files saved in the project appear in the folder; files you create or change in the folder (in VS Code, Finder,
-  Explorer, any app) are saved to the project within a few seconds.
-- Without internet, the folder still has everything. Changes you make are sent when you're back online.
-- If a file changed on both sides, the project's version keeps the name and yours is kept next to it as
-  `name (my copy).ext`. Keep what you want and delete the copy.
-- A file deleted in the project goes to the Trash / Recycle Bin. A file you delete in the folder stays in the project
-  until you click **Delete them in the project too** (or **Bring them back**).
-- `node_modules`, `.git`, build output, `.env` and other secret files, and files over 10 MB never sync.
-
-**Stop syncing** unlinks the folder; both sides stay as they are.
+- Your AI team reads and edits the files right there, while the app is open. Keep the folder open in VS Code,
+  Finder or Explorer at the same time; the project page and the preview show the latest files.
+- If you change a file while the team is working on it, the team's older copy is refused, so your edit is never
+  overwritten.
+- Before a file is replaced, the app keeps its earlier version: open the file's **History** to see or restore it.
+  Deleted files go to the Trash / Recycle Bin.
+- `node_modules`, `.git`, build output, `.env` and other secret files, and links to places outside the folder are
+  never read.
+- The team needs the app open on this computer to reach the folder. Without internet, the folder is still yours to
+  work on in any app.
 
 ## Development
 
 ```bash
 npm install
-npm test            # sync engine and folder tests
+npm test            # folder and device tests
 npm run test:app    # launches the built app against a local test page
 npm start           # runs the app against the live site (AGENT_COMPANY_URL=http://localhost:3000 for local)
 npm run dist -- --mac --arm64 --publish never   # builds an installer into dist-app/

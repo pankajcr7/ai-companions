@@ -3,15 +3,15 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { DownloadSimple, FilePlus, FolderPlus, UploadSimple } from "@phosphor-icons/react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { DownloadSimple, FilePlus, FolderOpen, FolderPlus, UploadSimple } from "@phosphor-icons/react";
 import { api, ApiError } from "@/lib/api";
+import { desktopBridge, noSubscribe } from "@/lib/desktop";
 import { isAppProject } from "@/lib/app-preview";
 import { formatBytes, type ProjectSummary, type ProjectSummaryInfo, type TreeEntry } from "@/lib/projects";
 import { canAdmin, canEdit } from "@/lib/types";
 import { useWorkspace } from "@/lib/workspace";
 import { FileTree, type TreeAction } from "@/components/app/files/FileTree";
-import { FolderSync } from "@/components/app/files/FolderSync";
 import { SummaryBox } from "@/components/app/files/SummaryBox";
 import { HistoryPanel } from "@/components/app/files/HistoryPanel";
 import { PreviewDialog } from "@/components/app/files/PreviewDialog";
@@ -50,15 +50,31 @@ export default function ProjectWorkspace() {
   const theme = snapshot.preferences.theme;
   const dark = theme === "dark" || (theme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
+  const desk = useSyncExternalStore(noSubscribe, desktopBridge, () => null);
+  const [folder, setFolder] = useState<string | null>(null);
+  const [unreachable, setUnreachable] = useState("");
+  const onDevice = !!project?.onDevice;
   const loadTree = useCallback(
     () =>
-      api<{ project: ProjectSummary; entries: TreeEntry[]; summary: ProjectSummaryInfo | null }>(`${base}/tree`).then((r) => {
+      api<{ project: ProjectSummary; entries: TreeEntry[]; summary: ProjectSummaryInfo | null; unreachable?: string }>(`${base}/tree`).then((r) => {
         setProject(r.project);
         setEntries(r.entries);
         setSummary(r.summary);
+        setUnreachable(r.unreachable ?? "");
       }),
     [base],
   );
+  useEffect(() => {
+    if (desk && onDevice) void desk.folderOf(pid).then(setFolder);
+  }, [desk, onDevice, pid]);
+  // A folder changes outside the app too (the team, VS Code, Finder): its file list stays current.
+  useEffect(() => {
+    if (!onDevice) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") loadTree().catch(() => {});
+    }, 10_000);
+    return () => clearInterval(timer);
+  }, [onDevice, loadTree]);
   useEffect(() => {
     loadTree().catch((e) => setNotice((e as Error).message));
   }, [loadTree]);
@@ -97,7 +113,7 @@ export default function ProjectWorkspace() {
       const r = await api<{ revision: number }>(`${base}/files`, { method: "PUT", body: { path: sent.path, content: sent.content, baseRevision: sent.revision } });
       // Keep anything typed while the save was in flight; only the sent text counts as saved.
       setOpen((o) => (o?.kind === "text" && o.path === sent.path ? { ...o, saved: sent.content, revision: r.revision } : o));
-      setNotice(`Saved version ${r.revision}.`);
+      setNotice(onDevice ? "Saved to the folder." : `Saved version ${r.revision}.`);
       await loadTree();
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) setConflict(true);
@@ -139,7 +155,7 @@ export default function ProjectWorkspace() {
         await loadTree();
       }
       if (kind === "delete" && path) {
-        if (!confirm(`Delete ${path}? Its history is deleted too.`)) return;
+        if (!confirm(onDevice ? `Move ${path} to the Trash?` : `Delete ${path}? Its history is deleted too.`)) return;
         await api(`${base}/entries?${q(path)}`, { method: "DELETE" });
         if (open && inside(open.path, path)) setOpen(null);
         await loadTree();
@@ -150,9 +166,10 @@ export default function ProjectWorkspace() {
   }
 
   async function deleteProject() {
-    if (!confirm(`Delete the project ${project?.name}? This can't be undone.`)) return;
+    if (!confirm(onDevice ? `Remove the project ${project?.name}? The folder and its files stay on your computer.` : `Delete the project ${project?.name}? This can't be undone.`)) return;
     try {
       await api(base, { method: "DELETE" });
+      if (onDevice) await desk?.forget(pid);
       router.push(projectsHref);
     } catch (e) {
       setNotice((e as Error).message);
@@ -167,17 +184,25 @@ export default function ProjectWorkspace() {
         <Link href={projectsHref} className="text-sm text-muted hover:underline">Projects</Link>
         <span className="text-muted">/</span>
         <h1 className="mr-auto truncate font-semibold">{project?.name ?? "Project"}</h1>
-        {project && <span className="text-xs text-muted">{project.fileCount} files · {formatBytes(project.totalBytes)}</span>}
+        {project && !onDevice && <span className="text-xs text-muted">{project.fileCount} files · {formatBytes(project.totalBytes)}</span>}
         {screens.length > 0 && (
           <button onClick={() => setShowingScreens(true)} className="btn-dark rounded-[10px] px-3 py-2 text-sm font-semibold">Phone screens</button>
         )}
         {(entries.some((e) => e.kind === "file" && /\.html?$/i.test(e.path)) || isAppProject(entries.filter((e) => e.kind === "file").map((e) => e.path))) && (
           <button onClick={() => setPreviewing(true)} className="btn-dark rounded-[10px] px-3 py-2 text-sm font-semibold">Preview</button>
         )}
-        <a href={`${base}/download.zip`} className="btn-light flex items-center gap-1.5 rounded-[10px] px-3 py-2 text-sm font-semibold"><DownloadSimple size={14} /> Download ZIP</a>
+        {!onDevice && <a href={`${base}/download.zip`} className="btn-light flex items-center gap-1.5 rounded-[10px] px-3 py-2 text-sm font-semibold"><DownloadSimple size={14} /> Download ZIP</a>}
         {canAdmin(snapshot.role) && <button onClick={deleteProject} className="rounded-[10px] px-3 py-2 text-sm font-semibold text-[#b42318] hover:bg-bg">Delete project</button>}
       </div>
-      {project && <FolderSync workspaceId={snapshot.workspace.id} projectId={pid} projectName={project.name} editable={editable} onSynced={loadTree} />}
+      {onDevice && (
+        <section aria-label="Folder on your computer" className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-paper px-4 py-2 text-sm">
+          <FolderOpen size={16} aria-hidden="true" className="shrink-0 text-muted" />
+          <span className="font-medium">{folder ?? "A folder on your computer"}</span>
+          {folder && desk && <button onClick={() => void desk.showFolder(pid)} className="rounded-[8px] px-2.5 py-1 font-semibold hover:bg-bg">Show folder</button>}
+          <span className="text-muted">The team edits these files directly. Earlier versions are in each file&apos;s History.</span>
+          {unreachable && <p role="status" className="w-full font-medium text-[#b54708]">{unreachable}</p>}
+        </section>
+      )}
       {previewing && <PreviewDialog projectApi={base} title={project?.name ?? "Project"} onClose={() => setPreviewing(false)} />}
       {showingScreens && <PhoneScreensDialog base={base} screens={screens} onClose={() => setShowingScreens(false)} />}
       {notice && <p role="status" className="bg-bg px-4 py-2 text-sm">{notice}</p>}
@@ -199,7 +224,7 @@ export default function ProjectWorkspace() {
               <>
                 <button aria-label="New file" title="New file" onClick={() => act("newFile", null)} className={iconBtn}><FilePlus size={16} /></button>
                 <button aria-label="New folder" title="New folder" onClick={() => act("newFolder", null)} className={iconBtn}><FolderPlus size={16} /></button>
-                <button aria-label="Upload into project" title="Upload into project" onClick={() => act("upload", null)} className={iconBtn}><UploadSimple size={16} /></button>
+                {!onDevice && <button aria-label="Upload into project" title="Upload into project" onClick={() => act("upload", null)} className={iconBtn}><UploadSimple size={16} /></button>}
               </>
             )}
           </div>
