@@ -5,13 +5,27 @@ name: Desktop app
 on:
   push:
     tags: ["desktop-v*"]
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  # One release for the tag, made before the builds: each build then adds its installers to it, instead of the two
+  # racing to create a release each (which split 0.3.1 into two).
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - run: >-
+          gh release view "$TAG" --repo "$REPO" > /dev/null 2>&1 ||
+          gh release create "$TAG" --repo "$REPO" --title "${TAG#desktop-v}"
+          --notes "Agent Company for Mac (.dmg: arm64 for Apple Silicon, x64 for Intel) and Windows (Setup .exe). How to install: desktop/README.md."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+
   build:
+    needs: release
     strategy:
       # Each system's installer is built and published on its own: one failing doesn't cancel the other.
       fail-fast: false
