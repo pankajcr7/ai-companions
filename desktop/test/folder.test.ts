@@ -114,4 +114,4 @@ test("a huge folder is listed up to 2,000 entries, and reads at the same moment 
   const [a, b] = await Promise.all([f.list(), f.list()]);
   expect(a).toHaveLength(2000);
   expect(b).toBe(a);
-});
+}, 60_000); // writing 2,100 files takes a while on Windows

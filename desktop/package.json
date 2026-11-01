@@ -1,7 +1,7 @@
 {
   "name": "agent-company-desktop",
   "productName": "Agent Company",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Agent Company for Mac and Windows: open a folder on your computer and your AI team works on its files.",
   "main": "dist/main.js",

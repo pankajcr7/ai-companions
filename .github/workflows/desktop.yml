@@ -13,6 +13,8 @@ permissions:
 jobs:
   build:
     strategy:
+      # Each system's installer is built and published on its own: one failing doesn't cancel the other.
+      fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
