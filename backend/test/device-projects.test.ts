@@ -8,6 +8,7 @@ import { goalContext } from "../src/goals/load.js";
 import { saveText } from "../src/files/service.js";
 import { projectTools } from "../src/harness/tools.js";
 import { client, makeApp, ORIGIN, signUp } from "./helpers.js";
+import { multipart } from "./upload-helpers.js";
 
 const app = await makeApp();
 await app.listen({ port: 0, host: "127.0.0.1" });
@@ -54,7 +55,7 @@ async function deviceProject(files: Record<string, string> = {}) {
 test("tree, editor read and save work on the folder, and nothing is stored on the server", async () => {
   const { req, base, pid, disk } = await deviceProject({ "index.html": "<h1>Hi</h1>", "src/app.js": "let a = 1;" });
   const tree = (await req("GET", `${base}/tree`)).json();
-  expect(tree.project.onDevice).toBeTruthy();
+  expect(tree.project.onDevice).toBe(true);
   expect(tree.entries.map((e: { path: string }) => e.path)).toEqual(["index.html", "src", "src/app.js"]);
   const file = (await req("GET", `${base}/files?path=src/app.js`)).json();
   expect(file.content).toBe("let a = 1;");
@@ -93,9 +94,12 @@ test("the team's briefing reads the brief from the folder", async () => {
 });
 
 test("preview serves pages and the app builder from the folder", async () => {
-  const { req, base } = await deviceProject({ "index.html": "<h1>Fresh bread</h1>" });
+  const { req, base } = await deviceProject({ "index.html": "<h1>Fresh bread</h1>", "style.css": "h1{}", "accounts.sqlite": "private" });
   const { url } = (await req("POST", `${base}/preview-token`, {})).json();
   expect((await app.inject({ method: "GET", url })).body).toBe("<h1>Fresh bread</h1>");
+  // A preview link reaches the folder's web files, not everything in it.
+  expect((await app.inject({ method: "GET", url: url.replace("index.html", "style.css") })).statusCode).toBe(200);
+  expect((await app.inject({ method: "GET", url: url.replace("index.html", "accounts.sqlite") })).statusCode).toBe(404);
 
   const appProject = await deviceProject({ "package.json": JSON.stringify({ dependencies: { react: "19" } }), "src/main.jsx": "export default () => <p>App</p>;" });
   const token = (await appProject.req("POST", `${appProject.base}/preview-token`, {})).json();
@@ -149,8 +153,31 @@ test("when the app isn't open, the page says to open it", async () => {
   // The project page still gets the project, with what to do instead of the files.
   const tree = await req("GET", `/api/workspaces/${workspaceId}/projects/${pid}/tree`);
   expect(tree.statusCode, tree.body).toBe(200);
-  expect(tree.json()).toMatchObject({ project: { name: "site", onDevice: "never-polled-device" }, entries: [], unreachable: "Open the Agent Company app on the computer that has this folder." });
+  expect(tree.json()).toMatchObject({ project: { name: "site", onDevice: true }, entries: [], unreachable: "Open the Agent Company app on the computer that has this folder." });
   const file = await req("GET", `/api/workspaces/${workspaceId}/projects/${pid}/files?path=a.md`);
   expect(file.statusCode).toBe(409);
   expect(file.json().error.message).toBe("Open the Agent Company app on the computer that has this folder.");
+});
+
+test("another member can't run or change the owner's goals on a folder, or save files into it", async () => {
+  const { workspaceId, project, site } = await deviceProject({ "a.md": "a" });
+  const other = await signUp(app);
+  const oreq = client(app, other.cookie);
+  const oid = (await oreq("GET", "/api/me")).json().user.id;
+  await prisma.membership.create({ data: { workspaceId, userId: oid, role: "member" } });
+  const goal = await prisma.goal.create({ data: { workspaceId, projectId: project.id, text: "Tidy the site", status: "awaiting_approval", createdById: project.createdById } });
+  const g = `/api/workspaces/${workspaceId}/goals/${goal.id}`;
+  const tries = [
+    await oreq("PUT", `${g}/plan`, { tasks: [] }),
+    await oreq("POST", `${g}/start`),
+    await oreq("POST", `${g}/resume`),
+    await oreq("POST", `${g}/replan`),
+    await oreq("POST", `${g}/tasks/nope/retry`),
+  ];
+  expect(tries.map((r) => r.statusCode)).toEqual([403, 403, 403, 403, 403]);
+  const f = multipart({}, [["file", "note.txt", "from someone else"]]);
+  const att = (await app.inject({ method: "POST", url: `/api/workspaces/${workspaceId}/attachments`, payload: f.payload, headers: { ...f.headers, cookie: other.cookie, origin: ORIGIN } })).json();
+  const saved = await oreq("POST", `/api/workspaces/${workspaceId}/attachments/${att.id}/save`, { projectId: project.id });
+  expect(saved.statusCode).toBe(403);
+  await expect(fs.stat(path.join(site, "attachments"))).rejects.toThrow();
 });

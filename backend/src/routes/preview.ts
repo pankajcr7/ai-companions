@@ -49,7 +49,8 @@ export async function previewRoutes(app: FastifyInstance) {
     const project = await prisma.project.findUnique({ where: { id: projectId } });
     if (!project) return reply.code(404).headers(SANDBOX).type("text/html; charset=utf-8").send("<p>This project no longer exists.</p>");
     if (path === APP_PAGE || path.endsWith(`/${APP_PAGE}`)) return reply.headers(SANDBOX).type("text/html; charset=utf-8").send(await appRunner(project, path.slice(0, -APP_PAGE.length)));
-    const entry = await findEntry(project, path);
+    // A folder on the owner's computer holds more than a site: its preview link reaches web files only.
+    const entry = project.deviceId && previewType(path) === "application/octet-stream" ? null : await findEntry(project, path);
     if (!entry || entry.kind !== "file" || !entry.blobHash) return reply.code(404).headers(SANDBOX).type("text/html; charset=utf-8").send("<p>That file isn't in this project.</p>");
     return reply.headers(SANDBOX).type(previewType(path)).send(await readBytes(project, entry));
   });

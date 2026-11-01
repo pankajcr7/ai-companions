@@ -44,11 +44,19 @@ test("without the app connected, the call says to open the app", async () => {
   await expect(desktopCall({ ...o.project, createdById: "someone-else" }, "list", {})).rejects.toMatchObject({ code: "desktop_offline" });
 });
 
-test("a device belongs to the first person who connects it", async () => {
+test("an app install signed in as someone else gets only that person's requests", async () => {
   const o = await owner();
   await o.poll();
   const other = await signUp(app);
-  expect((await o.poll(0, other.cookie)).statusCode).toBe(403);
+  expect((await o.poll(0, other.cookie)).json()).toEqual({ calls: [] });
+  const call = desktopCall(o.project, "list", {});
+  expect((await o.poll(0, other.cookie)).json()).toEqual({ calls: [] });
+  const { calls } = (await o.poll()).json();
+  expect(calls.map((c: { op: string }) => c.op)).toEqual(["list"]);
+  // Another person can't answer it either.
+  await client(app, other.cookie)("POST", "/api/desktop/reply", { device: o.device, id: calls[0].id, ok: true, result: { entries: ["forged"] } });
+  await o.reply({ id: calls[0].id, ok: true, result: { entries: [] } });
+  expect(await call).toEqual({ entries: [] });
 });
 
 test("the app's errors come back with their meaning", async () => {

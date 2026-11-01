@@ -79,6 +79,6 @@ export async function attachmentRoutes(app: FastifyInstance) {
   app.post("/api/workspaces/:id/attachments/:aid/save", async (req) => {
     const { id, user, att } = await mine(req, "member");
     const { projectId } = z.object({ projectId: z.string().min(1).max(64) }).parse(req.body);
-    return { path: await copyIntoProject(att, await loadProject(id, projectId), user.id) };
+    return { path: await copyIntoProject(att, await loadProject(id, projectId, user.id), user.id) };
   });
 }

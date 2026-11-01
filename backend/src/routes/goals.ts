@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { loadProject, saveText, uniqueProjectName } from "../files/service.js";
-import { findEntry, readText } from "../files/source.js";
+import { deviceAccess, findEntry, readText } from "../files/source.js";
 import { readiness } from "../goals/llm.js";
 import { loadHead } from "../goals/load.js";
 import { Plan, planProblems } from "../goals/plan.js";
@@ -23,9 +23,14 @@ export const RATING_REASONS = ["wrong facts", "off-brand", "too generic", "ignor
 const withTasks = { parent: { select: { id: true, text: true } }, tasks: { orderBy: { position: "asc" }, include: { agent: { select: { name: true } }, media: { orderBy: { createdAt: "asc" } } } }, edits: { orderBy: { createdAt: "asc" } } } satisfies Prisma.GoalInclude;
 type FullGoal = Prisma.GoalGetPayload<{ include: typeof withTasks }>;
 
-async function loadGoal(workspaceId: string, gid: string) {
+/** With userId (anything that runs or changes the goal), a goal on a folder project is only for the person whose computer has it. */
+async function loadGoal(workspaceId: string, gid: string, userId?: string) {
   const goal = await prisma.goal.findFirst({ where: { id: gid, workspaceId }, include: withTasks });
   if (!goal) throw new HttpError(404, "not_found", "Goal not found");
+  if (userId && goal.projectId) {
+    const project = await prisma.project.findUnique({ where: { id: goal.projectId }, select: { deviceId: true, createdById: true } });
+    if (project) deviceAccess(project, userId);
+  }
   return goal;
 }
 
@@ -91,7 +96,7 @@ async function rosterIds(workspaceId: string) {
 
 /** The goal's design brief becomes the project's shared brief: saved when there is none yet, otherwise suggested. */
 async function saveBrief(workspaceId: string, goalId: string, userId: string, projectId: string, brief: string) {
-  const project = await loadProject(workspaceId, projectId);
+  const project = await loadProject(workspaceId, projectId, userId);
   const existing = await findEntry(project, BRIEF_PATH);
   if (!existing) {
     await saveText(project, userId, BRIEF_PATH, brief, 0).catch((e) => console.error("brief", e));
@@ -139,8 +144,8 @@ export async function goalRoutes(app: FastifyInstance) {
 
   app.put("/api/workspaces/:id/goals/:gid/plan", async (req) => {
     const { id, gid } = GoalParams.parse(req.params);
-    await requireMember(req, id, "member");
-    const goal = await loadGoal(id, gid);
+    const { user } = await requireMember(req, id, "member");
+    const goal = await loadGoal(id, gid, user.id);
     const plan = Plan.parse(req.body);
     if (goal.newProject && !plan.projectName) throw new HttpError(400, "invalid", "Give the new project a name.");
     const problems = planProblems(plan, await rosterIds(id));
@@ -161,7 +166,7 @@ export async function goalRoutes(app: FastifyInstance) {
   app.post("/api/workspaces/:id/goals/:gid/start", async (req) => {
     const { id, gid } = GoalParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
-    const goal = await loadGoal(id, gid);
+    const goal = await loadGoal(id, gid, user.id);
     if (goal.status !== "awaiting_approval") throw new HttpError(409, "conflict", "This goal isn't waiting for approval.");
     const agents = await prisma.agent.findMany({ where: { id: { in: goal.tasks.map((t) => t.agentId) } }, include: { connection: true } });
     const problems = [...new Set(agents.map(readiness).filter((p): p is string => !!p))];
@@ -200,7 +205,7 @@ export async function goalRoutes(app: FastifyInstance) {
   app.post("/api/workspaces/:id/goals/:gid/resume", async (req) => {
     const { id, gid } = GoalParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
-    const goal = await loadGoal(id, gid);
+    const goal = await loadGoal(id, gid, user.id);
     if (goal.status !== "cancelled") throw new HttpError(409, "conflict", "Only a stopped goal can be resumed.");
     // A plan that was cancelled before Start was never approved: resuming it would run unapproved work.
     if (!goal.tasks.some((t) => t.startedAt || t.status === "done")) throw new HttpError(409, "conflict", "This plan was never started. Ask Nova again to make a new plan.");
@@ -219,8 +224,8 @@ export async function goalRoutes(app: FastifyInstance) {
 
   app.post("/api/workspaces/:id/goals/:gid/replan", async (req) => {
     const { id, gid } = GoalParams.parse(req.params);
-    await requireMember(req, id, "member");
-    const goal = await loadGoal(id, gid);
+    const { user } = await requireMember(req, id, "member");
+    const goal = await loadGoal(id, gid, user.id);
     if (goal.status !== "failed" || goal.tasks.length) throw new HttpError(409, "conflict", "Only a goal whose planning failed can be planned again.");
     await assertNoActiveGoal(id, gid);
     await prisma.goal.update({ where: { id: gid }, data: { status: "planning", error: null } });
@@ -230,8 +235,8 @@ export async function goalRoutes(app: FastifyInstance) {
 
   app.post("/api/workspaces/:id/goals/:gid/tasks/:tid/retry", async (req) => {
     const { id, gid, tid } = TaskParams.parse(req.params);
-    await requireMember(req, id, "member");
-    const goal = await loadGoal(id, gid);
+    const { user } = await requireMember(req, id, "member");
+    const goal = await loadGoal(id, gid, user.id);
     const task = goal.tasks.find((t) => t.id === tid);
     if (!task) throw new HttpError(404, "not_found", "Task not found");
     if (task.status !== "failed" && task.status !== "interrupted") throw new HttpError(409, "conflict", "Only a failed or interrupted task can be retried.");
@@ -291,7 +296,7 @@ export async function goalRoutes(app: FastifyInstance) {
     const { user } = await requireMember(req, id, "member");
     const { goal, edit } = await loadEdit(id, gid, eid);
     if (!goal.projectId) throw new HttpError(409, "conflict", "The project was deleted, so this change can't be applied.");
-    const project = await loadProject(id, goal.projectId);
+    const project = await loadProject(id, goal.projectId, user.id);
     // The edit row stays locked while saving, so a second Apply waits and then sees the decision.
     const outcome = await prisma.$transaction(
       async (tx) => {
