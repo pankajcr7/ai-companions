@@ -29,7 +29,7 @@ export function projectMap(entries: MapEntry[], maxLines = 1500): string {
 }
 
 /** Requested paths that exist and are text, in the order asked, until the budget is spent. */
-export async function pickFiles(requested: string[], entries: ProjectFile[], budget: number, load: (hash: string) => Promise<string>) {
+export async function pickFiles(requested: string[], entries: ProjectFile[], budget: number, load: (file: ProjectFile) => Promise<string>) {
   const byLower = new Map(entries.map((e) => [e.path.toLowerCase(), e]));
   const files: Loaded[] = [];
   const skipped: { path: string; reason: string }[] = [];
@@ -52,7 +52,7 @@ export async function pickFiles(requested: string[], entries: ProjectFile[], bud
       skipped.push({ path: entry.path, reason: "not allowed" });
       continue;
     }
-    const content = await load(entry.blobHash);
+    const content = await load(entry);
     if (content.length > left) {
       skipped.push({ path: entry.path, reason: "too large for the remaining budget" });
       continue;

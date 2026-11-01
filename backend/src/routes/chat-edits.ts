@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { loadProject, saveText } from "../files/service.js";
-import { loadText } from "../goals/load.js";
+import { findEntry, readText } from "../files/source.js";
 import type { Write } from "../harness/tools.js";
 import { audit, HttpError, requireMember } from "../http.js";
 import { WsParams } from "./workspaces.js";
@@ -33,8 +33,9 @@ export async function chatEditRoutes(app: FastifyInstance) {
     const { id, eid } = EditParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
     const edit = await loadEdit(id, user.id, eid);
-    const entry = await prisma.projectEntry.findFirst({ where: { projectId: edit.projectId, pathLower: edit.path.toLowerCase(), kind: "file" } });
-    const current = entry?.blobHash && entry.isText ? await loadText(entry.blobHash) : null;
+    const project = await loadProject(id, edit.projectId, user.id);
+    const entry = await findEntry(project, edit.path);
+    const current = entry?.kind === "file" && entry.blobHash && entry.isText ? await readText(project, entry) : null;
     return { edit: { id: edit.id, path: edit.path, content: edit.content, current, status: edit.status } };
   });
 

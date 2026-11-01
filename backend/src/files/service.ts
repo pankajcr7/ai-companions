@@ -6,6 +6,7 @@ import type { Project, ProjectEntry } from "../generated/prisma/client.js";
 import { HttpError } from "../http.js";
 import { WsParams } from "../routes/workspaces.js";
 import { exclusionReason, LIMITS, normalizePath, parentDirs, PRIVATE_KEY } from "./rules.js";
+import { deviceAccess, type Entry, onFolder, revOf } from "./source.js";
 import { isTextContent, putBlob } from "./store.js";
 
 export const ProjectParams = WsParams.extend({ pid: z.string().min(1).max(64) });
@@ -16,9 +17,11 @@ export function requirePath(raw: unknown): string {
   return r.path;
 }
 
-export async function loadProject(workspaceId: string, pid: string): Promise<Project> {
+/** With userId, also checks that a folder project's files are theirs to reach (it's on their computer). */
+export async function loadProject(workspaceId: string, pid: string, userId?: string): Promise<Project> {
   const p = await prisma.project.findFirst({ where: { id: pid, workspaceId } });
   if (!p) throw new HttpError(404, "not_found", "Project not found");
+  if (userId) deviceAccess(p, userId);
   return p;
 }
 
@@ -33,8 +36,8 @@ export async function recount(db: Db, projectId: string) {
   await db.project.update({ where: { id: projectId }, data: { fileCount: agg._count, totalBytes: agg._sum.size ?? 0 } });
 }
 
-export const entryDTO = (e: ProjectEntry) => ({ path: e.path, kind: e.kind, size: e.size, isText: e.isText, revision: e.revision, updatedAt: e.updatedAt, hash: e.kind === "file" ? e.blobHash : null });
-export const projectDTO = (p: Project) => ({ id: p.id, name: p.name, fileCount: p.fileCount, totalBytes: p.totalBytes, updatedAt: p.updatedAt });
+export const entryDTO = (e: Entry) => ({ path: e.path, kind: e.kind, size: e.size, isText: e.isText, revision: e.revision, updatedAt: e.updatedAt, hash: e.kind === "file" ? e.blobHash : null });
+export const projectDTO = (p: Project) => ({ id: p.id, name: p.name, fileCount: p.fileCount, totalBytes: p.totalBytes, updatedAt: p.updatedAt, onDevice: p.deviceId });
 
 const INLINE: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", pdf: "application/pdf" };
 
@@ -175,6 +178,11 @@ export async function saveFile(project: Project, userId: string, rawPath: string
   if (data.length > LIMITS.maxFileBytes) throw new HttpError(413, "too_large", "Files can be up to 10 MB");
   const isText = fromEditor || isTextContent(data);
   if (isText && PRIVATE_KEY.test(data.toString("utf8"))) throw new HttpError(400, "invalid", "This file contains a private key, which isn't allowed in projects");
+  if (project.deviceId) {
+    // Straight into the folder on the computer; the app refuses if the file changed since baseRevision.
+    const { hash } = (await onFolder(project, "write", { path, base64: data.toString("base64"), base: baseRevision })) as { hash: string };
+    return { revision: revOf(hash) };
+  }
   const existing = await prisma.projectEntry.findUnique({ where: { projectId_pathLower: { projectId: pid, pathLower: path.toLowerCase() } } });
   const current = await prisma.project.findUniqueOrThrow({ where: { id: pid } });
   if (current.totalBytes + data.length - (existing?.size ?? 0) > LIMITS.maxTotalBytes) throw new HttpError(413, "too_large", "The project has reached 50 MB");
@@ -206,6 +214,21 @@ export async function saveFile(project: Project, userId: string, rawPath: string
   });
   if (!updated) throw new HttpError(409, "conflict", "This file changed since you opened it. Reload to see the latest version.");
   return { revision: next };
+}
+
+/** Adds one file that must not exist yet (a made image, an attachment), to the database or the folder. */
+export async function addProjectFile(project: Project, userId: string, path: string, data: Buffer): Promise<{ added: boolean; reason?: string }> {
+  if (!project.deviceId) {
+    const r = await addFiles(project.id, userId, [{ path, data }], []);
+    return { added: r.added > 0, reason: r.skipped[0]?.reason };
+  }
+  try {
+    await saveFile(project, userId, path, data, 0);
+    return { added: true };
+  } catch (e) {
+    if (e instanceof HttpError) return { added: false, reason: e.message };
+    throw e;
+  }
 }
 
 /** "Bakery site", then "Bakery site 2", "Bakery site 3"... within a workspace. */

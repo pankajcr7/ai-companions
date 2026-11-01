@@ -1,5 +1,6 @@
 import { prisma } from "../db.js";
-import { addFiles } from "../files/service.js";
+import { addProjectFile } from "../files/service.js";
+import { findEntry, listEntries, readBytes } from "../files/source.js";
 import { getBlob, putBlob } from "../files/store.js";
 import type { Attachment, Project } from "../generated/prisma/client.js";
 import type { ImageSource, MediaStore } from "../harness/images.js";
@@ -32,8 +33,8 @@ export async function ownAttachments(workspaceId: string, userId: string, ids: s
 }
 
 /** "attachments/logo.png", or "attachments/logo (2).png" when that name is taken. */
-async function freePath(projectId: string, folder: string, name: string) {
-  const taken = new Set((await prisma.projectEntry.findMany({ where: { projectId, pathLower: { startsWith: `${folder.toLowerCase()}/` } }, select: { pathLower: true } })).map((e) => e.pathLower));
+async function freePath(project: Project, folder: string, name: string) {
+  const taken = new Set((await listEntries(project)).map((e) => e.pathLower).filter((p) => p.startsWith(`${folder.toLowerCase()}/`)));
   const dot = name.lastIndexOf(".");
   const [base, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
   for (let n = 1; ; n++) {
@@ -44,9 +45,9 @@ async function freePath(projectId: string, folder: string, name: string) {
 
 /** Copies the original file into a project; never overwrites. Returns where it was saved. */
 export async function copyIntoProject(att: Attachment, project: Project, userId: string): Promise<string> {
-  const path = await freePath(project.id, "attachments", att.name);
-  const result = await addFiles(project.id, userId, [{ path, data: await getBlob(att.blobHash) }], []);
-  if (!result.added) throw new HttpError(413, "too_large", `${att.name} couldn't be added: ${result.skipped[0]?.reason ?? "the project is full"}`);
+  const path = await freePath(project, "attachments", att.name);
+  const result = await addProjectFile(project, userId, path, await getBlob(att.blobHash));
+  if (!result.added) throw new HttpError(413, "too_large", `${att.name} couldn't be added: ${result.reason ?? "the project is full"}`);
   return path;
 }
 
@@ -97,9 +98,9 @@ export function madeImages(o: { workspaceId: string; userId: string; files: Atta
       made.push(row);
       if (!o.task) return `Shown to the owner under your reply as ${fileName}`;
       if (!o.project) return `Shown to the owner on the task card as ${fileName}`;
-      const path = await freePath(o.project.id, "images", fileName);
-      const result = await addFiles(o.project.id, o.userId, [{ path, data }], []);
-      if (!result.added) return `Shown to the owner on the task card as ${fileName}; it couldn't be added to the project (${result.skipped[0]?.reason ?? "the project is full"})`;
+      const path = await freePath(o.project, "images", fileName);
+      const result = await addProjectFile(o.project, o.userId, path, data);
+      if (!result.added) return `Shown to the owner on the task card as ${fileName}; it couldn't be added to the project (${result.reason ?? "the project is full"})`;
       await prisma.proposedEdit.create({ data: { taskId: o.task.id, goalId: o.task.goalId, path, baseRevision: 0, content: "", note: "Image", status: "applied", decidedById: o.userId } });
       return `Saved as ${path}`;
     },
@@ -109,8 +110,8 @@ export function madeImages(o: { workspaceId: string; userId: string; files: Atta
     const att = [...made, ...o.files].find((a) => a.name.toLowerCase() === want);
     let data = att ? await getBlob(att.blobHash) : null;
     if (!data && o.project) {
-      const entry = await prisma.projectEntry.findFirst({ where: { projectId: o.project.id, pathLower: want, kind: "file" } });
-      if (entry?.blobHash) data = await getBlob(entry.blobHash);
+      const entry = await findEntry(o.project, want);
+      if (entry?.kind === "file" && entry.blobHash) data = await readBytes(o.project, entry);
     }
     if (!data) throw new ToolError(`There's no image called ${name}. Use list_attachments or list_files to see them.`);
     if (detect(name, data)?.kind !== "image") throw new ToolError(`${name} isn't an image.`);

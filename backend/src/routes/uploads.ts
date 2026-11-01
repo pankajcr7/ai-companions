@@ -5,6 +5,7 @@ import { prisma } from "../db.js";
 import type { ImportSource, Prisma } from "../generated/prisma/client.js";
 import { LIMITS } from "../files/rules.js";
 import { addFiles, loadProject, ProjectParams, type Incoming } from "../files/service.js";
+import { notOnDevice } from "../files/source.js";
 import { readZip, ZipLimitError } from "../files/zip.js";
 import { audit, HttpError, perUser, requireMember } from "../http.js";
 import { Name, WsParams } from "./workspaces.js";
@@ -97,7 +98,7 @@ export async function uploadRoutes(app: FastifyInstance) {
   app.post("/api/workspaces/:id/projects/:pid/upload", limited, async (req) => {
     const { id, pid } = ProjectParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
-    await loadProject(id, pid);
+    notOnDevice(await loadProject(id, pid));
     const parsed = await parse(req);
     const source = Source.parse(parsed.fields.source ?? "files") as ImportSource;
     let importId = parsed.fields.importId;

@@ -15,7 +15,8 @@ import { signPreview } from "../files/preview.js";
 import { projectTools, webTools, type Write } from "../harness/tools.js";
 import type { Part } from "../providers/types.js";
 import { loadSearchKey } from "../harness/web.js";
-import { goalContext, loadHead, loadText, stepLog } from "./load.js";
+import { goalContext, loadHead, stepLog } from "./load.js";
+import { onDevice, readText } from "../files/source.js";
 import { selectInstructions, selectPrompt, summaryInstructions, summaryPrompt, taskInstructions, taskPrompt } from "./prompts.js";
 
 /**
@@ -133,7 +134,7 @@ async function runTask(goalId: string, taskId: string) {
       try {
         const pick = await completeJson(agent, selectInstructions(20), selectPrompt(task, ctx), Select, signal, stepLog(goal.workspaceId, goalId, taskId, "select"));
         pick.calls.forEach(add);
-        const picked = await pickFiles(pick.value.read, ctx.entries, FILE_BUDGET, loadText);
+        const picked = await pickFiles(pick.value.read, ctx.entries, FILE_BUDGET, (f) => readText(goal.project!, f));
         files = picked.files;
         if (picked.skipped.length) notes.push(`Some requested files were not included: ${picked.skipped.map((s) => `${s.path} (${s.reason})`).join(", ")}.`);
       } catch (e) {
@@ -148,13 +149,14 @@ async function runTask(goalId: string, taskId: string) {
     const read = new Map(files.map((f) => [f.path.toLowerCase(), f]));
     const existing = new Map((ctx.entries ?? []).map((e) => [e.path.toLowerCase(), e]));
     // A goal that created its project saves new files right away; anything else waits for Apply.
+    // In a folder on the owner's computer the team edits the files directly (the app keeps each file's earlier versions).
     // Files this goal created in its own project can be revised directly (Nova's review asks for fixes).
     // The owner's attachments are theirs, not files this goal made: changing them always needs the owner's OK.
     const goalCreated = new Set((await prisma.proposedEdit.findMany({ where: { goalId, status: "applied", note: { not: "Your attachment" } }, select: { path: true } })).map((e) => e.path.toLowerCase()));
     const saveOrSuggest = async (w: Write) => {
       const raw = { path: w.path, content: w.content, note: w.note };
       const ownFile = w.baseRevision !== 0 && goalCreated.has(w.path.toLowerCase());
-      if (!goal.newProject || !goal.project || (w.baseRevision !== 0 && !ownFile)) {
+      if (!goal.project || (!onDevice(goal.project) && (!goal.newProject || (w.baseRevision !== 0 && !ownFile)))) {
         // A rewrite replaces this task's earlier suggestion for the same file: one suggestion per file.
         const earlier = decided.findIndex((d) => d.check.status === "pending" && d.raw.path.toLowerCase() === w.path.toLowerCase());
         if (earlier >= 0) decided.splice(earlier, 1);
@@ -217,8 +219,8 @@ async function runTask(goalId: string, taskId: string) {
       const split = goal.project ? splitEdits(text) : { visible: text.trim(), edits: [], error: null };
       for (const raw of split.edits) {
         const check = checkEdit(raw, read, existing);
-        if (check.status === "pending" && check.baseRevision === 0 && goal.newProject && goal.project) {
-          await saveOrSuggest({ path: check.path, content: raw.content, note: raw.note ?? "", baseRevision: 0 }).catch((e) => {
+        if (check.status === "pending" && goal.project && (onDevice(goal.project) || (check.baseRevision === 0 && goal.newProject))) {
+          await saveOrSuggest({ path: check.path, content: raw.content, note: raw.note ?? "", baseRevision: check.baseRevision }).catch((e) => {
             if (!(e instanceof ToolError)) throw e;
           });
         } else decided.push({ raw: { path: check.path, content: raw.content, note: raw.note ?? "" }, check: { ...check, reason: check.reason ?? null }, decidedById: null });

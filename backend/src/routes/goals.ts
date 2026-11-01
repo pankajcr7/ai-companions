@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { loadProject, saveText, uniqueProjectName } from "../files/service.js";
-import { getBlob } from "../files/store.js";
+import { findEntry, readText } from "../files/source.js";
 import { readiness } from "../goals/llm.js";
 import { loadHead } from "../goals/load.js";
 import { Plan, planProblems } from "../goals/plan.js";
@@ -92,7 +92,7 @@ async function rosterIds(workspaceId: string) {
 /** The goal's design brief becomes the project's shared brief: saved when there is none yet, otherwise suggested. */
 async function saveBrief(workspaceId: string, goalId: string, userId: string, projectId: string, brief: string) {
   const project = await loadProject(workspaceId, projectId);
-  const existing = await prisma.projectEntry.findFirst({ where: { projectId, pathLower: BRIEF_PATH } });
+  const existing = await findEntry(project, BRIEF_PATH);
   if (!existing) {
     await saveText(project, userId, BRIEF_PATH, brief, 0).catch((e) => console.error("brief", e));
     return;
@@ -275,12 +275,13 @@ export async function goalRoutes(app: FastifyInstance) {
 
   app.get("/api/workspaces/:id/goals/:gid/edits/:eid", async (req) => {
     const { id, gid, eid } = EditParams.parse(req.params);
-    await requireMember(req, id);
+    const { user } = await requireMember(req, id);
     const { goal, edit } = await loadEdit(id, gid, eid);
     let current: string | null = null;
     if (goal.projectId) {
-      const entry = await prisma.projectEntry.findUnique({ where: { projectId_pathLower: { projectId: goal.projectId, pathLower: edit.path.toLowerCase() } } });
-      if (entry?.kind === "file" && entry.isText && entry.blobHash) current = (await getBlob(entry.blobHash)).toString("utf8");
+      const project = await loadProject(id, goal.projectId, user.id);
+      const entry = await findEntry(project, edit.path);
+      if (entry?.kind === "file" && entry.isText && entry.blobHash) current = await readText(project, entry);
     }
     return { edit: { id: edit.id, path: edit.path, content: edit.content, current, baseRevision: edit.baseRevision, status: edit.status, note: edit.note } };
   });

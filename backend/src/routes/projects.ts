@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../db.js";
-import { entryDTO, loadEntry, loadProject, ProjectParams, projectDTO, requirePath, sendFile } from "../files/service.js";
+import { entryDTO, loadProject, ProjectParams, projectDTO, requirePath, sendFile, uniqueProjectName } from "../files/service.js";
+import { type Entry, findEntry, listEntries, notOnDevice, readBytes } from "../files/source.js";
 import { getBlob } from "../files/store.js";
 import { writeZip } from "../files/zip.js";
 import { revisionKey } from "../goals/context.js";
@@ -36,8 +37,10 @@ export async function projectRoutes(app: FastifyInstance) {
   app.post("/api/workspaces/:id/projects", async (req, reply) => {
     const { id } = WsParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
-    const { name } = z.object({ name: Name }).parse(req.body);
-    const p = await prisma.project.create({ data: { workspaceId: id, name, createdById: user.id } });
+    const body = z.object({ name: Name, deviceId: z.string().min(8).max(64).optional() }).parse(req.body);
+    // A folder opened in the desktop app: named after the folder, numbered if that name is taken.
+    const name = body.deviceId ? await uniqueProjectName(prisma, id, body.name) : body.name;
+    const p = await prisma.project.create({ data: { workspaceId: id, name, createdById: user.id, deviceId: body.deviceId ?? null } });
     await audit(prisma, id, user.id, "project.create", "project", p.id, { name });
     return reply.code(201).send({ id: p.id });
   });
@@ -63,9 +66,16 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.get("/api/workspaces/:id/projects/:pid/tree", async (req) => {
     const { id, pid } = ProjectParams.parse(req.params);
-    await requireMember(req, id);
-    const project = await loadProject(id, pid);
-    const entries = await prisma.projectEntry.findMany({ where: { projectId: pid }, orderBy: { path: "asc" } });
+    const { user } = await requireMember(req, id);
+    const project = await loadProject(id, pid, user.id);
+    let entries: Entry[];
+    try {
+      entries = await listEntries(project);
+    } catch (e) {
+      // A folder whose app isn't answering: the page still shows the project, with what to do.
+      if (!(e instanceof HttpError) || !e.code.startsWith("desktop_")) throw e;
+      return { project: projectDTO(project), entries: [], summary: null, unreachable: e.message };
+    }
     const summary = project.summary
       ? { text: project.summary, summarizedAt: project.summarizedAt, stale: project.summaryRevisionKey !== revisionKey(entries) }
       : null;
@@ -74,18 +84,20 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.get("/api/workspaces/:id/projects/:pid/download", async (req, reply) => {
     const { id, pid } = ProjectParams.parse(req.params);
-    await requireMember(req, id);
-    await loadProject(id, pid);
+    const { user } = await requireMember(req, id);
+    const project = await loadProject(id, pid, user.id);
     const path = requirePath((req.query as { path?: string }).path);
-    const entry = await loadEntry(pid, path);
+    const entry = await findEntry(project, path);
+    if (!entry) throw new HttpError(404, "not_found", "File not found");
     if (entry.kind !== "file" || !entry.blobHash) throw new HttpError(400, "invalid", "That's a folder; download the project ZIP instead");
-    return sendFile(reply, path.split("/").pop()!, await getBlob(entry.blobHash));
+    return sendFile(reply, path.split("/").pop()!, await readBytes(project, entry));
   });
 
   app.get("/api/workspaces/:id/projects/:pid/download.zip", async (req, reply) => {
     const { id, pid } = ProjectParams.parse(req.params);
     await requireMember(req, id);
     const project = await loadProject(id, pid);
+    notOnDevice(project);
     const entries = await prisma.projectEntry.findMany({ where: { projectId: pid }, orderBy: { path: "asc" } });
     const items = [];
     for (const e of entries) items.push(e.kind === "dir" ? { path: e.path, isDir: true } : { path: e.path, isDir: false, data: await getBlob(e.blobHash!) });
@@ -97,8 +109,8 @@ export async function projectRoutes(app: FastifyInstance) {
     { config: { rateLimit: { max: 5, timeWindow: "1 minute", keyGenerator: perUser } } },
     async (req) => {
       const { id, pid } = ProjectParams.parse(req.params);
-      await requireMember(req, id, "member");
-      const project = await loadProject(id, pid);
+      const { user } = await requireMember(req, id, "member");
+      const project = await loadProject(id, pid, user.id);
       const nova = await loadHead(id);
       const problem = nova ? readiness(nova) : "Your company has no head agent";
       if (problem || !nova) throw new HttpError(409, "unassigned", `${problem}. Choose a model on the companion's Customize form.`);

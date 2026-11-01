@@ -1,6 +1,7 @@
 import { prisma } from "../db.js";
 import type { Project, StepPhase } from "../generated/prisma/client.js";
 import { getBlob } from "../files/store.js";
+import { listEntries, readText } from "../files/source.js";
 import { projectMap, revisionKey, sharedContext, type ProjectFile } from "./context.js";
 import { readiness, type StepLog } from "./llm.js";
 import type { RosterEntry } from "./prompts.js";
@@ -14,13 +15,13 @@ export type GoalContext = { shared: string; sharedRevisions: Record<string, numb
 /** Everything a prompt needs from the linked project: brief/brand, a fresh summary, and the file map. */
 export async function goalContext(project: Project | null): Promise<GoalContext> {
   if (!project) return { shared: "", sharedRevisions: {}, summary: null, map: null, entries: null };
-  const rows = await prisma.projectEntry.findMany({ where: { projectId: project.id }, orderBy: { path: "asc" } });
+  const rows = await listEntries(project);
   const entries: ProjectFile[] = rows.map((r) => ({ path: r.path, kind: r.kind, size: r.size, isText: r.isText, revision: r.revision, blobHash: r.blobHash }));
   const parts: { brief?: string; brand?: string } = {};
   const sharedRevisions: Record<string, number> = {};
   for (const r of rows) {
     if (r.kind !== "file" || !r.blobHash || (r.pathLower !== ".company/brief.md" && r.pathLower !== ".company/brand.md")) continue;
-    parts[r.pathLower === ".company/brief.md" ? "brief" : "brand"] = await loadText(r.blobHash);
+    parts[r.pathLower === ".company/brief.md" ? "brief" : "brand"] = await readText(project, r);
     sharedRevisions[r.path] = r.revision;
   }
   const fresh = project.summary && project.summaryRevisionKey === revisionKey(rows) ? project.summary : null;

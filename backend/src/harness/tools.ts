@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { prisma } from "../db.js";
-import type { Attachment, Project, ProjectEntry } from "../generated/prisma/client.js";
+import type { Attachment, Project } from "../generated/prisma/client.js";
 import { getBlob } from "../files/store.js";
 import { detect, type Kind } from "../attachments/detect.js";
 import { extractText } from "../attachments/extract.js";
@@ -9,7 +8,7 @@ import { LIMITS } from "../files/rules.js";
 import { requirePath } from "../files/service.js";
 import { exclusionReason } from "../files/rules.js";
 import type { Loaded } from "../goals/context.js";
-import { loadText } from "../goals/load.js";
+import { type Entry, listEntries, readBytes, readText } from "../files/source.js";
 import { HttpError } from "../http.js";
 import { ToolError, type Tool } from "./loop.js";
 import { hostOf, lookAtWebsite, studyWebsite } from "./site.js";
@@ -47,11 +46,11 @@ function cleanPath(raw: string): string {
   }
 }
 const folder = (raw: string | undefined) => (raw ? cleanPath(raw.replace(/\/+$/, "")) : "");
-const under = (e: ProjectEntry, dir: string) => !dir || e.pathLower.startsWith(`${dir.toLowerCase()}/`);
+const under = (e: Entry, dir: string) => !dir || e.pathLower.startsWith(`${dir.toLowerCase()}/`);
 
 export function projectTools(project: Project, o: { write: ((w: Write) => Promise<string>) | null; read: Map<string, Loaded> }): Tool[] {
-  let cache: Promise<ProjectEntry[]> | null = null;
-  const entries = () => (cache ??= prisma.projectEntry.findMany({ where: { projectId: project.id }, orderBy: { path: "asc" } }));
+  let cache: Promise<Entry[]> | null = null;
+  const entries = () => (cache ??= listEntries(project));
   const fileAt = async (raw: string) => {
     const path = cleanPath(raw);
     const e = (await entries()).find((x) => x.pathLower === path.toLowerCase());
@@ -83,10 +82,10 @@ export function projectTools(project: Project, o: { write: ((w: Write) => Promis
         const { path, e } = await fileAt(a.path);
         if (!e || e.kind !== "file" || !e.blobHash) throw new ToolError(`There is no file at ${path}. Use list_files to see what exists.`);
         let text: string;
-        if (e.isText) text = await loadText(e.blobHash);
+        if (e.isText) text = await readText(project, e);
         else {
           // Images come back as pictures; PDF and Office files as their text; anything else stays unreadable.
-          const data = await getBlob(e.blobHash);
+          const data = await readBytes(project, e);
           const type = detect(e.path, data);
           if (type?.kind === "image") {
             if (!imageFits(e.size)) return `${e.path} is an image too large to show (${(e.size / 1024 / 1024).toFixed(1)} MB).`;
@@ -114,13 +113,13 @@ export function projectTools(project: Project, o: { write: ((w: Write) => Promis
         const needle = a.query.toLowerCase();
         const hits: string[] = [];
         let scanned = 0;
-        const searchable = (x: ProjectEntry) => x.kind === "file" && !!x.blobHash && under(x, dir) && (x.isText ? x.size <= SEARCH_FILE_MAX : DOC_EXT.test(x.path) && x.size <= LIMITS.maxFileBytes);
+        const searchable = (x: Entry) => x.kind === "file" && !!x.blobHash && under(x, dir) && (x.isText ? x.size <= SEARCH_FILE_MAX : DOC_EXT.test(x.path) && x.size <= LIMITS.maxFileBytes);
         for (const e of (await entries()).filter(searchable)) {
           if (hits.length >= SEARCH_HITS || scanned > SEARCH_SCAN_MAX || signal.aborted) break;
           let body: string;
-          if (e.isText) body = await loadText(e.blobHash!);
+          if (e.isText) body = await readText(project, e);
           else {
-            const data = await getBlob(e.blobHash!);
+            const data = await readBytes(project, e);
             const type = detect(e.path, data);
             body = type && (type.kind === "pdf" || type.kind === "office") ? ((await documentText(e.blobHash!, type.kind, type.mime, data)) ?? "") : "";
           }

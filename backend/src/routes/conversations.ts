@@ -133,7 +133,7 @@ export async function conversationRoutes(app: FastifyInstance) {
     const conn = nova.connection;
     const model = nova.model;
     // Companions can look through the project chosen in the "Working on" chip; their file changes become suggestions.
-    const projectRow = project.kind === "existing" ? await loadProject(id, project.id) : null;
+    const projectRow = project.kind === "existing" ? await loadProject(id, project.id, user.id) : null;
     const writer = chatWriter();
     const tools = [...(projectRow ? projectTools(projectRow, { write: writer.write, read: new Map() }) : []), ...webTools(await loadSearchKey(id))];
     const withFiles = () => [...tools, ...(chatFiles.length ? attachmentTools(chatFiles) : []), ...(image ? [image] : [])];

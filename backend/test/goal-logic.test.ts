@@ -56,7 +56,7 @@ test("pickFiles keeps existing text files in order within the budget", async () 
     { path: ".env.example", kind: "file", size: 4, isText: true, revision: 1, blobHash: "h4" },
   ];
   const text: Record<string, string> = { h1: "hello", h2: "x".repeat(50), h4: "A=1" };
-  const out = await pickFiles(["./readme.md", "nope.txt", "big.txt", "logo.png", "src", "README.md", ".env.example"], entries, 20, async (h) => text[h]);
+  const out = await pickFiles(["./readme.md", "nope.txt", "big.txt", "logo.png", "src", "README.md", ".env.example"], entries, 20, async (f) => text[f.blobHash!]);
   expect(out.files).toEqual([
     { path: "README.md", revision: 2, content: "hello" },
     { path: ".env.example", revision: 1, content: "A=1" },

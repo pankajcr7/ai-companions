@@ -18,7 +18,7 @@ export async function createGoal(o: { workspaceId: string; userId: string; text:
   }
   // A goal that builds something new gets its own project when it starts.
   if (o.newProject) projectId = null;
-  if (projectId) await loadProject(id, projectId);
+  if (projectId) await loadProject(id, projectId, o.userId);
   const nova = await loadHead(id);
   const problem = nova ? readiness(nova) : "Your company has no head agent";
   if (problem) throw new HttpError(409, "unassigned", `${problem}. Choose a model on the companion's Customize form.`);

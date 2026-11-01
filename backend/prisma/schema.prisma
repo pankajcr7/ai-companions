@@ -345,6 +345,8 @@ model Project {
   summary            String?
   summaryRevisionKey String?
   summarizedAt       DateTime?
+  /// Set when the files live in a folder on the creator's computer (the desktop app install that holds it), not here.
+  deviceId           String?
   goals              Goal[]
   chatEdits          ChatEdit[]
 

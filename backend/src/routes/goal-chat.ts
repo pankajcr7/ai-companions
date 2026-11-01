@@ -13,6 +13,7 @@ import { attachmentDTO, madeImages, ownAttachments } from "../attachments/servic
 import { imageTool, loadImageKeys } from "../harness/images.js";
 import { loadSearchKey } from "../harness/web.js";
 import { HttpError, perUser, requireMember } from "../http.js";
+import { deviceAccess } from "../files/source.js";
 import type { ChatTurn } from "../providers/types.js";
 import { WsParams } from "./workspaces.js";
 
@@ -69,6 +70,7 @@ export async function goalChatRoutes(app: FastifyInstance) {
     const { message, attachmentIds } = Send.parse(req.body);
     const goal = await loadGoal(id, gid);
     if (!OPEN.has(goal.status)) throw new HttpError(409, "not_open", "Chat opens once the plan is approved.");
+    if (goal.project) deviceAccess(goal.project, user.id);
     const nova = await loadHead(id);
     const problem = nova ? readiness(nova) : "Your company has no head agent";
     if (problem || !nova?.connection || !nova.model) throw new HttpError(409, "unassigned", `${problem}. Choose a model on the companion's Customize form.`);

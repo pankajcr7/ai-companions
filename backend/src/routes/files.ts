@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { exclusionReason, LIMITS, parentDirs } from "../files/rules.js";
 import { loadEntry, loadProject, ProjectParams, recount, requirePath, saveFile, saveText } from "../files/service.js";
+import { findEntry, onFolder, readText, revOf } from "../files/source.js";
 import { getBlob, isTextContent } from "../files/store.js";
 import { HttpError, perUser, requireMember } from "../http.js";
 
@@ -10,7 +11,7 @@ const Save = z.object({ path: z.string().max(1024), content: z.string(), baseRev
 const PathBody = z.object({ path: z.string().max(1024) });
 const Move = z.object({ from: z.string().max(1024), to: z.string().max(1024) });
 const RawSave = z.object({ path: z.string().max(1024), baseRevision: z.coerce.number().int().min(0) });
-const Restore = z.object({ path: z.string().max(1024), revisionId: z.string().min(1).max(64) });
+const Restore = z.object({ path: z.string().max(1024), revisionId: z.string().min(1).max(1500) });
 
 async function ensureParents(projectId: string, path: string, userId: string) {
   const dirs = parentDirs(path);
@@ -25,6 +26,13 @@ function checkAllowed(path: string, kind: "file" | "dir") {
   if (reason) throw new HttpError(400, "invalid", `This isn't allowed in projects: ${reason}`);
 }
 
+// A folder project's versions are kept by the app on the computer; their ids carry the file's path.
+const versionId = (path: string, id: string) => `${Buffer.from(path).toString("base64url")}.${id}`;
+const fromVersionId = (v: string) => {
+  const [p, id] = v.split(".");
+  return { path: Buffer.from(p ?? "", "base64url").toString("utf8"), id: id ?? "" };
+};
+
 const findPath = (projectId: string, path: string) => prisma.projectEntry.findUnique({ where: { projectId_pathLower: { projectId, pathLower: path.toLowerCase() } } });
 
 export async function fileRoutes(app: FastifyInstance) {
@@ -32,20 +40,21 @@ export async function fileRoutes(app: FastifyInstance) {
 
   app.get("/api/workspaces/:id/projects/:pid/files", async (req) => {
     const { id, pid } = ProjectParams.parse(req.params);
-    await requireMember(req, id);
-    await loadProject(id, pid);
+    const { user } = await requireMember(req, id);
+    const project = await loadProject(id, pid, user.id);
     const path = requirePath((req.query as { path?: string }).path);
-    const entry = await loadEntry(pid, path);
+    const entry = await findEntry(project, path);
+    if (!entry) throw new HttpError(404, "not_found", "File not found");
     if (entry.kind !== "file" || !entry.isText || entry.size > LIMITS.maxEditorBytes) {
       throw new HttpError(415, "not_text", "This file can't be opened in the editor. Download it instead.");
     }
-    return { path: entry.path, content: (await getBlob(entry.blobHash!)).toString("utf8"), revision: entry.revision };
+    return { path: entry.path, content: await readText(project, entry), revision: entry.revision };
   });
 
   app.put("/api/workspaces/:id/projects/:pid/files", saveLimit, async (req) => {
     const { id, pid } = ProjectParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
-    const project = await loadProject(id, pid);
+    const project = await loadProject(id, pid, user.id);
     const body = Save.parse(req.body);
     return saveText(project, user.id, body.path, body.content, body.baseRevision);
   });
@@ -58,7 +67,7 @@ export async function fileRoutes(app: FastifyInstance) {
     async (req) => {
       const { id, pid } = ProjectParams.parse(req.params);
       const { user } = await requireMember(req, id, "member");
-      const project = await loadProject(id, pid);
+      const project = await loadProject(id, pid, user.id);
       const q = RawSave.parse(req.query);
       return saveFile(project, user.id, q.path, Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0), q.baseRevision);
     },
@@ -67,9 +76,13 @@ export async function fileRoutes(app: FastifyInstance) {
   app.post("/api/workspaces/:id/projects/:pid/folders", async (req, reply) => {
     const { id, pid } = ProjectParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
-    await loadProject(id, pid);
+    const project = await loadProject(id, pid, user.id);
     const path = requirePath(PathBody.parse(req.body).path);
     checkAllowed(path, "dir");
+    if (project.deviceId) {
+      await onFolder(project, "mkdir", { path });
+      return reply.code(201).send({ ok: true });
+    }
     if (await findPath(pid, path)) throw new HttpError(409, "conflict", "A file or folder with this name already exists");
     const entries = await prisma.projectEntry.count({ where: { projectId: pid } });
     if (entries + 1 + parentDirs(path).length > LIMITS.maxEntries) throw new HttpError(413, "too_large", "The project has reached 2,000 files and folders");
@@ -81,9 +94,16 @@ export async function fileRoutes(app: FastifyInstance) {
   app.post("/api/workspaces/:id/projects/:pid/move", async (req) => {
     const { id, pid } = ProjectParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
-    await loadProject(id, pid);
+    const project = await loadProject(id, pid, user.id);
     const body = Move.parse(req.body);
     const to = requirePath(body.to);
+    if (project.deviceId) {
+      const from = await findEntry(project, requirePath(body.from));
+      if (!from) throw new HttpError(404, "not_found", "File not found");
+      checkAllowed(to, from.kind);
+      await onFolder(project, "move", { from: from.path, to });
+      return { ok: true };
+    }
     const entry = await loadEntry(pid, requirePath(body.from));
     const from = entry.path;
     checkAllowed(to, entry.kind);
@@ -109,9 +129,14 @@ export async function fileRoutes(app: FastifyInstance) {
 
   app.delete("/api/workspaces/:id/projects/:pid/entries", async (req, reply) => {
     const { id, pid } = ProjectParams.parse(req.params);
-    await requireMember(req, id, "member");
-    await loadProject(id, pid);
+    const { user } = await requireMember(req, id, "member");
+    const project = await loadProject(id, pid, user.id);
     const path = requirePath((req.query as { path?: string }).path);
+    if (project.deviceId) {
+      // To the Trash / Recycle Bin on the computer.
+      await onFolder(project, "remove", { path });
+      return reply.code(204).send();
+    }
     const entry = await loadEntry(pid, path);
     await prisma.$transaction(async (tx) => {
       // starts_with, not Prisma's startsWith: LIKE would treat _ and % in folder names as wildcards.
@@ -123,8 +148,20 @@ export async function fileRoutes(app: FastifyInstance) {
 
   app.get("/api/workspaces/:id/projects/:pid/history", async (req) => {
     const { id, pid } = ProjectParams.parse(req.params);
-    await requireMember(req, id);
-    await loadProject(id, pid);
+    const { user } = await requireMember(req, id);
+    const project = await loadProject(id, pid, user.id);
+    if (project.deviceId) {
+      const entry = await findEntry(project, requirePath((req.query as { path?: string }).path));
+      if (!entry || entry.kind !== "file") throw new HttpError(404, "not_found", "File not found");
+      const { versions } = (await onFolder(project, "versions", { path: entry.path })) as { versions: { id: string; at: number; size: number }[] };
+      const by = "you or the team";
+      return {
+        revisions: [
+          { id: versionId(entry.path, "current"), revision: versions.length + 1, reason: "edit", size: entry.size, fromPath: null, createdAt: entry.updatedAt, createdBy: by },
+          ...versions.map((v, i) => ({ id: versionId(entry.path, v.id), revision: versions.length - i, reason: "edit", size: v.size, fromPath: null, createdAt: new Date(v.at), createdBy: by })),
+        ],
+      };
+    }
     const entry = await loadEntry(pid, requirePath((req.query as { path?: string }).path));
     const rows = await prisma.fileRevision.findMany({ where: { entryId: entry.id }, orderBy: [{ revision: "desc" }, { createdAt: "desc" }] });
     const users = await prisma.user.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.createdById))] } }, select: { id: true, name: true } });
@@ -133,9 +170,16 @@ export async function fileRoutes(app: FastifyInstance) {
   });
 
   app.get("/api/workspaces/:id/projects/:pid/history/:revisionId", async (req) => {
-    const { id, pid, revisionId } = ProjectParams.extend({ revisionId: z.string().min(1).max(64) }).parse(req.params);
-    await requireMember(req, id);
-    await loadProject(id, pid);
+    const { id, pid, revisionId } = ProjectParams.extend({ revisionId: z.string().min(1).max(1500) }).parse(req.params);
+    const { user } = await requireMember(req, id);
+    const project = await loadProject(id, pid, user.id);
+    if (project.deviceId) {
+      const v = fromVersionId(revisionId);
+      const path = requirePath(v.path);
+      const data = v.id === "current" ? Buffer.from(((await onFolder(project, "read", { path })) as { base64: string }).base64, "base64") : Buffer.from(((await onFolder(project, "version", { path, id: v.id })) as { base64: string }).base64, "base64");
+      if (!isTextContent(data) || data.length > LIMITS.maxEditorBytes) throw new HttpError(415, "not_text", "This version can't be shown as text");
+      return { content: data.toString("utf8"), revision: 0 };
+    }
     const rev = await prisma.fileRevision.findFirst({ where: { id: revisionId, projectId: pid } });
     if (!rev) throw new HttpError(404, "not_found", "Version not found");
     const data = await getBlob(rev.blobHash);
@@ -146,8 +190,14 @@ export async function fileRoutes(app: FastifyInstance) {
   app.post("/api/workspaces/:id/projects/:pid/restore", saveLimit, async (req) => {
     const { id, pid } = ProjectParams.parse(req.params);
     const { user } = await requireMember(req, id, "member");
-    await loadProject(id, pid);
+    const project = await loadProject(id, pid, user.id);
     const body = Restore.parse(req.body);
+    if (project.deviceId) {
+      const v = fromVersionId(body.revisionId);
+      if (v.id === "current") return { revision: 0 };
+      const { hash } = (await onFolder(project, "restore", { path: requirePath(body.path), id: v.id })) as { hash: string };
+      return { revision: revOf(hash) };
+    }
     const entry = await loadEntry(pid, requirePath(body.path));
     const rev = await prisma.fileRevision.findFirst({ where: { id: body.revisionId, entryId: entry.id } });
     if (!rev) throw new HttpError(404, "not_found", "Version not found");
