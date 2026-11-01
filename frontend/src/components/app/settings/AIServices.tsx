@@ -285,11 +285,11 @@ function AIServicesInner() {
       title: "Use your ChatGPT plan",
       text: data?.chatgptLocalLogin
         ? "Complete eligible AI requests with usage included in your ChatGPT plan. Works on this computer. Separate from any Agent Company charges."
-        : "ChatGPT sign-in works on local or self-hosted installs. A hosted site needs OpenAI's approval first.",
+        : "Coming soon: OpenAI has to approve ChatGPT sign-in for this site first. Until then, use an OpenAI API key.",
       action: data?.chatgptLocalLogin ? (
         <ChatGptButton onClick={() => startChatgpt()} busy={busy === "chatgpt"} />
       ) : (
-        <a href="https://openai.com/form/sign-in-with-chatgpt-interest/" target="_blank" rel="noreferrer" className="text-sm font-medium underline">OpenAI interest form</a>
+        <button onClick={() => setAdding("openai")} className="btn-light rounded-[10px] px-4 py-2 text-sm font-semibold">Add OpenAI key</button>
       ),
     },
     {
