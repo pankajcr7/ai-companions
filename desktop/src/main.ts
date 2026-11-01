@@ -40,12 +40,20 @@ const text = (v: unknown, max: number) => {
   return v;
 };
 
-handle("pickFolder", async () => {
+async function pickFolder() {
   const r = await dialog.showOpenDialog(win!, { title: "Open a folder as a project", buttonLabel: "Open", properties: ["openDirectory", "createDirectory"] });
   if (r.canceled || !r.filePaths[0]) return null;
   picked.add(r.filePaths[0]);
   return r.filePaths[0];
-});
+}
+handle("pickFolder", pickFolder);
+
+/** File → Open Folder… (⌘O), like an editor: the page opens the folder as a project. */
+async function openFolderFromMenu() {
+  if (!win) createWindow();
+  const folder = await pickFolder();
+  if (folder && win && sameSite(win.webContents.getURL())) win.webContents.send("agent:open-folder", folder);
+}
 handle("attach", async (projectId, folder) => {
   // A page can only attach a folder the owner just picked in the system dialog.
   if (!picked.has(text(folder, 4096))) throw new Error("Pick the folder first");
@@ -112,7 +120,13 @@ else {
   });
   void app.whenReady().then(async () => {
     Menu.setApplicationMenu(
-      Menu.buildFromTemplate([...(process.platform === "darwin" ? [{ role: "appMenu" as const }] : []), { role: "fileMenu" }, { role: "editMenu" }, { role: "viewMenu" }, { role: "windowMenu" }]),
+      Menu.buildFromTemplate([
+        ...(process.platform === "darwin" ? [{ role: "appMenu" as const }] : []),
+        { label: "File", submenu: [{ id: "open-folder", label: "Open Folder…", accelerator: "CmdOrCtrl+O", click: () => void openFolderFromMenu() }, { type: "separator" }, { role: process.platform === "darwin" ? "close" : "quit" }] },
+        { role: "editMenu" },
+        { role: "viewMenu" },
+        { role: "windowMenu" },
+      ]),
     );
     // No camera, microphone, location or the like for any page; copying to the clipboard and full screen for the site only.
     const allowed = (permission: string, url: string) => sameSite(url) && (permission === "clipboard-sanitized-write" || permission === "fullscreen");

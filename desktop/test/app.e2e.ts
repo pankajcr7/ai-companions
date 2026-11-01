@@ -53,6 +53,17 @@ test("shows the site with the desktop bridge; other sites open in the browser an
   await expect.poll(() => app.evaluate(() => (globalThis as unknown as { opened: string[] }).opened)).toEqual([`${other.url}/page`, "https://sites.google.com/view/x", "https://example.com/landing"]);
   await expect(win.locator("h1")).toHaveText("Agent Company");
 
+  // File → Open Folder… (⌘O), like an editor: the picked folder goes to the page.
+  await win.evaluate(() => (window as unknown as { agentDesktop: { onOpenFolder(cb: (f: string) => void): void } }).agentDesktop.onOpenFolder((f) => ((window as unknown as { picked: string }).picked = f)));
+  const accelerator = await app.evaluate(({ dialog, Menu }) => {
+    dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: ["/Users/me/Sites/shop"] })) as typeof dialog.showOpenDialog;
+    const item = Menu.getApplicationMenu()?.getMenuItemById("open-folder");
+    item?.click();
+    return item?.accelerator;
+  });
+  expect(accelerator).toBe("CmdOrCtrl+O");
+  await expect.poll(() => win.evaluate(() => (window as unknown as { picked?: string }).picked)).toBe("/Users/me/Sites/shop");
+
   await app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows()[0].loadURL(u), `${site.url}/preview`);
   await expect(win.locator("h1")).toHaveText("Agent Company");
   expect(await win.evaluate(() => typeof (window as unknown as { agentDesktop?: unknown }).agentDesktop)).toBe("undefined");

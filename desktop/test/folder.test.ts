@@ -89,3 +89,29 @@ test("a missing folder says so and is never recreated", async () => {
   await expect(f.write("a.md", Buffer.from("x"), 0)).rejects.toMatchObject({ code: "not_found" });
   await expect(fs.stat(root)).rejects.toThrow();
 });
+
+test("two saves of the same file at once: one wins, the other is told the file changed", async () => {
+  const { f, disk } = await folder({ "a.md": "original" });
+  const base = rev(sha("original"));
+  const results = await Promise.allSettled([f.write("a.md", Buffer.from("team"), base), f.write("a.md", Buffer.from("editor"), base)]);
+  expect(results.map((r) => r.status).sort()).toEqual(["fulfilled", "rejected"]);
+  const won = results[0].status === "fulfilled" ? "team" : "editor";
+  expect(await disk("a.md")).toBe(won);
+  expect((await f.versions("a.md")).length).toBe(1);
+});
+
+test("files with very long names still keep their versions", async () => {
+  const name = `${"文档".repeat(40)}.md`;
+  const { f } = await folder({ [name]: "one" });
+  await f.write(name, Buffer.from("two"), rev(sha("one")));
+  expect((await f.version(name, (await f.versions(name))[0].id)).toString()).toBe("one");
+});
+
+test("a huge folder is listed up to 2,000 entries, and reads at the same moment share one walk", async () => {
+  const files: Record<string, string> = {};
+  for (let i = 0; i < 2100; i++) files[`f${i}.txt`] = `${i}`;
+  const { f } = await folder(files);
+  const [a, b] = await Promise.all([f.list(), f.list()]);
+  expect(a).toHaveLength(2000);
+  expect(b).toBe(a);
+});

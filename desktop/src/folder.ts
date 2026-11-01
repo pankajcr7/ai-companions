@@ -22,6 +22,8 @@ const SKIP_FILES = [
 const skipFile = (name: string) => !KEEP_FILES.includes(name.toLowerCase()) && SKIP_FILES.some((r) => r.test(name));
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const KEEP_VERSIONS = 20;
+/** Like the server's project limit: a huge folder is listed up to here, not walked and hashed in full every time. */
+const MAX_ENTRIES = 2000;
 
 /** A file's revision as the server shows it: from its content, so it changes whenever the content does. */
 export const rev = (hash: string) => parseInt(hash.slice(0, 12), 16) + 1;
@@ -55,6 +57,14 @@ export type FolderEntry = { path: string; kind: "file" | "dir"; size: number; is
 /** A project's folder on this computer. Paths are relative with "/" on every system; nothing outside it, or behind a link, is reachable. */
 export class Folder {
   private known = new Map<string, { mtimeMs: number; size: number; hash: string; isText: boolean }>();
+  /** Changes run one at a time, so a check-then-write can't interleave with another (the team saving while the editor does). */
+  private changes: Promise<unknown> = Promise.resolve();
+
+  private oneAtATime<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.changes.then(fn, fn);
+    this.changes = run.catch(() => {});
+    return run;
+  }
 
   constructor(
     readonly root: string,
@@ -94,11 +104,19 @@ export class Folder {
     return d;
   }
 
-  async list(): Promise<FolderEntry[]> {
+  private listing: Promise<FolderEntry[]> | null = null;
+
+  /** Callers asking at the same moment share one walk of the folder. */
+  list(): Promise<FolderEntry[]> {
+    return (this.listing ??= this.listNow().finally(() => (this.listing = null)));
+  }
+
+  private async listNow(): Promise<FolderEntry[]> {
     await this.rootOk();
     const out: FolderEntry[] = [];
     const walk = async (dir: string, rel: string) => {
       for (const d of await fs.readdir(dir, { withFileTypes: true })) {
+        if (out.length >= MAX_ENTRIES) return;
         const p = rel ? `${rel}/${d.name}` : d.name;
         const abs = path.join(dir, d.name);
         if (d.isDirectory()) {
@@ -124,7 +142,11 @@ export class Folder {
   }
 
   /** base 0 creates a new file; otherwise the file must still be the version the caller read (its rev). */
-  async write(rel: string, data: Buffer, base: number) {
+  write(rel: string, data: Buffer, base: number) {
+    return this.oneAtATime(() => this.writeNow(rel, data, base));
+  }
+
+  private async writeNow(rel: string, data: Buffer, base: number) {
     const abs = await this.abs(rel);
     if (data.length > MAX_FILE_BYTES) throw new FolderError("too_large", "Files can be up to 10 MB.");
     const st = await fs.stat(abs).catch(() => null);
@@ -141,27 +163,32 @@ export class Folder {
     return sha(data);
   }
 
-  async remove(rel: string) {
-    const abs = await this.abs(rel);
-    if (!(await fs.lstat(abs).catch(() => null))) throw new FolderError("not_found", `There is nothing at ${rel}.`);
-    await this.moveToTrash(abs);
+  remove(rel: string) {
+    return this.oneAtATime(async () => {
+      const abs = await this.abs(rel);
+      if (!(await fs.lstat(abs).catch(() => null))) throw new FolderError("not_found", `There is nothing at ${rel}.`);
+      await this.moveToTrash(abs);
+    });
   }
 
   async mkdir(rel: string) {
     await fs.mkdir(await this.abs(rel), { recursive: true });
   }
 
-  async move(from: string, to: string) {
-    const src = await this.abs(from);
-    const dest = await this.abs(to);
-    if (!(await fs.lstat(src).catch(() => null))) throw new FolderError("not_found", `There is nothing at ${from}.`);
-    if (await fs.lstat(dest).catch(() => null)) throw new FolderError("conflict", "Something with that name already exists there.");
-    await fs.mkdir(path.dirname(dest), { recursive: true });
-    await fs.rename(src, dest);
+  move(from: string, to: string) {
+    return this.oneAtATime(async () => {
+      const src = await this.abs(from);
+      const dest = await this.abs(to);
+      if (!(await fs.lstat(src).catch(() => null))) throw new FolderError("not_found", `There is nothing at ${from}.`);
+      if (await fs.lstat(dest).catch(() => null)) throw new FolderError("conflict", "Something with that name already exists there.");
+      await fs.mkdir(path.dirname(dest), { recursive: true });
+      await fs.rename(src, dest);
+    });
   }
 
+  /** Named by a hash of the path: any file name fits the disk's limit on folder names. */
   private dirOf(rel: string) {
-    return path.join(this.versionsDir, encodeURIComponent(rel));
+    return path.join(this.versionsDir, createHash("sha256").update(rel).digest("hex"));
   }
 
   /** Keeps the file's current content before it's replaced; the newest 20 stay. */
@@ -189,7 +216,11 @@ export class Folder {
     });
   }
 
-  async restore(rel: string, id: string) {
+  restore(rel: string, id: string) {
+    return this.oneAtATime(() => this.restoreNow(rel, id));
+  }
+
+  private async restoreNow(rel: string, id: string) {
     const data = await this.version(rel, id);
     const abs = await this.abs(rel);
     if (await fs.stat(abs).catch(() => null)) await this.keep(rel, abs);

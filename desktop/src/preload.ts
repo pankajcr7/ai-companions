@@ -17,5 +17,11 @@ if (allowed) {
     showFolder: (projectId: string) => call("showFolder", projectId),
     forget: (projectId: string) => call("forget", projectId),
     retry: () => call("retry"),
+    /** File → Open Folder… in the app's menu hands the picked folder to the page. */
+    onOpenFolder: (cb: (folder: string) => void) => {
+      const listener = (_e: unknown, folder: string) => cb(folder);
+      ipcRenderer.on("agent:open-folder", listener);
+      return () => void ipcRenderer.removeListener("agent:open-folder", listener);
+    },
   });
 }

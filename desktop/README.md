@@ -19,8 +19,9 @@ click **More info**, then **Run anyway**.
 
 ## Opening a folder
 
-On the Projects page, click **Open folder** and pick a folder. It becomes a project, and its files stay in the
-folder: nothing is uploaded.
+Choose **File → Open Folder…** (⌘O on Mac, Ctrl+O on Windows), or **Open folder** on the Projects page, and pick a
+folder. It becomes a project, and its files stay in the folder: nothing is uploaded. Opening the same folder again
+goes back to the same project.
 
 - Your AI team reads and edits the files right there, while the app is open. Keep the folder open in VS Code,
   Finder or Explorer at the same time; the project page and the preview show the latest files.
